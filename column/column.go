@@ -58,10 +58,13 @@ type ColDef[T any] struct {
 	LockPinned bool         // Prevent user from changing pin state.
 
 	// Cell rendering
-	CellStyle func(value any, data T) lipgloss.Style // Per-cell styling.
+	CellRenderer         any                                   // Custom renderer (implements cell.CellRenderer[T]).
+	CellRendererSelector func(T) any                           // Dynamic renderer per row (returns cell.CellRenderer[T]).
+	CellStyle            func(value any, data T) lipgloss.Style // Per-cell styling.
 
 	// Cell editing
 	Editable    bool                      // Default: false.
+	CellEditor  any                       // Custom editor (implements cell.CellEditor[T]).
 	ValueSetter func(data *T, value any)  // Write the edited value back.
 
 	// Column spanning
@@ -111,6 +114,9 @@ func Columns[T any]() []ColDef[T] {
 			ValueGetter: func(data T) any {
 				v := reflect.ValueOf(data)
 				if v.Kind() == reflect.Ptr {
+					if v.IsNil() {
+						return nil
+					}
 					v = v.Elem()
 				}
 				return v.Field(idx).Interface()

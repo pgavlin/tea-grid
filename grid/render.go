@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pgavlin/tea-grid/cell"
 	"github.com/pgavlin/tea-grid/column"
 	"github.com/pgavlin/tea-grid/row"
 )
@@ -301,8 +302,37 @@ func (m Model[T]) renderCells(rn *row.RowNode[T], colIndices []int, displayIndex
 			style = col.CellStyle(val, rn.Data)
 		}
 
-		// Use custom renderer if available or default text rendering
+		// Use custom renderer if available, otherwise default to formatted text
 		cellContent := formatted
+		ctx := cell.CellContext[T]{
+			Value:          val,
+			FormattedValue: formatted,
+			Data:           rn.Data,
+			RowNode:        rn,
+			ColDef:         &col,
+			ColIndex:       idx,
+			RowIndex:       displayIndex,
+			IsSelected:     isSelected,
+			IsFocused:      isFocused,
+			Width:          w,
+			Height:         1,
+		}
+
+		var renderer cell.CellRenderer[T]
+		if col.CellRendererSelector != nil {
+			if r, ok := col.CellRendererSelector(rn.Data).(cell.CellRenderer[T]); ok {
+				renderer = r
+			}
+		}
+		if renderer == nil && col.CellRenderer != nil {
+			if r, ok := col.CellRenderer.(cell.CellRenderer[T]); ok {
+				renderer = r
+			}
+		}
+		if renderer != nil {
+			cellContent = renderer.Render(ctx)
+		}
+
 		cells = append(cells, style.Width(w).MaxWidth(w).Render(cellContent))
 	}
 

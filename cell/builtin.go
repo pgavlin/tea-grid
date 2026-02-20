@@ -239,6 +239,9 @@ func (e *TextEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
 			e.cursor = 0
 		case tea.KeyEnd, tea.KeyCtrlE:
 			e.cursor = len(e.value)
+		case tea.KeySpace:
+			e.value = e.value[:e.cursor] + " " + e.value[e.cursor:]
+			e.cursor++
 		case tea.KeyRunes:
 			e.value = e.value[:e.cursor] + string(msg.Runes) + e.value[e.cursor:]
 			e.cursor += len(msg.Runes)
@@ -248,7 +251,11 @@ func (e *TextEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
 }
 
 func (e *TextEditorModel[T]) View() string {
-	return e.value
+	runes := []rune(e.value)
+	if e.cursor >= len(runes) {
+		return e.value + "█"
+	}
+	return string(runes[:e.cursor]) + "█" + string(runes[e.cursor:])
 }
 
 func (e *TextEditorModel[T]) Value() any {
@@ -439,6 +446,7 @@ func (e *BoolEditorModel[T]) Validate() string {
 // TimeEditorModel edits time.Time values via text input.
 type TimeEditorModel[T any] struct {
 	text     string
+	cursor   int
 	parseErr string
 }
 
@@ -467,6 +475,7 @@ func (e *TimeEditorModel[T]) Init(ctx CellContext[T]) tea.Cmd {
 	} else {
 		e.text = ctx.FormattedValue
 	}
+	e.cursor = len(e.text)
 	return nil
 }
 
@@ -474,11 +483,32 @@ func (e *TimeEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.Type {
 		case tea.KeyBackspace:
-			if len(e.text) > 0 {
-				e.text = e.text[:len(e.text)-1]
+			if e.cursor > 0 {
+				e.text = e.text[:e.cursor-1] + e.text[e.cursor:]
+				e.cursor--
 			}
+		case tea.KeyDelete:
+			if e.cursor < len(e.text) {
+				e.text = e.text[:e.cursor] + e.text[e.cursor+1:]
+			}
+		case tea.KeyLeft:
+			if e.cursor > 0 {
+				e.cursor--
+			}
+		case tea.KeyRight:
+			if e.cursor < len(e.text) {
+				e.cursor++
+			}
+		case tea.KeyHome, tea.KeyCtrlA:
+			e.cursor = 0
+		case tea.KeyEnd, tea.KeyCtrlE:
+			e.cursor = len(e.text)
+		case tea.KeySpace:
+			e.text = e.text[:e.cursor] + " " + e.text[e.cursor:]
+			e.cursor++
 		case tea.KeyRunes:
-			e.text += string(msg.Runes)
+			e.text = e.text[:e.cursor] + string(msg.Runes) + e.text[e.cursor:]
+			e.cursor += len(msg.Runes)
 		}
 		e.parseErr = ""
 	}
@@ -486,10 +516,15 @@ func (e *TimeEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
 }
 
 func (e *TimeEditorModel[T]) View() string {
+	suffix := ""
 	if e.parseErr != "" {
-		return e.text + " (" + e.parseErr + ")"
+		suffix = " (" + e.parseErr + ")"
 	}
-	return e.text
+	runes := []rune(e.text)
+	if e.cursor >= len(runes) {
+		return e.text + "█" + suffix
+	}
+	return string(runes[:e.cursor]) + "█" + string(runes[e.cursor:]) + suffix
 }
 
 func (e *TimeEditorModel[T]) Value() any {

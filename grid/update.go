@@ -397,19 +397,42 @@ func (m Model[T]) startEditing() (tea.Model, tea.Cmd) {
 		val = col.ValueGetter(rn.Data)
 	}
 
-	// Use column's editor or default text editor
-	var editor interface{} = nil
-	_ = editor
+	// Format value for context
+	formatted := fmt.Sprintf("%v", val)
+	if col.ValueFormatter != nil {
+		formatted = col.ValueFormatter(val, rn.Data)
+	}
 
-	// Create a text editor as default
-	textEditor := &defaultTextEditor[T]{}
-	textEditor.init(val)
+	ctx := cell.CellContext[T]{
+		Value:          val,
+		FormattedValue: formatted,
+		Data:           rn.Data,
+		RowNode:        &rn,
+		ColDef:         &col,
+		ColIndex:       pos.Col,
+		RowIndex:       pos.Row,
+		Width:          m.colWidths[pos.Col],
+	}
+
+	// Use column's editor or default text editor
+	var editor cell.CellEditor[T]
+	if col.CellEditor != nil {
+		if ce, ok := col.CellEditor.(cell.CellEditor[T]); ok {
+			editor = ce
+		}
+	}
+	if editor == nil {
+		editor = cell.NewTextEditor[T]()
+	}
+	cmd := editor.Init(ctx)
 
 	m.editState = &editState[T]{
 		position: pos,
-		editor:   textEditor,
+		editor:   editor,
 		oldValue: val,
 	}
+
+	_ = cmd
 
 	return m, func() tea.Msg {
 		return CellEditingStartedMsg{Position: pos}
@@ -468,46 +491,6 @@ func (m Model[T]) toggleCurrentGroup() (tea.Model, tea.Cmd) {
 		return m.collapseCurrentGroup()
 	}
 	return m.expandCurrentGroup()
-}
-
-// defaultTextEditor is a simple text editor used when no custom editor is specified.
-type defaultTextEditor[T any] struct {
-	text string
-}
-
-func (e *defaultTextEditor[T]) init(val any) {
-	e.text = fmt.Sprintf("%v", val)
-}
-
-func (e *defaultTextEditor[T]) Init(ctx cell.CellContext[T]) tea.Cmd {
-	e.text = ctx.FormattedValue
-	return nil
-}
-
-func (e *defaultTextEditor[T]) Update(msg tea.Msg) (cell.CellEditor[T], tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch msg.Type {
-		case tea.KeyBackspace:
-			if len(e.text) > 0 {
-				e.text = e.text[:len(e.text)-1]
-			}
-		case tea.KeyRunes:
-			e.text += string(msg.Runes)
-		}
-	}
-	return e, nil
-}
-
-func (e *defaultTextEditor[T]) View() string {
-	return e.text
-}
-
-func (e *defaultTextEditor[T]) Value() any {
-	return e.text
-}
-
-func (e *defaultTextEditor[T]) Validate() string {
-	return ""
 }
 
 // ensure imports are used
