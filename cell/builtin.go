@@ -203,6 +203,7 @@ func (r ProgressRenderer[T]) Render(ctx CellContext[T]) string {
 type TextEditorModel[T any] struct {
 	value string
 	cursor int
+	width  int
 }
 
 func NewTextEditor[T any]() *TextEditorModel[T] {
@@ -212,6 +213,7 @@ func NewTextEditor[T any]() *TextEditorModel[T] {
 func (e *TextEditorModel[T]) Init(ctx CellContext[T]) tea.Cmd {
 	e.value = ctx.FormattedValue
 	e.cursor = len(e.value)
+	e.width = ctx.Width
 	return nil
 }
 
@@ -251,11 +253,7 @@ func (e *TextEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
 }
 
 func (e *TextEditorModel[T]) View() string {
-	runes := []rune(e.value)
-	if e.cursor >= len(runes) {
-		return e.value + "█"
-	}
-	return string(runes[:e.cursor]) + "█" + string(runes[e.cursor:])
+	return renderEditorLine(e.value, e.cursor, e.width, "")
 }
 
 func (e *TextEditorModel[T]) Value() any {
@@ -447,6 +445,7 @@ func (e *BoolEditorModel[T]) Validate() string {
 type TimeEditorModel[T any] struct {
 	text     string
 	cursor   int
+	width    int
 	parseErr string
 }
 
@@ -476,6 +475,7 @@ func (e *TimeEditorModel[T]) Init(ctx CellContext[T]) tea.Cmd {
 		e.text = ctx.FormattedValue
 	}
 	e.cursor = len(e.text)
+	e.width = ctx.Width
 	return nil
 }
 
@@ -520,11 +520,7 @@ func (e *TimeEditorModel[T]) View() string {
 	if e.parseErr != "" {
 		suffix = " (" + e.parseErr + ")"
 	}
-	runes := []rune(e.text)
-	if e.cursor >= len(runes) {
-		return e.text + "█" + suffix
-	}
-	return string(runes[:e.cursor]) + "█" + string(runes[e.cursor:]) + suffix
+	return renderEditorLine(e.text, e.cursor, e.width, suffix)
 }
 
 func (e *TimeEditorModel[T]) Value() any {
@@ -547,6 +543,79 @@ func (e *TimeEditorModel[T]) Validate() string {
 }
 
 // --- Helpers ---
+
+// cursorStyle inverts foreground and background to render the cursor.
+var cursorStyle = lipgloss.NewStyle().Reverse(true)
+
+// renderEditorLine renders a single-line editor value as a viewport of the
+// given width, ensuring the cursor is always visible. The cursor character is
+// rendered with inverted colors. suffix is appended after the viewport (e.g.
+// an error message) and counts against the available width.
+func renderEditorLine(value string, cursor, width int, suffix string) string {
+	if width <= 0 {
+		return ""
+	}
+
+	// Reserve space for suffix
+	suffixRunes := []rune(suffix)
+	viewWidth := width - len(suffixRunes)
+	if viewWidth < 1 {
+		viewWidth = 1
+	}
+
+	runes := []rune(value)
+
+	// Determine the cursor rune (space if at end of value)
+	var cursorRune rune = ' '
+	if cursor < len(runes) {
+		cursorRune = runes[cursor]
+	}
+
+	// Compute viewport window [start, start+viewWidth) that keeps cursor visible.
+	// The cursor must fall within [start, start+viewWidth).
+	start := 0
+	if cursor >= viewWidth {
+		start = cursor - viewWidth + 1
+	}
+
+	end := start + viewWidth
+	if end > len(runes)+1 { // +1 to account for cursor-at-end space
+		end = len(runes) + 1
+	}
+
+	// Build the visible portion
+	var before, after string
+	if start < len(runes) {
+		beforeEnd := cursor
+		if beforeEnd > len(runes) {
+			beforeEnd = len(runes)
+		}
+		if start < beforeEnd {
+			before = string(runes[start:beforeEnd])
+		}
+	}
+
+	afterStart := cursor + 1
+	if afterStart < len(runes) {
+		afterEnd := end
+		if afterEnd > len(runes) {
+			afterEnd = len(runes)
+		}
+		if afterStart < afterEnd {
+			after = string(runes[afterStart:afterEnd])
+		}
+	}
+
+	rendered := before + cursorStyle.Render(string(cursorRune)) + after
+
+	// Pad to fill viewport width if needed
+	visibleLen := len([]rune(before)) + 1 + len([]rune(after))
+	if visibleLen < viewWidth {
+		rendered += strings.Repeat(" ", viewWidth-visibleLen)
+	}
+
+	return rendered + suffix
+}
 
 func truncateOrPad(s string, width int) string {
 	if width <= 0 {
