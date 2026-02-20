@@ -1,0 +1,12 @@
+{"name": "Alice", "age": 30, "email": "alice@example.com", "active": true}
+{"name": "Bob", "age": 25, "email": "bob@example.com", "active": false, "score": 88.5}
+{"name": "Widget", "price": 9.99, "in_stock": true, "category": "Tools"}
+{"name": "Gadget", "price": 24.50, "in_stock": false, "category": "Electronics"}
+{"name": "GoConf", "date": "2025-06-15", "attendees": 500, "category": "Conference"}
+{"name": "HackDay", "date": "2025-09-01", "attendees": 120, "category": "Hackathon"}
+{"name": "Carol", "age": 42, "email": "carol@example.com", "active": true, "score": 95.2}
+{"name": "Doohickey", "price": 4.75, "in_stock": true, "category": "Tools"}
+{"name": "MeetUp", "date": "2025-03-10", "attendees": 45, "category": "Meetup"}
+{"name": "Dave", "age": 37, "email": "dave@example.com", "active": true}
+{"name": "Eve", "age": 28, "email": "eve@example.com", "active": false, "score": 72.0}
+{"name": "Thingamajig", "price": 149.99, "in_stock": false, "category": "Electronics"}
