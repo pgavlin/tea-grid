@@ -88,7 +88,7 @@ github.com/charmbracelet/tea-grid/
 │   └── builtin.go   # Built-in renderers/editors
 ├── filter/          # Filtering subsystem
 │   ├── filter.go    # Filter interface
-│   └── builtin.go   # Text, Number, Set filters
+│   └── builtin.go   # Text, Number, Set, Bool, Time filters
 ├── sort/            # Sorting subsystem
 │   └── sort.go      # SortModel, Comparator
 ├── selection/       # Selection subsystem
@@ -159,12 +159,11 @@ package column
 // ColDef defines a single column in the grid.
 type ColDef[T any] struct {
     // Identity
-    ColID      string  // Unique identifier. Defaults to Field if empty.
+    ColID      string  // Unique identifier. Required.
     HeaderName string  // Display name in the header row.
 
     // Data access
-    Field       string              // Dot-path into T for simple structs (via reflect).
-    ValueGetter func(T) any         // Programmatic value extraction (overrides Field).
+    ValueGetter func(T) any         // Extracts the cell value from the row data. Required.
     ValueFormatter func(value any, data T) string // Format the value for display.
 
     // Sizing
@@ -209,6 +208,17 @@ type ColDef[T any] struct {
     Hide bool // If true, column is not rendered.
 }
 
+// Columns returns a []ColDef[T] derived from T's exported struct fields.
+// For each exported field, it produces a ColDef with:
+//   - ColID and HeaderName set to the field name
+//   - ValueGetter set to a function that retrieves the field's value from T
+// This is a convenience for the common case where the column list mirrors the
+// struct layout. Callers can modify the returned slice to customize individual
+// columns (e.g., override HeaderName, set Width, attach a Filter, etc.).
+//
+// Panics if T is not a struct type.
+func Columns[T any]() []ColDef[T]
+
 type PinDirection int
 
 const (
@@ -228,13 +238,13 @@ const (
 
 **Column Groups**
 
-Column groups produce multi-level headers:
+Column groups produce a single level of grouped headers. Each group spans its
+child columns with a shared header label:
 
 ```go
 type ColGroup[T any] struct {
     HeaderName string
     Children   []ColDef[T]   // Leaf columns in this group.
-    // Groups can nest: a ColGroup can also appear as a child of another group.
 }
 ```
 
@@ -395,12 +405,13 @@ type Filter interface {
 
 Built-in filters:
 
-| Filter           | Description                                   | UI              |
-|------------------|-----------------------------------------------|-----------------|
-| `TextFilter`     | Substring / regex match on string values.     | Text input      |
-| `NumberFilter`   | Comparison operators (=, !=, <, >, <=, >=).   | Text input      |
-| `SetFilter`      | Include/exclude from a set of distinct values. | Checkbox list   |
-| `BoolFilter`     | True / false / any.                           | Toggle          |
+| Filter           | Description                                                          | UI              |
+|------------------|----------------------------------------------------------------------|-----------------|
+| `TextFilter`     | Substring / regex match on string values.                            | Text input      |
+| `NumberFilter`   | Comparison operators (=, !=, <, >, <=, >=) or range (e.g. `10..50`).| Text input      |
+| `SetFilter`      | Include/exclude from a set of distinct values.                       | Checkbox list   |
+| `BoolFilter`     | True / false / any.                                                  | Toggle          |
+| `TimeFilter`     | Date/time range filter. Accepts a start..end range as text input. Parses dates in common human-readable formats (e.g. `2024-01-01`, `Jan 2 2024`) as well as RFC1123Z. Either bound may be omitted for an open-ended range (e.g. `2024-01-01..` or `..2024-06-30`). | Text input |
 
 **5.4.2 Quick Filter**
 
@@ -533,14 +544,15 @@ func (f CellRendererFunc[T]) Render(ctx CellContext[T]) string {
 
 **Built-in renderers:**
 
-| Renderer              | Description                                    |
-|-----------------------|------------------------------------------------|
-| `TextRenderer`        | Default. Truncates/pads text to fit width.     |
-| `NumberRenderer`      | Right-aligned, optional thousands separator.   |
-| `BarRenderer`         | Renders a horizontal bar proportional to value.|
-| `SparklineRenderer`   | Inline sparkline for numeric series.           |
-| `BoolRenderer`        | Renders `✓` / `✗` or custom true/false glyphs.|
-| `ProgressRenderer`    | Mini progress bar within the cell.             |
+| Renderer              | Description                                                      |
+|-----------------------|------------------------------------------------------------------|
+| `TextRenderer`        | Default. Truncates/pads text to fit width.                       |
+| `NumberRenderer`      | Right-aligned, optional thousands separator.                     |
+| `TimeRenderer`        | Renders `time.Time` values. Configurable format string (default: `2006-01-02 15:04`). Supports relative display (e.g. "2h ago") via an optional `Relative bool` flag. |
+| `BarRenderer`         | Renders a horizontal bar proportional to value.                  |
+| `SparklineRenderer`   | Inline sparkline for numeric series.                             |
+| `BoolRenderer`        | Renders `✓` / `✗` or custom true/false glyphs.                  |
+| `ProgressRenderer`    | Mini progress bar within the cell.                               |
 
 #### 5.7 Cell Editing
 
@@ -577,6 +589,7 @@ type CellEditor[T any] interface {
 | `NumberEditor`    | Numeric input with optional min/max/step.            |
 | `SelectEditor`    | Cycle through a list of options.                     |
 | `BoolEditor`      | Toggle true/false.                                   |
+| `TimeEditor`      | Text input for `time.Time` values. Accepts human-readable formats (e.g. `Jan 2 2024 3:04pm`, `2024-01-02 15:04`) and RFC1123Z (`Mon, 02 Jan 2006 15:04:05 -0700`). Validates on confirm and displays a parse error if the input is not recognized. |
 
 **Editing lifecycle:**
 
@@ -1057,7 +1070,7 @@ The `View()` method follows this pipeline:
    ├─ If group row: render group row with indent + expand indicator
    └─ If data row:
       For each visible column:
-      ├─ Get value: ValueGetter or reflect on Field
+      ├─ Get value: ValueGetter(data)
       ├─ Format: ValueFormatter
       ├─ Render: CellRenderer or default TextRenderer
       ├─ Apply style: CellStyle, then Styles.Cell/Selected/Focused
@@ -1159,36 +1172,40 @@ type Employee struct {
 func main() {
     cols := []column.ColDef[Employee]{
         {
-            Field:      "Name",
-            HeaderName: "Employee Name",
-            Pinned:     column.PinLeft,
-            MinWidth:   20,
-            Flex:       2,
-            Filterable: true,
-            Filter:     filter.NewTextFilter(),
+            ColID:       "name",
+            HeaderName:  "Employee Name",
+            ValueGetter: func(e Employee) any { return e.Name },
+            Pinned:      column.PinLeft,
+            MinWidth:    20,
+            Flex:        2,
+            Filterable:  true,
+            Filter:      filter.NewTextFilter(),
         },
         {
-            Field:      "Department",
-            HeaderName: "Dept",
-            Width:      15,
-            Sortable:   true,
-            RowGroup:   true,
-            Filter:     filter.NewSetFilter(),
+            ColID:       "department",
+            HeaderName:  "Dept",
+            ValueGetter: func(e Employee) any { return e.Department },
+            Width:       15,
+            Sortable:    true,
+            RowGroup:    true,
+            Filter:      filter.NewSetFilter(),
         },
         {
-            Field:      "Salary",
-            HeaderName: "Salary",
-            Width:      12,
-            Sortable:   true,
+            ColID:       "salary",
+            HeaderName:  "Salary",
+            ValueGetter: func(e Employee) any { return e.Salary },
+            Width:       12,
+            Sortable:    true,
             ValueFormatter: func(v any, _ Employee) string {
                 return fmt.Sprintf("$%,.0f", v.(float64))
             },
             AggFunc: "sum",
         },
         {
-            Field:      "Active",
-            HeaderName: "Active",
-            Width:      8,
+            ColID:       "active",
+            HeaderName:  "Active",
+            ValueGetter: func(e Employee) any { return e.Active },
+            Width:       8,
             CellRenderer: cell.BoolRenderer[Employee]{
                 TrueGlyph:  "✓",
                 FalseGlyph: "✗",
@@ -1268,19 +1285,25 @@ These features are explicitly deferred but the architecture accommodates them:
 
 ---
 
-### 16. Open Questions
+### 16. Design Decisions
 
-1. **Generics constraint**: Should `T` be constrained beyond `any`? A `comparable`
-   constraint would simplify row identity but limits flexibility. The current design
-   uses `WithRowID(func(T) string)` to avoid this.
+1. **Generics constraint**: `T` is constrained to `any`. Row identity is handled via
+   `WithRowID(func(T) string)` rather than requiring `comparable`. This keeps the API
+   flexible for users whose row types contain slices, maps, or other non-comparable
+   fields.
 
-2. **Reflect vs. explicit**: The `Field` string approach uses reflection to access
-   struct fields. This is convenient but slow and loses type safety. Should we
-   require `ValueGetter` for all columns and drop `Field` entirely?
+2. **No reflection for data access**: The `Field` string path has been dropped.
+   `ValueGetter` is required on every `ColDef`. The convenience function
+   `Columns[T]()` uses reflection once at init time to generate a default column list
+   with pre-built `ValueGetter` functions, so users who want the simple struct-mirroring
+   behavior get it without per-access reflection cost.
 
-3. **Nested column groups**: AG Grid supports arbitrary nesting of column groups.
-   For v1, should we limit to a single level of grouping to simplify header rendering?
+3. **Single-level column groups**: For v1, `ColGroup` supports only one level of
+   grouping (a group header spanning its child columns). Nested column groups are
+   deferred to a future version. This simplifies header rendering and keyboard
+   navigation in the header region.
 
-4. **lipgloss/table reuse**: The static `lipgloss/table` package handles border
-   rendering well. Should the grid's render pipeline delegate to it for each
-   viewport frame, or is the overhead too high for interactive use?
+4. **Custom border rendering**: The grid implements its own border rendering rather
+   than delegating to `lipgloss/table`. This avoids the overhead of reconstructing a
+   `lipgloss/table.Table` on every frame and gives full control over border drawing
+   in the presence of pinned regions, column spanning, and virtual scrolling.
