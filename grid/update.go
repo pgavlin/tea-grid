@@ -183,6 +183,35 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+	// Sort column from any row
+	case key.Matches(msg, m.KeyMap.SortColumn):
+		if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
+			col := m.cols[m.focusedCell.Col]
+			if col.Sortable {
+				m.sortModel.ToggleSort(col.ColID)
+				m.dirty = true
+				m.recomputeDisplayRows()
+				if m.onSortChanged != nil {
+					m.onSortChanged(m.sortModel.SortOrder)
+				}
+			}
+		}
+		return m, nil
+
+	case key.Matches(msg, m.KeyMap.MultiSortColumn):
+		if m.sortModel.MultiSort && m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
+			col := m.cols[m.focusedCell.Col]
+			if col.Sortable {
+				m.sortModel.AddSort(col.ColID)
+				m.dirty = true
+				m.recomputeDisplayRows()
+				if m.onSortChanged != nil {
+					m.onSortChanged(m.sortModel.SortOrder)
+				}
+			}
+		}
+		return m, nil
+
 	// Quick filter
 	case key.Matches(msg, m.KeyMap.QuickFilter):
 		if m.quickFilterEnabled {

@@ -31,6 +31,10 @@ type KeyMap struct {
 	ToggleSort      key.Binding
 	ToggleMultiSort key.Binding
 
+	// Sorting (from any row)
+	SortColumn      key.Binding
+	MultiSortColumn key.Binding
+
 	// Editing
 	StartEdit   key.Binding
 	ConfirmEdit key.Binding
@@ -121,6 +125,14 @@ func DefaultKeyMap() KeyMap {
 		ToggleMultiSort: key.NewBinding(
 			key.WithKeys("shift+enter"),
 			key.WithHelp("shift+enter", "multi-sort"),
+		),
+		SortColumn: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "sort column"),
+		),
+		MultiSortColumn: key.NewBinding(
+			key.WithKeys("S"),
+			key.WithHelp("S", "multi-sort column"),
 		),
 		StartEdit: key.NewBinding(
 			key.WithKeys("enter", "f2"),
