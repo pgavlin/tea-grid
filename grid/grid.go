@@ -839,7 +839,7 @@ func (m *Model[T]) updateVisibleColCount() {
 		return
 	}
 
-	// Calculate how many center columns fit
+	// Calculate available space for center columns
 	available := m.width
 	// Subtract pinned column widths
 	for i, col := range m.cols {
@@ -851,10 +851,19 @@ func (m *Model[T]) updateVisibleColCount() {
 		}
 	}
 
+	// Count from leftCol, not from 0
+	start := m.vp.leftCol
+	if start >= len(center) {
+		start = len(center) - 1
+	}
+	if start < 0 {
+		start = 0
+	}
+
 	count := 0
 	used := 0
-	for _, idx := range center {
-		w := m.colWidths[idx]
+	for i := start; i < len(center); i++ {
+		w := m.colWidths[center[i]]
 		if m.styles.BorderColumn && count > 0 {
 			w++
 		}

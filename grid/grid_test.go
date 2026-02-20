@@ -1961,6 +1961,153 @@ func TestSelectedRowNodes(t *testing.T) {
 	}
 }
 
+// -----------------------------------------------------------------------
+// Horizontal Scrolling Tests
+// -----------------------------------------------------------------------
+
+func TestHorizontalScroll_ColumnsExceedViewport(t *testing.T) {
+	// Create columns whose MinWidths total > viewport width (80)
+	cols := []column.ColDef[TestRow]{
+		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, MinWidth: 30},
+		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, MinWidth: 30},
+		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, MinWidth: 30},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+
+	// Not all columns should be visible at once
+	if m.vp.visibleCols >= 3 {
+		t.Errorf("expected visibleCols < 3 (cols exceed viewport), got %d", m.vp.visibleCols)
+	}
+
+	// All columns should be reachable via navigation
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+	// Navigate right to column B (index 1)
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	if m.focusedCell.Col != 1 {
+		t.Errorf("expected col=1 after Right, got %d", m.focusedCell.Col)
+	}
+	// Navigate right to column C (index 2)
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	if m.focusedCell.Col != 2 {
+		t.Errorf("expected col=2 after second Right, got %d", m.focusedCell.Col)
+	}
+}
+
+func TestHorizontalScroll_LeftColUpdatesVisibleCols(t *testing.T) {
+	// Columns with varying widths; total exceeds viewport width
+	cols := []column.ColDef[TestRow]{
+		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 25},
+		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 25},
+		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 25},
+		{ColID: "D", HeaderName: "D", ValueGetter: func(r TestRow) any { return r.Active }, Width: 25},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+
+	// Width=80, 4 cols * 25 = 100 > 80, so not all visible
+	initialVisible := m.vp.visibleCols
+	if initialVisible >= 4 {
+		t.Fatalf("expected < 4 visible cols, got %d", initialVisible)
+	}
+
+	// Navigate right until leftCol changes
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+	for i := 0; i < 3; i++ {
+		m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	}
+
+	// After scrolling right, visibleCols should still be correct
+	// (recomputed from the new leftCol position)
+	if m.vp.visibleCols < 1 {
+		t.Error("expected at least 1 visible col after scrolling")
+	}
+}
+
+func TestHorizontalScroll_VaryingWidths(t *testing.T) {
+	// First column is very wide, rest are narrow
+	cols := []column.ColDef[TestRow]{
+		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 50},
+		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 10},
+		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 10},
+		{ColID: "D", HeaderName: "D", ValueGetter: func(r TestRow) any { return r.Active }, Width: 10},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+
+	// At leftCol=0, the wide column takes most space
+	visibleAt0 := m.vp.visibleCols
+
+	// Navigate right past the wide column
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+	for i := 0; i < 3; i++ {
+		m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	}
+
+	// After scrolling past the wide column, more narrow columns should fit
+	if m.vp.leftCol > 0 && m.vp.visibleCols <= visibleAt0 {
+		// When we've scrolled past the wide column, more columns should fit
+		// (unless we haven't scrolled enough for leftCol to change)
+		if m.vp.leftCol > 0 {
+			t.Logf("leftCol=%d, visibleCols at 0=%d, visibleCols now=%d",
+				m.vp.leftCol, visibleAt0, m.vp.visibleCols)
+		}
+	}
+
+	// Key invariant: we should be able to see the focused column
+	_, center, _ := m.visibleColIndices()
+	visibleCenter := m.visibleCenterCols(center)
+	found := false
+	for _, idx := range visibleCenter {
+		if idx == m.focusedCell.Col {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("focused column should always be in the visible center columns")
+	}
+}
+
+func TestUpdateVisibleColCount_CountsFromLeftCol(t *testing.T) {
+	// Set up a grid with fixed-width columns that exceed viewport
+	cols := []column.ColDef[TestRow]{
+		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 30},
+		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30},
+		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 30},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+
+	// At leftCol=0: 80/30 = 2 cols fit
+	m.vp.leftCol = 0
+	m.updateVisibleColCount()
+	visibleAt0 := m.vp.visibleCols
+	if visibleAt0 != 2 {
+		t.Errorf("expected 2 visible cols at leftCol=0, got %d", visibleAt0)
+	}
+
+	// At leftCol=1: starting from col B, still 2 cols of 30px each fit in 80px
+	m.vp.leftCol = 1
+	m.updateVisibleColCount()
+	visibleAt1 := m.vp.visibleCols
+	if visibleAt1 != 2 {
+		t.Errorf("expected 2 visible cols at leftCol=1, got %d", visibleAt1)
+	}
+
+	// At leftCol=2: only 1 col left (col C)
+	m.vp.leftCol = 2
+	m.updateVisibleColCount()
+	visibleAt2 := m.vp.visibleCols
+	if visibleAt2 != 1 {
+		t.Errorf("expected 1 visible col at leftCol=2, got %d", visibleAt2)
+	}
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a

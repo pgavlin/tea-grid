@@ -500,6 +500,7 @@ func (m Model[T]) moveFocus(newRow, newCol int) (tea.Model, tea.Cmd) {
 	for i, idx := range center {
 		if idx == newCol {
 			m.vp.ensureColVisible(i)
+			m.updateVisibleColCount()
 			break
 		}
 	}

@@ -163,7 +163,8 @@ func (m Model[T]) renderGroupHeaders() string {
 		cells = append(cells, renderGroupRegion(left))
 		cells = append(cells, m.styles.PinSeparator)
 	}
-	cells = append(cells, renderGroupRegion(center))
+	visibleCenter := m.visibleCenterCols(center)
+	cells = append(cells, renderGroupRegion(visibleCenter))
 	if len(right) > 0 {
 		cells = append(cells, m.styles.PinSeparator)
 		cells = append(cells, renderGroupRegion(right))
