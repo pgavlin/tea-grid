@@ -37,6 +37,20 @@ type Event struct {
 	Attendees int
 }
 
+type model struct {
+	grid grid.Model[Row]
+}
+
+func (m model) Init() tea.Cmd { return m.grid.Init() }
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.grid, cmd = m.grid.Update(msg)
+	return m, cmd
+}
+
+func (m model) View() string { return m.grid.View() }
+
 func nameGetter(r Row) string {
 	for _, elem := range r {
 		v := reflect.ValueOf(elem)
@@ -87,7 +101,7 @@ func main() {
 		grid.WithMultiSort[Row](true),
 	)
 
-	p := tea.NewProgram(g, tea.WithAltScreen())
+	p := tea.NewProgram(model{grid: g}, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

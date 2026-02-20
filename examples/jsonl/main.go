@@ -18,6 +18,20 @@ import (
 // Row is a JSON object decoded as a map.
 type Row = map[string]any
 
+type model struct {
+	grid grid.Model[Row]
+}
+
+func (m model) Init() tea.Cmd { return m.grid.Init() }
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.grid, cmd = m.grid.Update(msg)
+	return m, cmd
+}
+
+func (m model) View() string { return m.grid.View() }
+
 // loadJSONL reads a JSONL file and returns a slice of Row.
 // Non-object lines and blank lines are skipped.
 func loadJSONL(path string) ([]Row, error) {
@@ -91,7 +105,7 @@ func main() {
 		grid.WithMultiSort[Row](true),
 	)
 
-	p := tea.NewProgram(g, tea.WithAltScreen())
+	p := tea.NewProgram(model{grid: g}, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

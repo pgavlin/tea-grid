@@ -7,12 +7,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/pgavlin/tea-grid/cell"
-	"github.com/pgavlin/tea-grid/column"
 	"github.com/pgavlin/tea-grid/filter"
 )
 
-// Update handles messages. Implements tea.Model.
-func (m Model[T]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update handles messages and returns the updated model.
+func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -51,7 +50,7 @@ func (m Model[T]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleKeyMsg handles key messages in normal (non-editing) mode.
-func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	visibleCols := m.visibleCols()
 	totalRows := len(m.displayRows)
 
@@ -269,7 +268,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleEditKeyMsg handles key messages while editing a cell.
-func (m Model[T]) handleEditKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model[T]) handleEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.KeyMap.ConfirmEdit):
 		// Validate and confirm
@@ -323,7 +322,7 @@ func (m Model[T]) handleEditKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleQuickFilterKeyMsg handles key messages while the quick filter is active.
-func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.quickFilterActive = false
@@ -358,7 +357,7 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleFilterEditKeyMsg handles key messages while the column filter editor is active.
-func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	colIdx := m.filterEditColIdx
 	if colIdx < 0 || colIdx >= len(m.cols) {
 		m.filterEditColIdx = -1
@@ -401,7 +400,7 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // startFilterEdit begins editing the column filter for the focused column.
-func (m Model[T]) startFilterEdit() (tea.Model, tea.Cmd) {
+func (m Model[T]) startFilterEdit() (Model[T], tea.Cmd) {
 	colIdx := m.focusedCell.Col
 	if colIdx < 0 || colIdx >= len(m.cols) {
 		return m, nil
@@ -441,7 +440,7 @@ func (m Model[T]) startFilterEdit() (tea.Model, tea.Cmd) {
 }
 
 // moveFocus moves the focus to a new position, clamping to valid bounds.
-func (m Model[T]) moveFocus(newRow, newCol int) (tea.Model, tea.Cmd) {
+func (m Model[T]) moveFocus(newRow, newCol int) (Model[T], tea.Cmd) {
 	prev := m.focusedCell
 
 	// Clamp row: -1 = header, 0..len-1 = data rows
@@ -515,7 +514,7 @@ func (m Model[T]) moveFocus(newRow, newCol int) (tea.Model, tea.Cmd) {
 }
 
 // startEditing begins editing the currently focused cell.
-func (m Model[T]) startEditing() (tea.Model, tea.Cmd) {
+func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 	if !m.editable {
 		return m, nil
 	}
@@ -587,7 +586,7 @@ func (m Model[T]) startEditing() (tea.Model, tea.Cmd) {
 }
 
 // expandCurrentGroup expands the currently focused group.
-func (m Model[T]) expandCurrentGroup() (tea.Model, tea.Cmd) {
+func (m Model[T]) expandCurrentGroup() (Model[T], tea.Cmd) {
 	if m.focusedCell.Row < 0 || m.focusedCell.Row >= len(m.displayRows) {
 		return m, nil
 	}
@@ -606,7 +605,7 @@ func (m Model[T]) expandCurrentGroup() (tea.Model, tea.Cmd) {
 }
 
 // collapseCurrentGroup collapses the currently focused group.
-func (m Model[T]) collapseCurrentGroup() (tea.Model, tea.Cmd) {
+func (m Model[T]) collapseCurrentGroup() (Model[T], tea.Cmd) {
 	if m.focusedCell.Row < 0 || m.focusedCell.Row >= len(m.displayRows) {
 		return m, nil
 	}
@@ -625,7 +624,7 @@ func (m Model[T]) collapseCurrentGroup() (tea.Model, tea.Cmd) {
 }
 
 // toggleCurrentGroup toggles the expand/collapse state of the focused group.
-func (m Model[T]) toggleCurrentGroup() (tea.Model, tea.Cmd) {
+func (m Model[T]) toggleCurrentGroup() (Model[T], tea.Cmd) {
 	if m.focusedCell.Row < 0 || m.focusedCell.Row >= len(m.displayRows) {
 		return m, nil
 	}
@@ -639,6 +638,3 @@ func (m Model[T]) toggleCurrentGroup() (tea.Model, tea.Cmd) {
 	}
 	return m.expandCurrentGroup()
 }
-
-// ensure imports are used
-var _ = column.SortAsc

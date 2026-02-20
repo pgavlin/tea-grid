@@ -25,6 +25,20 @@ type Stock struct {
 	YTD      float64
 }
 
+type model struct {
+	grid grid.Model[Stock]
+}
+
+func (m model) Init() tea.Cmd { return m.grid.Init() }
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.grid, cmd = m.grid.Update(msg)
+	return m, cmd
+}
+
+func (m model) View() string { return m.grid.View() }
+
 func main() {
 	cols := []column.ColDef[Stock]{
 		{ColID: "ticker", HeaderName: "Ticker", ValueGetter: func(s Stock) any { return s.Ticker }, Width: 8, Pinned: column.PinLeft, Sortable: true},
@@ -67,7 +81,7 @@ func main() {
 		grid.WithMultiSort[Stock](true),
 	)
 
-	p := tea.NewProgram(g, tea.WithAltScreen())
+	p := tea.NewProgram(model{grid: g}, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

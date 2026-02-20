@@ -53,14 +53,14 @@ func newTestGrid(opts ...Option[TestRow]) Model[TestRow] {
 	}
 	m := New(append(defaults, opts...)...)
 	// Apply WindowSizeMsg so ready=true and column widths computed
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-	return updated.(Model[TestRow])
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	return m
 }
 
 // sendKey sends a single key message and returns the updated model.
 func sendKey(m Model[TestRow], k tea.KeyMsg) Model[TestRow] {
-	updated, _ := m.Update(k)
-	return updated.(Model[TestRow])
+	m, _ = m.Update(k)
+	return m
 }
 
 // -----------------------------------------------------------------------
@@ -398,8 +398,7 @@ func TestUpdateRow(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-	m = updated.(Model[TestRow])
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 
 	m.UpdateRow("Alice", TestRow{"Alice", "Management", 150000, true})
 	rows := m.Rows()
@@ -441,8 +440,7 @@ func TestRemoveRow(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-	m = updated.(Model[TestRow])
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 
 	before := len(m.rows)
 	m.RemoveRow("Bob")
@@ -926,8 +924,7 @@ func TestNavigation_WindowSizeMsgSetsReady(t *testing.T) {
 	if m.ready {
 		t.Error("expected ready=false before WindowSizeMsg")
 	}
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-	m = updated.(Model[TestRow])
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	if !m.ready {
 		t.Error("expected ready=true after WindowSizeMsg")
 	}
@@ -1392,8 +1389,7 @@ func TestRender_SortIndicators(t *testing.T) {
 		{ColID: "Name", Direction: column.SortDesc},
 	})
 	// Need to recompute view via WindowSizeMsg to ensure colwidths recalculated
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-	m = updated.(Model[TestRow])
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	output = m.View()
 	if !strings.Contains(output, m.styles.SortDesc) {
 		t.Errorf("expected sort desc indicator %q in output", m.styles.SortDesc)
@@ -1485,8 +1481,7 @@ func TestPublicAPI_SelectedRows(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-	m = updated.(Model[TestRow])
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 
 	m.SelectRow("Alice")
 	m.SelectRow("Carol")
@@ -1667,8 +1662,7 @@ func TestPublicAPI_PinUnpinRow(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-	m = updated.(Model[TestRow])
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 
 	m.PinRow("Alice", row.PinTop)
 	// Recomputation should move Alice to pinnedTop
@@ -1848,8 +1842,7 @@ func TestInit_ReturnsNil(t *testing.T) {
 
 func TestUpdate_WindowSizeMsgUpdatesWidthHeight(t *testing.T) {
 	m := newTestGrid()
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model[TestRow])
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	if m.width != 120 {
 		t.Errorf("expected width=120, got %d", m.width)
 	}
@@ -1948,8 +1941,7 @@ func TestSelectedRowNodes(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-	m = updated.(Model[TestRow])
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 
 	m.SelectRow("Alice")
 	nodes := m.SelectedRowNodes()
