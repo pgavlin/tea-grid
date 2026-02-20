@@ -428,15 +428,9 @@ func (m Model[T]) startFilterEdit() (tea.Model, tea.Cmd) {
 		maxLines = 2
 	}
 
-	// Compute column width
-	colWidth := m.width
-	if colIdx < len(m.colWidths) {
-		colWidth = m.colWidths[colIdx]
-	}
-
 	// Send focus message to the filter
 	newFilter, cmd := col.Filter.Update(filter.FilterFocusMsg{
-		Width:    colWidth,
+		Width:    m.width,
 		MaxLines: maxLines,
 	})
 	m.cols[colIdx].Filter = newFilter
