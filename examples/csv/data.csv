@@ -1,0 +1,16 @@
+City,Country,Population,Area,Founded,Capital
+Tokyo,Japan,13960000,2194,1457,false
+Delhi,India,11035000,1484,736,false
+Shanghai,China,24870000,6341,751,false
+São Paulo,Brazil,12330000,1521,1554,false
+Mexico City,Mexico,9210000,1485,1325,true
+Cairo,Egypt,10230000,3085,969,true
+Mumbai,India,12480000,603,1507,false
+Beijing,China,21540000,16411,1045,true
+Dhaka,Bangladesh,8906000,306,1608,true
+Osaka,Japan,2750000,225,1583,false
+London,United Kingdom,8982000,1572,43,true
+Istanbul,Turkey,15460000,5461,660,false
+Buenos Aires,Argentina,3075000,203,1536,true
+Berlin,Germany,3645000,892,1237,true
+Sydney,Australia,5312000,12368,1788,false
