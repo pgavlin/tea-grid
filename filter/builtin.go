@@ -126,6 +126,10 @@ func (f *TextFilter) Active() bool {
 	return f.text != ""
 }
 
+func (f *TextFilter) Clear() {
+	f.SetText("")
+}
+
 // --- NumberFilter ---
 
 // NumberFilter performs comparison operations on numeric values.
@@ -289,6 +293,10 @@ func (f *NumberFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 
 func (f *NumberFilter) Active() bool {
 	return f.text != ""
+}
+
+func (f *NumberFilter) Clear() {
+	f.SetText("")
 }
 
 // --- SetFilter ---
@@ -533,6 +541,10 @@ func (f *SetFilter) Active() bool {
 	return false
 }
 
+func (f *SetFilter) Clear() {
+	f.IncludeAll()
+}
+
 // --- BoolFilter ---
 
 // BoolFilter filters true/false/any values.
@@ -616,6 +628,10 @@ func (f *BoolFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 
 func (f *BoolFilter) Active() bool {
 	return f.state != 0
+}
+
+func (f *BoolFilter) Clear() {
+	f.state = 0
 }
 
 // --- TimeFilter ---
@@ -775,6 +791,10 @@ func (f *TimeFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 
 func (f *TimeFilter) Active() bool {
 	return f.start != nil || f.end != nil
+}
+
+func (f *TimeFilter) Clear() {
+	f.SetText("")
 }
 
 // --- Helpers ---

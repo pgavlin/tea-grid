@@ -28,4 +28,7 @@ type Filter interface {
 
 	// Active returns true if the filter is currently constraining results.
 	Active() bool
+
+	// Clear resets the filter to its default (non-filtering) state.
+	Clear()
 }

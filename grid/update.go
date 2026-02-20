@@ -328,20 +328,7 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.KeyMap.CancelEdit):
 		// Clear the filter and close editor
-		switch f := col.Filter.(type) {
-		case *filter.TextFilter:
-			f.SetText("")
-		case *filter.NumberFilter:
-			f.SetText("")
-		case *filter.TimeFilter:
-			f.SetText("")
-		case *filter.SetFilter:
-			f.IncludeAll()
-		case *filter.BoolFilter:
-			for f.Active() {
-				f.Toggle()
-			}
-		}
+		col.Filter.Clear()
 		col.Filter.Update(filter.FilterBlurMsg{})
 		m.cols[colIdx] = col
 		m.filterEditColIdx = -1
