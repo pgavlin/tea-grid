@@ -16,7 +16,7 @@ import (
 type TextRenderer[T any] struct{}
 
 func (r TextRenderer[T]) Render(ctx CellContext[T]) string {
-	return truncateOrPad(ctx.FormattedValue, ctx.Width)
+	return TruncateOrPad(ctx.FormattedValue, ctx.Width)
 }
 
 // NumberRenderer is a right-aligned renderer with optional thousands separator.
@@ -47,7 +47,7 @@ type TimeRenderer[T any] struct {
 func (r TimeRenderer[T]) Render(ctx CellContext[T]) string {
 	t, ok := ctx.Value.(time.Time)
 	if !ok {
-		return truncateOrPad(ctx.FormattedValue, ctx.Width)
+		return TruncateOrPad(ctx.FormattedValue, ctx.Width)
 	}
 
 	var s string
@@ -60,7 +60,7 @@ func (r TimeRenderer[T]) Render(ctx CellContext[T]) string {
 		}
 		s = t.Format(format)
 	}
-	return truncateOrPad(s, ctx.Width)
+	return TruncateOrPad(s, ctx.Width)
 }
 
 // BarRenderer renders a horizontal bar proportional to value.
@@ -94,7 +94,7 @@ func (r BarRenderer[T]) Render(ctx CellContext[T]) string {
 	if r.Style.Value() != "" {
 		bar = r.Style.Render(bar)
 	}
-	return truncateOrPad(bar, ctx.Width)
+	return TruncateOrPad(bar, ctx.Width)
 }
 
 // SparklineRenderer renders an inline sparkline for numeric series.
@@ -103,12 +103,12 @@ type SparklineRenderer[T any] struct{}
 func (r SparklineRenderer[T]) Render(ctx CellContext[T]) string {
 	values, ok := ctx.Value.([]float64)
 	if !ok {
-		return truncateOrPad(ctx.FormattedValue, ctx.Width)
+		return TruncateOrPad(ctx.FormattedValue, ctx.Width)
 	}
 
 	blocks := []rune("▁▂▃▄▅▆▇█")
 	if len(values) == 0 {
-		return truncateOrPad("", ctx.Width)
+		return TruncateOrPad("", ctx.Width)
 	}
 
 	minV, maxV := values[0], values[0]
@@ -134,7 +134,7 @@ func (r SparklineRenderer[T]) Render(ctx CellContext[T]) string {
 		}
 		sb.WriteRune(blocks[idx])
 	}
-	return truncateOrPad(sb.String(), ctx.Width)
+	return TruncateOrPad(sb.String(), ctx.Width)
 }
 
 // BoolRenderer renders checkmark/cross glyphs for boolean values.
@@ -146,7 +146,7 @@ type BoolRenderer[T any] struct {
 func (r BoolRenderer[T]) Render(ctx CellContext[T]) string {
 	b, ok := ctx.Value.(bool)
 	if !ok {
-		return truncateOrPad(ctx.FormattedValue, ctx.Width)
+		return TruncateOrPad(ctx.FormattedValue, ctx.Width)
 	}
 	trueG := r.TrueGlyph
 	if trueG == "" {
@@ -157,9 +157,9 @@ func (r BoolRenderer[T]) Render(ctx CellContext[T]) string {
 		falseG = "✗"
 	}
 	if b {
-		return truncateOrPad(trueG, ctx.Width)
+		return TruncateOrPad(trueG, ctx.Width)
 	}
-	return truncateOrPad(falseG, ctx.Width)
+	return TruncateOrPad(falseG, ctx.Width)
 }
 
 // ProgressRenderer renders a mini progress bar within the cell.
@@ -253,7 +253,7 @@ func (e *TextEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
 }
 
 func (e *TextEditorModel[T]) View() string {
-	return renderEditorLine(e.value, e.cursor, e.width, "")
+	return RenderEditorLine(e.value, e.cursor, e.width, "")
 }
 
 func (e *TextEditorModel[T]) Value() any {
@@ -520,7 +520,7 @@ func (e *TimeEditorModel[T]) View() string {
 	if e.parseErr != "" {
 		suffix = " (" + e.parseErr + ")"
 	}
-	return renderEditorLine(e.text, e.cursor, e.width, suffix)
+	return RenderEditorLine(e.text, e.cursor, e.width, suffix)
 }
 
 func (e *TimeEditorModel[T]) Value() any {
@@ -550,11 +550,11 @@ const (
 	reverseOff = "\x1b[27m"
 )
 
-// renderEditorLine renders a single-line editor value as a viewport of the
+// RenderEditorLine renders a single-line editor value as a viewport of the
 // given width, ensuring the cursor is always visible. The cursor character is
 // rendered with inverted colors via reverse video. suffix is appended after the
 // viewport (e.g. an error message) and counts against the available width.
-func renderEditorLine(value string, cursor, width int, suffix string) string {
+func RenderEditorLine(value string, cursor, width int, suffix string) string {
 	if width <= 0 {
 		return ""
 	}
@@ -622,7 +622,8 @@ func renderEditorLine(value string, cursor, width int, suffix string) string {
 	return rendered + suffix
 }
 
-func truncateOrPad(s string, width int) string {
+// TruncateOrPad truncates or pads a string to the given width.
+func TruncateOrPad(s string, width int) string {
 	if width <= 0 {
 		return ""
 	}

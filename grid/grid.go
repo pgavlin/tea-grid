@@ -67,6 +67,7 @@ type Model[T any] struct {
 	quickFilterEnabled bool
 	quickFilterText    string
 	quickFilterActive  bool
+	filterEditColIdx   int // -1 = no filter editor active
 	externalFilter     func(T) bool
 
 	// Grouping
@@ -116,6 +117,7 @@ func New[T any](opts ...Option[T]) Model[T] {
 		defaultRowHeight: 1,
 		dirty:            true,
 		focusedCell:      CellPosition{Row: 0, Col: 0},
+		filterEditColIdx: -1,
 	}
 
 	for _, opt := range opts {
@@ -438,6 +440,16 @@ func (m *Model[T]) updateViewportSize() {
 	if m.quickFilterActive {
 		filterHeight = 1
 	}
+	if m.filterEditColIdx >= 0 && m.filterEditColIdx < len(m.cols) {
+		col := m.cols[m.filterEditColIdx]
+		if col.Filter != nil {
+			view := col.Filter.View()
+			filterHeight += 1 // title line
+			if view != "" {
+				filterHeight += strings.Count(view, "\n") + 1
+			}
+		}
+	}
 
 	pinnedTopHeight := len(m.pinnedTop)
 	pinnedBotHeight := len(m.pinnedBot)
@@ -547,7 +559,10 @@ func (m *Model[T]) recomputeDisplayRows() {
 }
 
 func (m *Model[T]) passesColumnFilters(data T) bool {
-	for _, col := range m.cols {
+	for i, col := range m.cols {
+		if i == m.filterEditColIdx {
+			continue // skip the column being edited
+		}
 		if col.Filter == nil || !col.Filter.Active() {
 			continue
 		}

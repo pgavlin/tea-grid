@@ -38,6 +38,7 @@ func main() {
 			Width:       15,
 			Sortable:    true,
 			RowGroup:    true,
+			Filterable:  true,
 			Filter:      filter.NewSetFilter(),
 		},
 		{
@@ -46,6 +47,8 @@ func main() {
 			ValueGetter: func(e Employee) any { return e.Salary },
 			Width:       12,
 			Sortable:    true,
+			Filterable:  true,
+			Filter:      filter.NewNumberFilter(),
 			ValueFormatter: func(v any, _ Employee) string {
 				return fmt.Sprintf("$%.0f", v.(float64))
 			},
@@ -56,6 +59,8 @@ func main() {
 			HeaderName:  "Active",
 			ValueGetter: func(e Employee) any { return e.Active },
 			Width:       8,
+			Filterable:  true,
+			Filter:      filter.NewBoolFilter(),
 			ValueFormatter: func(v any, _ Employee) string {
 				if v.(bool) {
 					return "✓"

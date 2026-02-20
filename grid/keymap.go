@@ -24,8 +24,8 @@ type KeyMap struct {
 	GoToHeader key.Binding
 
 	// Selection
-	Select      key.Binding
-	SelectAll   key.Binding
+	Select    key.Binding
+	SelectAll key.Binding
 
 	// Sorting (when header is focused)
 	ToggleSort      key.Binding
@@ -37,7 +37,8 @@ type KeyMap struct {
 	CancelEdit  key.Binding
 
 	// Filtering
-	QuickFilter key.Binding
+	QuickFilter  key.Binding
+	ColumnFilter key.Binding
 
 	// Grouping
 	ExpandGroup   key.Binding
@@ -134,8 +135,12 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("esc", "cancel"),
 		),
 		QuickFilter: key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "quick filter"),
+		),
+		ColumnFilter: key.NewBinding(
 			key.WithKeys("ctrl+f"),
-			key.WithHelp("ctrl+f", "filter"),
+			key.WithHelp("ctrl+f", "column filter"),
 		),
 		ExpandGroup: key.NewBinding(
 			key.WithKeys("enter", "right"),

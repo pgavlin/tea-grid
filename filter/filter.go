@@ -5,6 +5,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// FilterFocusMsg is sent to a filter when it begins interactive editing.
+type FilterFocusMsg struct {
+	Width    int // Available render width.
+	MaxLines int // Maximum lines for the editor (up to 10).
+}
+
+// FilterBlurMsg is sent to a filter when interactive editing ends.
+type FilterBlurMsg struct{}
+
 // Filter is the interface that column filters implement.
 type Filter interface {
 	// Matches returns true if the value passes the filter.

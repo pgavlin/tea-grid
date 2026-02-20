@@ -8,6 +8,7 @@ import (
 
 	"github.com/pgavlin/tea-grid/cell"
 	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/filter"
 )
 
 // Update handles messages. Implements tea.Model.
@@ -31,6 +32,11 @@ func (m Model[T]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// If editing, route to editor
 		if m.editState != nil {
 			return m.handleEditKeyMsg(msg)
+		}
+
+		// If filter editor is active, route there
+		if m.filterEditColIdx >= 0 {
+			return m.handleFilterEditKeyMsg(msg)
 		}
 
 		// If quick filter is active, route there
@@ -182,6 +188,10 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+	// Column filter
+	case key.Matches(msg, m.KeyMap.ColumnFilter):
+		return m.startFilterEdit()
+
 	// Cancel/Escape
 	case key.Matches(msg, m.KeyMap.CancelEdit):
 		// Deselect all on escape
@@ -292,6 +302,108 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// handleFilterEditKeyMsg handles key messages while the column filter editor is active.
+func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	colIdx := m.filterEditColIdx
+	if colIdx < 0 || colIdx >= len(m.cols) {
+		m.filterEditColIdx = -1
+		return m, nil
+	}
+	col := m.cols[colIdx]
+
+	switch {
+	case key.Matches(msg, m.KeyMap.ConfirmEdit):
+		// Apply the filter and close editor
+		col.Filter.Update(filter.FilterBlurMsg{})
+		m.cols[colIdx] = col
+		m.filterEditColIdx = -1
+		m.dirty = true
+		m.recomputeDisplayRows()
+		m.updateViewportSize()
+		return m, func() tea.Msg {
+			return FilterChangedMsg{ColID: col.ColID, Active: col.Filter.Active()}
+		}
+
+	case key.Matches(msg, m.KeyMap.CancelEdit):
+		// Clear the filter and close editor
+		switch f := col.Filter.(type) {
+		case *filter.TextFilter:
+			f.SetText("")
+		case *filter.NumberFilter:
+			f.SetText("")
+		case *filter.TimeFilter:
+			f.SetText("")
+		case *filter.SetFilter:
+			f.IncludeAll()
+		case *filter.BoolFilter:
+			for f.Active() {
+				f.Toggle()
+			}
+		}
+		col.Filter.Update(filter.FilterBlurMsg{})
+		m.cols[colIdx] = col
+		m.filterEditColIdx = -1
+		m.dirty = true
+		m.recomputeDisplayRows()
+		m.updateViewportSize()
+		return m, func() tea.Msg {
+			return FilterChangedMsg{ColID: col.ColID, Active: false}
+		}
+
+	default:
+		// Route to filter
+		newFilter, cmd := col.Filter.Update(msg)
+		m.cols[colIdx].Filter = newFilter
+		return m, cmd
+	}
+}
+
+// startFilterEdit begins editing the column filter for the focused column.
+func (m Model[T]) startFilterEdit() (tea.Model, tea.Cmd) {
+	colIdx := m.focusedCell.Col
+	if colIdx < 0 || colIdx >= len(m.cols) {
+		return m, nil
+	}
+
+	col := m.cols[colIdx]
+	if !col.Filterable || col.Filter == nil {
+		return m, nil
+	}
+
+	// Compute available maxLines
+	headerHeight := 1
+	if len(m.colGroups) > 0 {
+		headerHeight = 2
+	}
+	if m.styles.BorderHeader {
+		headerHeight++
+	}
+	maxLines := m.height - headerHeight - 3
+	if maxLines > 10 {
+		maxLines = 10
+	}
+	if maxLines < 2 {
+		maxLines = 2
+	}
+
+	// Compute column width
+	colWidth := m.width
+	if colIdx < len(m.colWidths) {
+		colWidth = m.colWidths[colIdx]
+	}
+
+	// Send focus message to the filter
+	newFilter, cmd := col.Filter.Update(filter.FilterFocusMsg{
+		Width:    colWidth,
+		MaxLines: maxLines,
+	})
+	m.cols[colIdx].Filter = newFilter
+	m.filterEditColIdx = colIdx
+	m.updateViewportSize()
+
+	return m, cmd
 }
 
 // moveFocus moves the focus to a new position, clamping to valid bounds.

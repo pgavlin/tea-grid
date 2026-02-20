@@ -22,6 +22,11 @@ func (m Model[T]) View() string {
 		sections = append(sections, m.renderQuickFilter())
 	}
 
+	// Column filter editor
+	if m.filterEditColIdx >= 0 {
+		sections = append(sections, m.renderFilterEditor())
+	}
+
 	// Column group headers (if any)
 	if len(m.colGroups) > 0 {
 		sections = append(sections, m.renderGroupHeaders())
@@ -90,6 +95,34 @@ func (m Model[T]) renderQuickFilter() string {
 	}
 	line := m.styles.FilterInput.Width(m.width).Render(label + input)
 	return line
+}
+
+// renderFilterEditor renders the column filter editor above the header.
+func (m Model[T]) renderFilterEditor() string {
+	if m.filterEditColIdx < 0 || m.filterEditColIdx >= len(m.cols) {
+		return ""
+	}
+
+	col := m.cols[m.filterEditColIdx]
+	if col.Filter == nil {
+		return ""
+	}
+
+	var lines []string
+
+	// Title line
+	title := "Filter: " + col.HeaderName
+	lines = append(lines, m.styles.FilterInput.Width(m.width).Render(title))
+
+	// Filter view lines
+	view := col.Filter.View()
+	if view != "" {
+		for _, vl := range strings.Split(view, "\n") {
+			lines = append(lines, m.styles.FilterInput.Width(m.width).Render(vl))
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // renderGroupHeaders renders the column group header row.
@@ -164,6 +197,11 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 		w := m.colWidths[idx]
 
 		header := col.HeaderName
+
+		// Add filter active indicator
+		if col.Filter != nil && col.Filter.Active() {
+			header += " " + m.styles.FilterActive
+		}
 
 		// Add sort indicator
 		dir := m.sortModel.DirectionFor(col.ColID)
