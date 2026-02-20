@@ -49,8 +49,6 @@ type ColDef[T any] struct {
 	// Sorting
 	Sortable   bool                            // Default: true.
 	Comparator func(a, b any, isDesc bool) int // Custom sort.
-	SortIndex  int                             // Initial sort priority (0 = primary). -1 = not sorted.
-	SortDir    SortDirection                   // Asc, Desc, or None.
 
 	// Filtering
 	Filterable bool          // Default: true.
@@ -73,8 +71,7 @@ type ColDef[T any] struct {
 	// Column spanning
 	ColSpan func(data T) int // Number of columns this cell spans. Default: 1.
 
-	// Grouping
-	RowGroup      bool                   // If true, rows are grouped by this column's values.
+	// Aggregation
 	AggFunc       string                 // Aggregation function name: "sum", "avg", "count", "min", "max".
 	AggFuncCustom func(values []any) any // Custom aggregation.
 

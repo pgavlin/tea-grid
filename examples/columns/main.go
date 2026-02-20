@@ -37,7 +37,6 @@ func main() {
 			ValueGetter: func(e Employee) any { return e.Department },
 			Width:       15,
 			Sortable:    true,
-			RowGroup:    true,
 			Filterable:  true,
 			Filter:      filter.NewSetFilter("Engineering", "Marketing", "Sales"),
 		},
