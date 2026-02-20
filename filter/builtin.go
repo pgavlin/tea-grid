@@ -319,9 +319,14 @@ type SetFilter struct {
 }
 
 // NewSetFilter creates a new SetFilter.
-func NewSetFilter() *SetFilter {
+func NewSetFilter(allValues ...string) *SetFilter {
+	values := make(map[string]bool)
+	for _, v := range allValues {
+		values[v] = true
+	}
 	return &SetFilter{
-		values: make(map[string]bool),
+		values:    values,
+		allValues: allValues,
 	}
 }
 

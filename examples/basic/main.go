@@ -39,7 +39,7 @@ func main() {
 			Sortable:    true,
 			RowGroup:    true,
 			Filterable:  true,
-			Filter:      filter.NewSetFilter(),
+			Filter:      filter.NewSetFilter("Engineering", "Marketing", "Sales"),
 		},
 		{
 			ColID:       "salary",
