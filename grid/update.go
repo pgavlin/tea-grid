@@ -212,6 +212,22 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	// Toggle group column from any row
+	case key.Matches(msg, m.KeyMap.ToggleGroupColumn):
+		if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
+			col := m.cols[m.focusedCell.Col]
+			m.groupModel.ToggleGroupColumn(col.ColID)
+			m.dirty = true
+			m.recomputeDisplayRows()
+			if m.onGroupColumnsChanged != nil {
+				m.onGroupColumnsChanged(m.groupModel.GroupColumns)
+			}
+			return m, func() tea.Msg {
+				return GroupColumnsChangedMsg{GroupColumns: m.groupModel.GroupColumns}
+			}
+		}
+		return m, nil
+
 	// Quick filter
 	case key.Matches(msg, m.KeyMap.QuickFilter):
 		if m.quickFilterEnabled {

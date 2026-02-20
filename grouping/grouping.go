@@ -46,6 +46,17 @@ func (m *Model[T]) ExpandAll(groups []*row.RowNode[T]) {
 	}
 }
 
+// ToggleGroupColumn adds colID to GroupColumns if absent, or removes it if present.
+func (m *Model[T]) ToggleGroupColumn(colID string) {
+	for i, id := range m.GroupColumns {
+		if id == colID {
+			m.GroupColumns = append(m.GroupColumns[:i], m.GroupColumns[i+1:]...)
+			return
+		}
+	}
+	m.GroupColumns = append(m.GroupColumns, colID)
+}
+
 // CollapseAll collapses all groups.
 func (m *Model[T]) CollapseAll(groups []*row.RowNode[T]) {
 	for _, g := range groups {

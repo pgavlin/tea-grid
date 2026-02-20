@@ -205,3 +205,10 @@ func WithOnSortChanged[T any](fn func([]sort.SortCriterion)) Option[T] {
 		m.onSortChanged = fn
 	}
 }
+
+// WithOnGroupColumnsChanged sets a callback for group column changes.
+func WithOnGroupColumnsChanged[T any](fn func([]string)) Option[T] {
+	return func(m *Model[T]) {
+		m.onGroupColumnsChanged = fn
+	}
+}

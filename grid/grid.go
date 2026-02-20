@@ -102,7 +102,8 @@ type Model[T any] struct {
 	// Callbacks
 	onSelectionChanged func([]T)
 	onCellValueChanged func(CellValueChangedMsg[T])
-	onSortChanged      func([]gridsort.SortCriterion)
+	onSortChanged         func([]gridsort.SortCriterion)
+	onGroupColumnsChanged func([]string)
 }
 
 // New creates a new grid model with the given options.

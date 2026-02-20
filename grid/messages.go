@@ -80,6 +80,11 @@ type GroupCollapsedMsg struct {
 	Level    int
 }
 
+// GroupColumnsChangedMsg is emitted when the set of grouped columns changes.
+type GroupColumnsChangedMsg struct {
+	GroupColumns []string
+}
+
 // RowsSetMsg is emitted when the row data is replaced.
 type RowsSetMsg[T any] struct {
 	Rows []T

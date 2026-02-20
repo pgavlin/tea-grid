@@ -45,10 +45,11 @@ type KeyMap struct {
 	ColumnFilter key.Binding
 
 	// Grouping
-	ExpandGroup   key.Binding
-	CollapseGroup key.Binding
-	ExpandAll     key.Binding
-	CollapseAll   key.Binding
+	ToggleGroupColumn key.Binding
+	ExpandGroup       key.Binding
+	CollapseGroup     key.Binding
+	ExpandAll         key.Binding
+	CollapseAll       key.Binding
 
 	// General
 	Quit key.Binding
@@ -153,6 +154,10 @@ func DefaultKeyMap() KeyMap {
 		ColumnFilter: key.NewBinding(
 			key.WithKeys("ctrl+f"),
 			key.WithHelp("ctrl+f", "column filter"),
+		),
+		ToggleGroupColumn: key.NewBinding(
+			key.WithKeys("G"),
+			key.WithHelp("G", "toggle grouping"),
 		),
 		ExpandGroup: key.NewBinding(
 			key.WithKeys("enter", "right"),
