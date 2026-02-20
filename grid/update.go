@@ -91,13 +91,21 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.moveFocus(m.focusedCell.Row, m.focusedCell.Col+1)
 
 	case key.Matches(msg, m.KeyMap.PageUp):
-		return m.moveFocus(m.focusedCell.Row-m.vp.visibleRows, m.focusedCell.Col)
+		newRow := m.focusedCell.Row - m.vp.visibleRows
+		if newRow < 0 {
+			newRow = 0
+		}
+		return m.moveFocus(newRow, m.focusedCell.Col)
 
 	case key.Matches(msg, m.KeyMap.PageDown):
 		return m.moveFocus(m.focusedCell.Row+m.vp.visibleRows, m.focusedCell.Col)
 
 	case key.Matches(msg, m.KeyMap.HalfPageUp):
-		return m.moveFocus(m.focusedCell.Row-m.vp.visibleRows/2, m.focusedCell.Col)
+		newRow := m.focusedCell.Row - m.vp.visibleRows/2
+		if newRow < 0 {
+			newRow = 0
+		}
+		return m.moveFocus(newRow, m.focusedCell.Col)
 
 	case key.Matches(msg, m.KeyMap.HalfPageDown):
 		return m.moveFocus(m.focusedCell.Row+m.vp.visibleRows/2, m.focusedCell.Col)
