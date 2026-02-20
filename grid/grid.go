@@ -718,15 +718,22 @@ func (m *Model[T]) computeColWidths() {
 		remaining -= fc.min
 	}
 
-	// Distribute remaining space by flex weight
+	// Distribute remaining space by flex weight.
+	// Use cumulative calculation to avoid losing pixels to integer division.
 	if remaining > 0 && len(flexCols) > 0 {
 		totalFlex := 0
 		for _, fc := range flexCols {
 			totalFlex += fc.flex
 		}
 
+		distributed := 0
+		cumulativeFlex := 0
 		for i := range flexCols {
-			extra := remaining * flexCols[i].flex / totalFlex
+			cumulativeFlex += flexCols[i].flex
+			target := remaining * cumulativeFlex / totalFlex
+			extra := target - distributed
+			distributed = target
+
 			newWidth := m.colWidths[flexCols[i].idx] + extra
 
 			// Clamp to max

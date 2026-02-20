@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/pgavlin/tea-grid/cell"
 	"github.com/pgavlin/tea-grid/column"
@@ -69,8 +70,11 @@ func (m Model[T]) View() string {
 
 	content := strings.Join(sections, "\n")
 
-	// Pad or truncate to fill the grid height
+	// Pad or truncate to fill the grid dimensions
 	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		lines[i] = ansi.Truncate(line, m.width, "")
+	}
 	for len(lines) < m.height {
 		lines = append(lines, strings.Repeat(" ", m.width))
 	}
@@ -220,6 +224,13 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 			style = m.styles.CellFocused
 		}
 
+		// Truncate header to content width (column width minus style padding/borders)
+		contentWidth := w - style.GetHorizontalFrameSize()
+		if contentWidth < 1 {
+			contentWidth = 1
+		}
+		header = cell.TruncateOrPad(header, contentWidth)
+
 		cells = append(cells, style.Width(w).MaxWidth(w).Render(header))
 	}
 	return strings.Join(cells, m.colSeparator())
@@ -342,6 +353,12 @@ func (m Model[T]) renderCells(rn *row.RowNode[T], colIndices []int, displayIndex
 			style = applyCustomStyle(col.CellStyle(val, rn.Data), style, isFocused, isSelected)
 		}
 
+		// Compute content width (column width minus style padding/borders)
+		contentWidth := w - style.GetHorizontalFrameSize()
+		if contentWidth < 1 {
+			contentWidth = 1
+		}
+
 		// Use custom renderer if available, otherwise default to formatted text
 		cellContent := formatted
 		ctx := cell.CellContext[T]{
@@ -354,7 +371,7 @@ func (m Model[T]) renderCells(rn *row.RowNode[T], colIndices []int, displayIndex
 			RowIndex:       displayIndex,
 			IsSelected:     isSelected,
 			IsFocused:      isFocused,
-			Width:          w,
+			Width:          contentWidth,
 			Height:         1,
 		}
 
@@ -371,6 +388,8 @@ func (m Model[T]) renderCells(rn *row.RowNode[T], colIndices []int, displayIndex
 		}
 		if renderer != nil {
 			cellContent = renderer.Render(ctx)
+		} else {
+			cellContent = cell.TruncateOrPad(cellContent, contentWidth)
 		}
 
 		cells = append(cells, style.Width(w).MaxWidth(w).Render(cellContent))
