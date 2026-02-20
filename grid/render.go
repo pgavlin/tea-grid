@@ -179,9 +179,13 @@ func (m Model[T]) renderHeader() string {
 
 	var parts []string
 
+	leftSep, rightSep := m.scrollSeparators(center)
+
 	if len(left) > 0 {
 		parts = append(parts, m.renderHeaderCells(left))
-		parts = append(parts, m.styles.PinSeparator)
+		parts = append(parts, leftSep)
+	} else if leftSep != m.styles.PinSeparator {
+		parts = append(parts, leftSep)
 	}
 
 	// Only render visible center columns
@@ -189,8 +193,10 @@ func (m Model[T]) renderHeader() string {
 	parts = append(parts, m.renderHeaderCells(visibleCenter))
 
 	if len(right) > 0 {
-		parts = append(parts, m.styles.PinSeparator)
+		parts = append(parts, rightSep)
 		parts = append(parts, m.renderHeaderCells(right))
+	} else if rightSep != m.styles.PinSeparator {
+		parts = append(parts, rightSep)
 	}
 
 	return strings.Join(parts, "")
@@ -450,6 +456,23 @@ func applyCustomStyle(custom, state lipgloss.Style, isFocused, isSelected bool) 
 	return custom.
 		Foreground(state.GetForeground()).
 		Background(state.GetBackground())
+}
+
+// scrollSeparators computes the left and right separator strings for the center
+// region edges. When columns are hidden off-screen in a given direction, the
+// corresponding scroll indicator is returned instead of the pin separator.
+func (m Model[T]) scrollSeparators(center []int) (left, right string) {
+	left = m.styles.PinSeparator
+	if m.vp.leftCol > 0 {
+		left = m.styles.ScrollLeft
+	}
+
+	right = m.styles.PinSeparator
+	if m.vp.leftCol+m.vp.visibleCols < len(center) {
+		right = m.styles.ScrollRight
+	}
+
+	return left, right
 }
 
 // visibleCenterCols returns the subset of center columns that are visible in the viewport.

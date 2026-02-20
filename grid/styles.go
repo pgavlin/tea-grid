@@ -25,6 +25,8 @@ type Styles struct {
 	PinnedRight  lipgloss.Style // Pinned-right region.
 	PinnedRow    lipgloss.Style // Pinned row (top/bottom).
 	PinSeparator string         // Vertical separator between pinned and scrollable.
+	ScrollLeft   string         // Indicator that columns exist off-screen to the left (default: "◀").
+	ScrollRight  string         // Indicator that columns exist off-screen to the right (default: "▶").
 
 	// Grouping
 	GroupRow       lipgloss.Style
@@ -89,6 +91,8 @@ func DefaultStyles() Styles {
 		PinnedRight:  lipgloss.NewStyle(),
 		PinnedRow:    lipgloss.NewStyle().Bold(true),
 		PinSeparator: "│",
+		ScrollLeft:   "◀",
+		ScrollRight:  "▶",
 
 		GroupRow: lipgloss.NewStyle().
 			Bold(true).
