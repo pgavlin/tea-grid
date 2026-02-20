@@ -12,17 +12,7 @@ import (
 
 // Update handles messages and returns the updated model.
 func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
-	var cmds []tea.Cmd
-
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.ready = true
-		m.computeColWidths()
-		m.updateViewportSize()
-		return m, nil
-
 	case tea.KeyMsg:
 		if !m.focused {
 			return m, nil
@@ -46,7 +36,7 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 		return m.handleKeyMsg(msg)
 	}
 
-	return m, tea.Batch(cmds...)
+	return m, nil
 }
 
 // handleKeyMsg handles key messages in normal (non-editing) mode.

@@ -12,7 +12,7 @@ import (
 	"github.com/pgavlin/tea-grid/row"
 )
 
-// View renders the grid as a string. Implements tea.Model.
+// View renders the grid as a string.
 func (m Model[T]) View() string {
 	if m.width == 0 || m.height == 0 {
 		return ""

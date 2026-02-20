@@ -51,10 +51,7 @@ func newTestGrid(opts ...Option[TestRow]) Model[TestRow] {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	}
-	m := New(append(defaults, opts...)...)
-	// Apply WindowSizeMsg so ready=true and column widths computed
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-	return m
+	return New(append(defaults, opts...)...)
 }
 
 // sendKey sends a single key message and returns the updated model.
@@ -398,8 +395,6 @@ func TestUpdateRow(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-
 	m.UpdateRow("Alice", TestRow{"Alice", "Management", 150000, true})
 	rows := m.Rows()
 	for _, r := range rows {
@@ -440,8 +435,6 @@ func TestRemoveRow(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-
 	before := len(m.rows)
 	m.RemoveRow("Bob")
 	if len(m.rows) != before-1 {
@@ -456,7 +449,7 @@ func TestRemoveRow(t *testing.T) {
 
 func TestDirtyFlag(t *testing.T) {
 	m := newTestGrid()
-	// After construction + WindowSizeMsg, dirty should be false
+	// After construction, dirty should be false
 	if m.dirty {
 		t.Error("expected dirty=false after full init")
 	}
@@ -916,20 +909,6 @@ func TestNavigation_GoToHeader(t *testing.T) {
 	}
 }
 
-func TestNavigation_WindowSizeMsgSetsReady(t *testing.T) {
-	m := New(
-		WithColumns[TestRow](testCols()),
-		WithRows[TestRow](testData()),
-	)
-	if m.ready {
-		t.Error("expected ready=false before WindowSizeMsg")
-	}
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-	if !m.ready {
-		t.Error("expected ready=true after WindowSizeMsg")
-	}
-}
-
 func TestNavigation_UnfocusedIgnoresKeys(t *testing.T) {
 	m := newTestGrid(WithFocused[TestRow](false))
 	pos := m.focusedCell
@@ -1328,7 +1307,7 @@ func TestEditing_RequiresWithEditable(t *testing.T) {
 // 8l. Rendering
 // -----------------------------------------------------------------------
 
-func TestRender_NonEmptyAfterWindowSizeMsg(t *testing.T) {
+func TestRender_NonEmpty(t *testing.T) {
 	m := newTestGrid()
 	output := m.View()
 	if len(output) == 0 {
@@ -1341,7 +1320,7 @@ func TestRender_EmptyWithZeroDimensions(t *testing.T) {
 		WithColumns[TestRow](testCols()),
 		WithRows[TestRow](testData()),
 	)
-	// No WindowSizeMsg, width/height both 0
+	// No width/height set, both 0
 	output := m.View()
 	if output != "" {
 		t.Error("expected empty View() with zero dimensions")
@@ -1388,8 +1367,6 @@ func TestRender_SortIndicators(t *testing.T) {
 	m.SetSort([]gridsort.SortCriterion{
 		{ColID: "Name", Direction: column.SortDesc},
 	})
-	// Need to recompute view via WindowSizeMsg to ensure colwidths recalculated
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	output = m.View()
 	if !strings.Contains(output, m.styles.SortDesc) {
 		t.Errorf("expected sort desc indicator %q in output", m.styles.SortDesc)
@@ -1481,8 +1458,6 @@ func TestPublicAPI_SelectedRows(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-
 	m.SelectRow("Alice")
 	m.SelectRow("Carol")
 	selected := m.SelectedRows()
@@ -1662,8 +1637,6 @@ func TestPublicAPI_PinUnpinRow(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-
 	m.PinRow("Alice", row.PinTop)
 	// Recomputation should move Alice to pinnedTop
 	found := false
@@ -1840,9 +1813,10 @@ func TestInit_ReturnsNil(t *testing.T) {
 	}
 }
 
-func TestUpdate_WindowSizeMsgUpdatesWidthHeight(t *testing.T) {
+func TestSetWidthHeight_UpdatesDimensions(t *testing.T) {
 	m := newTestGrid()
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m.SetWidth(120)
+	m.SetHeight(40)
 	if m.width != 120 {
 		t.Errorf("expected width=120, got %d", m.width)
 	}
@@ -1941,8 +1915,6 @@ func TestSelectedRowNodes(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
-
 	m.SelectRow("Alice")
 	nodes := m.SelectedRowNodes()
 	if len(nodes) != 1 {

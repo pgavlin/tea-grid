@@ -97,7 +97,6 @@ type Model[T any] struct {
 
 	// Styles
 	styles Styles
-	ready  bool // true after first WindowSizeMsg
 
 	// Callbacks
 	onSelectionChanged func([]T)
@@ -125,13 +124,15 @@ func New[T any](opts ...Option[T]) Model[T] {
 		opt(&m)
 	}
 
-	// Build initial display rows
+	// Build initial display rows and compute layout
 	m.recomputeDisplayRows()
+	m.computeColWidths()
+	m.updateViewportSize()
 
 	return m
 }
 
-// Init implements tea.Model.
+// Init returns an initial command. Currently always returns nil.
 func (m Model[T]) Init() tea.Cmd {
 	return nil
 }
