@@ -16,18 +16,18 @@ type testRow struct {
 func testCols() []column.ColDef[testRow] {
 	return []column.ColDef[testRow]{
 		{
-			ColID:      "Name",
-			HeaderName: "Name",
+			ColID:       "Name",
+			HeaderName:  "Name",
 			ValueGetter: func(r testRow) any { return r.Name },
 		},
 		{
-			ColID:      "Department",
-			HeaderName: "Department",
+			ColID:       "Department",
+			HeaderName:  "Department",
 			ValueGetter: func(r testRow) any { return r.Department },
 		},
 		{
-			ColID:      "Salary",
-			HeaderName: "Salary",
+			ColID:       "Salary",
+			HeaderName:  "Salary",
 			ValueGetter: func(r testRow) any { return r.Salary },
 		},
 	}

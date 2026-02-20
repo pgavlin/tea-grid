@@ -164,7 +164,7 @@ func (r BoolRenderer[T]) Render(ctx CellContext[T]) string {
 
 // ProgressRenderer renders a mini progress bar within the cell.
 type ProgressRenderer[T any] struct {
-	MaxValue float64
+	MaxValue   float64
 	FilledChar string
 	EmptyChar  string
 }
@@ -201,7 +201,7 @@ func (r ProgressRenderer[T]) Render(ctx CellContext[T]) string {
 
 // TextEditorModel is a single-line text input editor.
 type TextEditorModel[T any] struct {
-	value string
+	value  string
 	cursor int
 	width  int
 }

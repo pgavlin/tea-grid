@@ -11,18 +11,18 @@ import (
 )
 
 type Stock struct {
-	Ticker   string
-	Company  string
-	Sector   string
-	Price    float64
-	Open     float64
-	High     float64
-	Low      float64
-	Volume   int
+	Ticker    string
+	Company   string
+	Sector    string
+	Price     float64
+	Open      float64
+	High      float64
+	Low       float64
+	Volume    int
 	MarketCap string
-	PE       float64
-	Dividend float64
-	YTD      float64
+	PE        float64
+	Dividend  float64
+	YTD       float64
 }
 
 type model struct {

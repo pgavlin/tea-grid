@@ -78,8 +78,8 @@ type Model[T any] struct {
 	editState *editState[T]
 
 	// Pinning functions
-	pinnedTopFunc  func(T) bool
-	pinnedBotFunc  func(T) bool
+	pinnedTopFunc   func(T) bool
+	pinnedBotFunc   func(T) bool
 	staticPinnedTop []T
 	staticPinnedBot []T
 
@@ -99,8 +99,8 @@ type Model[T any] struct {
 	styles Styles
 
 	// Callbacks
-	onSelectionChanged func([]T)
-	onCellValueChanged func(CellValueChangedMsg[T])
+	onSelectionChanged    func([]T)
+	onCellValueChanged    func(CellValueChangedMsg[T])
 	onSortChanged         func([]gridsort.SortCriterion)
 	onGroupColumnsChanged func([]string)
 }
@@ -267,7 +267,7 @@ func (m *Model[T]) SelectAll() {
 	}
 	m.sel.SelectAll(ids)
 }
-func (m *Model[T]) DeselectAll()          { m.sel.DeselectAll() }
+func (m *Model[T]) DeselectAll()             { m.sel.DeselectAll() }
 func (m Model[T]) IsSelected(id string) bool { return m.sel.IsSelected(id) }
 
 // --- Sorting ---

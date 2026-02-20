@@ -8,9 +8,9 @@ import (
 
 // CellContext provides all information a renderer needs.
 type CellContext[T any] struct {
-	Value          any              // The raw cell value.
-	FormattedValue string           // After ValueFormatter.
-	Data           T                // The full row data.
+	Value          any    // The raw cell value.
+	FormattedValue string // After ValueFormatter.
+	Data           T      // The full row data.
 	RowNode        *row.RowNode[T]
 	ColDef         *column.ColDef[T]
 	ColIndex       int

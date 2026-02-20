@@ -5,7 +5,7 @@ package row
 type PinPosition int
 
 const (
-	PinNone   PinPosition = iota
+	PinNone PinPosition = iota
 	PinTop
 	PinBottom
 )
@@ -16,8 +16,8 @@ type RowNode[T any] struct {
 	Data T
 
 	// Runtime state (managed by the grid)
-	ID         string      // Unique row ID.
-	RowIndex   int         // Current display index (post sort/filter/group).
+	ID         string // Unique row ID.
+	RowIndex   int    // Current display index (post sort/filter/group).
 	Selected   bool
 	Expanded   bool        // For group rows.
 	RowHeight  int         // In terminal lines. Default: 1.

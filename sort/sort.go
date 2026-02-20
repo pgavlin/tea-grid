@@ -13,8 +13,8 @@ type SortCriterion struct {
 
 // Model holds the current sort state.
 type Model[T any] struct {
-	SortOrder  []SortCriterion // Ordered list of active sorts.
-	MultiSort  bool            // Whether multi-column sort is enabled.
+	SortOrder []SortCriterion // Ordered list of active sorts.
+	MultiSort bool            // Whether multi-column sort is enabled.
 }
 
 // ToggleSort cycles a column through asc -> desc -> none.
