@@ -111,7 +111,7 @@ func FromType[T any]() []ColDef[T] {
 			continue
 		}
 		idx := i // capture for closure
-		cols = append(cols, ColDef[T]{
+		col := ColDef[T]{
 			ColID:      field.Name,
 			HeaderName: field.Name,
 			ValueGetter: func(data T) any {
@@ -127,7 +127,9 @@ func FromType[T any]() []ColDef[T] {
 			Sortable:   true,
 			Filterable: true,
 			MinWidth:   4,
-		})
+			Filter:     filterForType(field.Type),
+		}
+		cols = append(cols, col)
 	}
 	return cols
 }
@@ -476,6 +478,20 @@ func sliceFieldValue(row any, fieldName string) any {
 		}
 	}
 	return nil
+}
+
+// filterForType returns an appropriate Filter for the given reflect.Type.
+func filterForType(t reflect.Type) filter.Filter {
+	switch classifyReflectType(t) {
+	case "int", "float":
+		return filter.NewNumberFilter()
+	case "bool":
+		return filter.NewBoolFilter()
+	case "time":
+		return filter.NewTimeFilter()
+	default:
+		return filter.NewTextFilter()
+	}
 }
 
 // classifyReflectType maps a reflect.Type to a category string.

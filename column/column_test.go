@@ -42,9 +42,9 @@ func TestSortDirectionConstants(t *testing.T) {
 	}
 }
 
-// --- Columns[T]() ---
+// --- FromType[T]() ---
 
-func TestColumnsExportedFields(t *testing.T) {
+func TestFromTypeExportedFields(t *testing.T) {
 	cols := FromType[Person]()
 	if len(cols) != 2 {
 		t.Fatalf("expected 2 columns, got %d", len(cols))
@@ -70,7 +70,7 @@ func TestColumnsExportedFields(t *testing.T) {
 	}
 }
 
-func TestColumnsValueGetter(t *testing.T) {
+func TestFromTypeValueGetter(t *testing.T) {
 	cols := FromType[Person]()
 	p := Person{Name: "Alice", Age: 30}
 
@@ -85,7 +85,7 @@ func TestColumnsValueGetter(t *testing.T) {
 	}
 }
 
-func TestColumnsPointerType(t *testing.T) {
+func TestFromTypePointerType(t *testing.T) {
 	cols := FromType[*Person]()
 	if len(cols) != 2 {
 		t.Fatalf("expected 2 columns for *Person, got %d", len(cols))
@@ -98,7 +98,7 @@ func TestColumnsPointerType(t *testing.T) {
 	}
 }
 
-func TestColumnsNonStructPanics(t *testing.T) {
+func TestFromTypeNonStructPanics(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
 			t.Fatal("expected panic for non-struct type")
@@ -107,14 +107,14 @@ func TestColumnsNonStructPanics(t *testing.T) {
 	FromType[string]()
 }
 
-func TestColumnsEmptyStruct(t *testing.T) {
+func TestFromTypeEmptyStruct(t *testing.T) {
 	cols := FromType[struct{}]()
 	if len(cols) != 0 {
 		t.Fatalf("expected 0 columns for empty struct, got %d", len(cols))
 	}
 }
 
-func TestColumnsUnexportedSkipped(t *testing.T) {
+func TestFromTypeUnexportedSkipped(t *testing.T) {
 	cols := FromType[mixedFields]()
 	if len(cols) != 2 {
 		t.Fatalf("expected 2 columns (exported only), got %d", len(cols))
@@ -127,7 +127,7 @@ func TestColumnsUnexportedSkipped(t *testing.T) {
 	}
 }
 
-func TestColumnsMultipleFieldTypes(t *testing.T) {
+func TestFromTypeMultipleFieldTypes(t *testing.T) {
 	cols := FromType[multiType]()
 	if len(cols) != 5 {
 		t.Fatalf("expected 5 columns, got %d", len(cols))
@@ -151,6 +151,64 @@ func TestColumnsMultipleFieldTypes(t *testing.T) {
 		got := cols[tt.idx].ValueGetter(row)
 		if got != tt.want {
 			t.Errorf("col %d: got %v, want %v", tt.idx, got, tt.want)
+		}
+	}
+}
+
+func TestFromTypeFilterString(t *testing.T) {
+	cols := FromType[Person]()
+	if _, ok := cols[0].Filter.(*filter.TextFilter); !ok {
+		t.Errorf("Name (string): expected TextFilter, got %T", cols[0].Filter)
+	}
+}
+
+func TestFromTypeFilterInt(t *testing.T) {
+	cols := FromType[Person]()
+	if _, ok := cols[1].Filter.(*filter.NumberFilter); !ok {
+		t.Errorf("Age (int): expected NumberFilter, got %T", cols[1].Filter)
+	}
+}
+
+type filterTestUint struct {
+	Count uint64
+}
+
+func TestFromTypeFilterUint(t *testing.T) {
+	cols := FromType[filterTestUint]()
+	if _, ok := cols[0].Filter.(*filter.NumberFilter); !ok {
+		t.Errorf("Count (uint64): expected NumberFilter, got %T", cols[0].Filter)
+	}
+}
+
+func TestFromTypeFilterAllTypes(t *testing.T) {
+	cols := FromType[multiType]()
+
+	tests := []struct {
+		idx      int
+		name     string
+		wantType string
+	}{
+		{0, "S (string)", "*filter.TextFilter"},
+		{1, "I (int)", "*filter.NumberFilter"},
+		{2, "F (float64)", "*filter.NumberFilter"},
+		{3, "B (bool)", "*filter.BoolFilter"},
+		{4, "T (time.Time)", "*filter.TimeFilter"},
+	}
+
+	for _, tt := range tests {
+		var ok bool
+		switch tt.idx {
+		case 0:
+			_, ok = cols[tt.idx].Filter.(*filter.TextFilter)
+		case 1, 2:
+			_, ok = cols[tt.idx].Filter.(*filter.NumberFilter)
+		case 3:
+			_, ok = cols[tt.idx].Filter.(*filter.BoolFilter)
+		case 4:
+			_, ok = cols[tt.idx].Filter.(*filter.TimeFilter)
+		}
+		if !ok {
+			t.Errorf("%s: expected %s, got %T", tt.name, tt.wantType, cols[tt.idx].Filter)
 		}
 	}
 }
