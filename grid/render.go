@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/pgavlin/tea-grid/cell"
 	"github.com/pgavlin/tea-grid/column"
 	"github.com/pgavlin/tea-grid/row"
@@ -334,10 +336,10 @@ func (m Model[T]) renderCells(rn *row.RowNode[T], colIndices []int, displayIndex
 		}
 
 		if m.styles.StyleFunc != nil {
-			style = m.styles.StyleFunc(displayIndex, idx, rn.Data)
+			style = applyCustomStyle(m.styles.StyleFunc(displayIndex, idx, rn.Data), style, isFocused, isSelected)
 		}
 		if col.CellStyle != nil {
-			style = col.CellStyle(val, rn.Data)
+			style = applyCustomStyle(col.CellStyle(val, rn.Data), style, isFocused, isSelected)
 		}
 
 		// Use custom renderer if available, otherwise default to formatted text
@@ -416,6 +418,18 @@ func (m Model[T]) colSeparator() string {
 		return "│"
 	}
 	return ""
+}
+
+// applyCustomStyle merges a custom cell style with the current state style.
+// When the cell is focused or selected, the colors from the state style are
+// preserved while other properties (e.g. alignment) come from the custom style.
+func applyCustomStyle(custom, state lipgloss.Style, isFocused, isSelected bool) lipgloss.Style {
+	if !isFocused && !isSelected {
+		return custom
+	}
+	return custom.
+		Foreground(state.GetForeground()).
+		Background(state.GetBackground())
 }
 
 // visibleCenterCols returns the subset of center columns that are visible in the viewport.
