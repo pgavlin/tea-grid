@@ -544,13 +544,16 @@ func (e *TimeEditorModel[T]) Validate() string {
 
 // --- Helpers ---
 
-// cursorStyle inverts foreground and background to render the cursor.
-var cursorStyle = lipgloss.NewStyle().Reverse(true)
+// ANSI escape sequences to toggle reverse video without resetting other attributes.
+const (
+	reverseOn  = "\x1b[7m"
+	reverseOff = "\x1b[27m"
+)
 
 // renderEditorLine renders a single-line editor value as a viewport of the
 // given width, ensuring the cursor is always visible. The cursor character is
-// rendered with inverted colors. suffix is appended after the viewport (e.g.
-// an error message) and counts against the available width.
+// rendered with inverted colors via reverse video. suffix is appended after the
+// viewport (e.g. an error message) and counts against the available width.
 func renderEditorLine(value string, cursor, width int, suffix string) string {
 	if width <= 0 {
 		return ""
@@ -606,7 +609,9 @@ func renderEditorLine(value string, cursor, width int, suffix string) string {
 		}
 	}
 
-	rendered := before + cursorStyle.Render(string(cursorRune)) + after
+	// Use raw ANSI reverse on/off so we only toggle reverse video without
+	// resetting the parent style (e.g. EditorInput background).
+	rendered := before + reverseOn + string(cursorRune) + reverseOff + after
 
 	// Pad to fill viewport width if needed
 	visibleLen := len([]rune(before)) + 1 + len([]rune(after))
