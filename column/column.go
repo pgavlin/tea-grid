@@ -2,7 +2,10 @@
 package column
 
 import (
+	"fmt"
+	"math"
 	"reflect"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -13,7 +16,7 @@ import (
 type PinDirection int
 
 const (
-	PinNone  PinDirection = iota
+	PinNone PinDirection = iota
 	PinLeft
 	PinRight
 )
@@ -44,13 +47,13 @@ type ColDef[T any] struct {
 	Flex     int // Flex weight for distributing remaining space. 0 = no flex.
 
 	// Sorting
-	Sortable   bool                                           // Default: true.
-	Comparator func(a, b any, isDesc bool) int                // Custom sort.
-	SortIndex  int                                            // Initial sort priority (0 = primary). -1 = not sorted.
-	SortDir    SortDirection                                  // Asc, Desc, or None.
+	Sortable   bool                            // Default: true.
+	Comparator func(a, b any, isDesc bool) int // Custom sort.
+	SortIndex  int                             // Initial sort priority (0 = primary). -1 = not sorted.
+	SortDir    SortDirection                   // Asc, Desc, or None.
 
 	// Filtering
-	Filterable bool // Default: true.
+	Filterable bool          // Default: true.
 	Filter     filter.Filter // Column filter.
 
 	// Pinning
@@ -58,21 +61,21 @@ type ColDef[T any] struct {
 	LockPinned bool         // Prevent user from changing pin state.
 
 	// Cell rendering
-	CellRenderer         any                                   // Custom renderer (implements cell.CellRenderer[T]).
-	CellRendererSelector func(T) any                           // Dynamic renderer per row (returns cell.CellRenderer[T]).
+	CellRenderer         any                                    // Custom renderer (implements cell.CellRenderer[T]).
+	CellRendererSelector func(T) any                            // Dynamic renderer per row (returns cell.CellRenderer[T]).
 	CellStyle            func(value any, data T) lipgloss.Style // Per-cell styling.
 
 	// Cell editing
-	Editable    bool                      // Default: false.
-	CellEditor  any                       // Custom editor (implements cell.CellEditor[T]).
-	ValueSetter func(data *T, value any)  // Write the edited value back.
+	Editable    bool                     // Default: false.
+	CellEditor  any                      // Custom editor (implements cell.CellEditor[T]).
+	ValueSetter func(data *T, value any) // Write the edited value back.
 
 	// Column spanning
 	ColSpan func(data T) int // Number of columns this cell spans. Default: 1.
 
 	// Grouping
-	RowGroup      bool               // If true, rows are grouped by this column's values.
-	AggFunc       string             // Aggregation function name: "sum", "avg", "count", "min", "max".
+	RowGroup      bool                   // If true, rows are grouped by this column's values.
+	AggFunc       string                 // Aggregation function name: "sum", "avg", "count", "min", "max".
 	AggFuncCustom func(values []any) any // Custom aggregation.
 
 	// Visibility
@@ -85,13 +88,13 @@ type ColGroup[T any] struct {
 	Children   []ColDef[T] // Leaf columns in this group.
 }
 
-// Columns returns a []ColDef[T] derived from T's exported struct fields.
+// FromType returns a []ColDef[T] derived from T's exported struct fields.
 // For each exported field, it produces a ColDef with:
 //   - ColID and HeaderName set to the field name
 //   - ValueGetter set to a function that retrieves the field's value from T
 //
 // Panics if T is not a struct type.
-func Columns[T any]() []ColDef[T] {
+func FromType[T any]() []ColDef[T] {
 	var zero T
 	t := reflect.TypeOf(zero)
 	if t.Kind() == reflect.Ptr {
@@ -127,4 +130,430 @@ func Columns[T any]() []ColDef[T] {
 		})
 	}
 	return cols
+}
+
+// timeFormats lists time layouts tried when inferring time-typed columns from strings.
+var timeFormats = []string{
+	time.RFC3339,
+	"2006-01-02T15:04:05",
+	"2006-01-02",
+}
+
+// FromRows returns a []ColDef[T] inferred from the provided rows.
+// It supports:
+//   - map[string]any: discovers keys and infers value types
+//   - []any (slice): discovers struct fields from heterogeneous elements
+//   - struct or *struct: delegates to Columns[T]() (rows are ignored)
+//
+// For interface types, the first non-nil row is inspected to determine the
+// actual kind. Returns nil for unsupported types or empty rows.
+func FromRows[T any](rows []T) []ColDef[T] {
+	var zero T
+	t := reflect.TypeOf(&zero).Elem()
+
+	// For concrete types, dispatch directly.
+	switch t.Kind() {
+	case reflect.Map:
+		if t.Key().Kind() == reflect.String {
+			return columnsFromMap(rows)
+		}
+		return nil
+	case reflect.Slice:
+		return columnsFromSlice(rows)
+	case reflect.Struct:
+		return FromType[T]()
+	case reflect.Ptr:
+		if t.Elem().Kind() == reflect.Struct {
+			return FromType[T]()
+		}
+		return nil
+	case reflect.Interface:
+		// Inspect first non-nil row to determine actual kind.
+		for _, row := range rows {
+			v := reflect.ValueOf(row)
+			if !v.IsValid() || v.IsNil() {
+				continue
+			}
+			elem := v.Elem()
+			switch elem.Kind() {
+			case reflect.Map:
+				if elem.Type().Key().Kind() == reflect.String {
+					return columnsFromMap(rows)
+				}
+				return nil
+			case reflect.Slice:
+				return columnsFromSlice(rows)
+			default:
+				return nil
+			}
+		}
+		return nil
+	default:
+		return nil
+	}
+}
+
+// columnsFromMap discovers columns from map-typed rows (map[string]any).
+// Keys are collected in first-appearance order across all rows.
+func columnsFromMap[T any](rows []T) []ColDef[T] {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	// Discover keys in first-appearance order.
+	seen := make(map[string]struct{})
+	var keys []string
+	for _, row := range rows {
+		v := reflect.ValueOf(row)
+		if v.Kind() == reflect.Interface {
+			v = v.Elem()
+		}
+		if v.Kind() != reflect.Map {
+			continue
+		}
+		for _, k := range v.MapKeys() {
+			name := k.String()
+			if _, ok := seen[name]; !ok {
+				seen[name] = struct{}{}
+				keys = append(keys, name)
+			}
+		}
+	}
+
+	cols := make([]ColDef[T], 0, len(keys))
+	for _, key := range keys {
+		category := inferMapColumnType(key, rows)
+		col := makeMapColDef[T](key, category)
+		applyTypeDefaults(&col, category, collectDistinctValues(col.ValueGetter, rows))
+		cols = append(cols, col)
+	}
+	return cols
+}
+
+// makeMapColDef builds a ColDef for a map column with the given key and type category.
+func makeMapColDef[T any](key, category string) ColDef[T] {
+	col := ColDef[T]{
+		ColID:      key,
+		HeaderName: key,
+		Sortable:   true,
+		Filterable: true,
+	}
+
+	switch category {
+	case "int", "number":
+		col.ValueGetter = func(row T) any {
+			v := mapIndex(row, key)
+			if v == nil {
+				return nil
+			}
+			if f, ok := v.(float64); ok {
+				return f
+			}
+			return v
+		}
+	case "bool":
+		col.ValueGetter = func(row T) any {
+			v := mapIndex(row, key)
+			if v == nil {
+				return nil
+			}
+			if b, ok := v.(bool); ok {
+				return b
+			}
+			return v
+		}
+	case "time":
+		col.ValueGetter = func(row T) any {
+			v := mapIndex(row, key)
+			if v == nil {
+				return nil
+			}
+			if s, ok := v.(string); ok {
+				if t, ok := parseTimeString(s); ok {
+					return t
+				}
+			}
+			return v
+		}
+	default: // string
+		col.ValueGetter = func(row T) any {
+			v := mapIndex(row, key)
+			if v == nil {
+				return nil
+			}
+			return fmt.Sprint(v)
+		}
+	}
+
+	return col
+}
+
+// mapIndex extracts a value from a map-typed row by string key.
+func mapIndex(row any, key string) any {
+	v := reflect.ValueOf(row)
+	if v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Map {
+		return nil
+	}
+	result := v.MapIndex(reflect.ValueOf(key))
+	if !result.IsValid() {
+		return nil
+	}
+	iface := result.Interface()
+	// Unwrap interface values.
+	rv := reflect.ValueOf(iface)
+	if rv.Kind() == reflect.Interface {
+		if rv.IsNil() {
+			return nil
+		}
+		return rv.Elem().Interface()
+	}
+	return iface
+}
+
+// inferMapColumnType inspects non-nil values for a key across map rows
+// and returns a type category: "bool", "int", "number", "time", or "string".
+func inferMapColumnType[T any](key string, rows []T) string {
+	allBool := true
+	allFloat := true
+	allInt := true
+	allTime := true
+	count := 0
+
+	for _, row := range rows {
+		v := mapIndex(row, key)
+		if v == nil {
+			continue
+		}
+		count++
+
+		switch val := v.(type) {
+		case bool:
+			allFloat = false
+			allInt = false
+			allTime = false
+		case float64:
+			allBool = false
+			allTime = false
+			if val != math.Trunc(val) {
+				allInt = false
+			}
+		case string:
+			allBool = false
+			allFloat = false
+			allInt = false
+			parsed := false
+			for _, layout := range timeFormats {
+				if _, err := time.Parse(layout, val); err == nil {
+					parsed = true
+					break
+				}
+			}
+			if !parsed {
+				allTime = false
+			}
+		default:
+			allBool = false
+			allFloat = false
+			allInt = false
+			allTime = false
+		}
+	}
+
+	if count == 0 {
+		return "string"
+	}
+	if allBool {
+		return "bool"
+	}
+	if allFloat && allInt {
+		return "int"
+	}
+	if allFloat {
+		return "number"
+	}
+	if allTime {
+		return "time"
+	}
+	return "string"
+}
+
+// columnsFromSlice discovers columns from slice-typed rows ([]any).
+// Each element is expected to be a struct; fields are collected in first-appearance order.
+func columnsFromSlice[T any](rows []T) []ColDef[T] {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	type fieldMeta struct {
+		name   string
+		goType reflect.Type
+	}
+
+	seen := make(map[string]struct{})
+	var fields []fieldMeta
+
+	for _, row := range rows {
+		v := reflect.ValueOf(row)
+		if v.Kind() == reflect.Interface {
+			v = v.Elem()
+		}
+		if v.Kind() != reflect.Slice {
+			continue
+		}
+		for i := 0; i < v.Len(); i++ {
+			elem := v.Index(i)
+			if elem.Kind() == reflect.Interface {
+				elem = elem.Elem()
+			}
+			if elem.Kind() == reflect.Ptr {
+				elem = elem.Elem()
+			}
+			if elem.Kind() != reflect.Struct {
+				continue
+			}
+			et := elem.Type()
+			for j := 0; j < et.NumField(); j++ {
+				sf := et.Field(j)
+				if !sf.IsExported() {
+					continue
+				}
+				if _, ok := seen[sf.Name]; !ok {
+					seen[sf.Name] = struct{}{}
+					fields = append(fields, fieldMeta{name: sf.Name, goType: sf.Type})
+				}
+			}
+		}
+	}
+
+	cols := make([]ColDef[T], 0, len(fields))
+	for _, fi := range fields {
+		category := classifyReflectType(fi.goType)
+		fieldName := fi.name // capture
+
+		getter := func(row T) any {
+			return sliceFieldValue(row, fieldName)
+		}
+
+		col := ColDef[T]{
+			ColID:       fieldName,
+			HeaderName:  fieldName,
+			ValueGetter: getter,
+			Sortable:    true,
+			Filterable:  true,
+		}
+		applyTypeDefaults(&col, category, collectDistinctValues(getter, rows))
+		cols = append(cols, col)
+	}
+	return cols
+}
+
+// sliceFieldValue extracts a named field from a slice-of-structs row.
+func sliceFieldValue(row any, fieldName string) any {
+	v := reflect.ValueOf(row)
+	if v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Slice {
+		return nil
+	}
+	for i := 0; i < v.Len(); i++ {
+		elem := v.Index(i)
+		if elem.Kind() == reflect.Interface {
+			elem = elem.Elem()
+		}
+		if elem.Kind() == reflect.Ptr {
+			elem = elem.Elem()
+		}
+		if elem.Kind() != reflect.Struct {
+			continue
+		}
+		fv := elem.FieldByName(fieldName)
+		if fv.IsValid() {
+			return fv.Interface()
+		}
+	}
+	return nil
+}
+
+// classifyReflectType maps a reflect.Type to a category string.
+func classifyReflectType(t reflect.Type) string {
+	switch t.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return "int"
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return "int"
+	case reflect.Float32, reflect.Float64:
+		return "float"
+	case reflect.Bool:
+		return "bool"
+	default:
+		if t == reflect.TypeOf(time.Time{}) {
+			return "time"
+		}
+		return "string"
+	}
+}
+
+// applyTypeDefaults sets Filter and sizing on a ColDef based on the type category.
+func applyTypeDefaults[T any](col *ColDef[T], category string, distinctValues []string) {
+	rightAligned := lipgloss.NewStyle().Align(lipgloss.Right)
+
+	switch category {
+	case "int":
+		col.Filter = filter.NewNumberFilter()
+		col.CellStyle = func(_ any, _ T) lipgloss.Style { return rightAligned }
+		col.Width = 12
+	case "float", "number":
+		col.Filter = filter.NewNumberFilter()
+		col.CellStyle = func(_ any, _ T) lipgloss.Style { return rightAligned }
+		col.Width = 14
+	case "bool":
+		col.Filter = filter.NewBoolFilter()
+		col.Width = 10
+	case "time":
+		col.Filter = filter.NewTimeFilter()
+		col.Width = 14
+	default: // string
+		if len(distinctValues) > 0 && len(distinctValues) <= 20 {
+			col.Filter = filter.NewSetFilter(distinctValues...)
+		} else {
+			col.Filter = filter.NewTextFilter()
+		}
+		col.MinWidth = 8
+		col.Flex = 1
+	}
+}
+
+// collectDistinctValues scans rows and returns distinct non-empty string representations.
+func collectDistinctValues[T any](getter func(T) any, rows []T) []string {
+	seen := make(map[string]struct{})
+	var vals []string
+	for _, row := range rows {
+		v := getter(row)
+		if v == nil {
+			continue
+		}
+		s := fmt.Sprint(v)
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; !ok {
+			seen[s] = struct{}{}
+			vals = append(vals, s)
+		}
+	}
+	return vals
+}
+
+// parseTimeString attempts to parse a string with known time layouts.
+func parseTimeString(s string) (time.Time, bool) {
+	for _, layout := range timeFormats {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
