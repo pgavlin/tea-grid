@@ -104,7 +104,7 @@ func DefaultStyles() Styles {
 		Border:       lipgloss.NormalBorder(),
 		BorderHeader: true,
 		BorderRow:    false,
-		BorderColumn: true,
+		BorderColumn: false,
 
 		FilterInput: lipgloss.NewStyle().
 			Padding(0, 1).
