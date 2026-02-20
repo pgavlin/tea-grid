@@ -185,13 +185,6 @@ func WithDynamicRowHeight[T any](fn func(T) int) Option[T] {
 	}
 }
 
-// WithRowBuffer sets the number of extra rows rendered above/below the viewport.
-func WithRowBuffer[T any](n int) Option[T] {
-	return func(m *Model[T]) {
-		m.vp.rowBuffer = n
-	}
-}
-
 // WithOnSelectionChanged sets a callback for selection changes.
 func WithOnSelectionChanged[T any](fn func([]T)) Option[T] {
 	return func(m *Model[T]) {

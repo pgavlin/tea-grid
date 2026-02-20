@@ -6,14 +6,11 @@ type viewport struct {
 	leftCol     int // Index of the first visible (unpinned) column.
 	visibleRows int // Number of rows that fit in the viewport height.
 	visibleCols int // Number of columns that fit in the viewport width.
-	rowBuffer   int // Extra rows to render above/below viewport (default: 5).
 }
 
 // newViewport creates a new viewport with default settings.
 func newViewport() viewport {
-	return viewport{
-		rowBuffer: 5,
-	}
+	return viewport{}
 }
 
 // ensureVisible adjusts the scroll position to ensure the given row is visible.
@@ -40,13 +37,13 @@ func (v *viewport) ensureColVisible(col int) {
 	}
 }
 
-// visibleRowRange returns the start and end indices of visible rows (including buffer).
+// visibleRowRange returns the start and end indices of visible rows.
 func (v *viewport) visibleRowRange(totalRows int) (start, end int) {
-	start = v.topRow - v.rowBuffer
+	start = v.topRow
 	if start < 0 {
 		start = 0
 	}
-	end = v.topRow + v.visibleRows + v.rowBuffer
+	end = v.topRow + v.visibleRows
 	if end > totalRows {
 		end = totalRows
 	}
