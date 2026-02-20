@@ -33,7 +33,12 @@ func (m model) Init() tea.Cmd { return m.grid.Init() }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
-		m.grid.SetWidth(msg.Width)
+		// Cap width at 80 so the 12 columns always exceed the viewport.
+		w := msg.Width
+		if w > 80 {
+			w = 80
+		}
+		m.grid.SetWidth(w)
 		m.grid.SetHeight(msg.Height)
 	}
 	var cmd tea.Cmd
