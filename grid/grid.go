@@ -633,9 +633,53 @@ func (m *Model[T]) sortRows(rows []row.RowNode[T]) {
 }
 
 func (m *Model[T]) sortGroups(groups []*row.RowNode[T]) {
+	m.sortGroupsAtLevel(groups, 0)
+}
+
+func (m *Model[T]) sortGroupsAtLevel(groups []*row.RowNode[T], level int) {
+	// Sort the group nodes themselves by the grouping column's sort criteria
+	if level < len(m.groupModel.GroupColumns) {
+		groupColID := m.groupModel.GroupColumns[level]
+		var sortDir column.SortDirection
+		for _, sc := range m.sortModel.SortOrder {
+			if sc.ColID == groupColID {
+				sortDir = sc.Direction
+				break
+			}
+		}
+		if sortDir != column.SortNone {
+			col := m.findCol(groupColID)
+			if col != nil && col.ValueGetter != nil {
+				sort.SliceStable(groups, func(i, j int) bool {
+					aVal := m.firstLeafValue(groups[i], col)
+					bVal := m.firstLeafValue(groups[j], col)
+
+					var cmp int
+					if col.Comparator != nil {
+						cmp = col.Comparator(aVal, bVal, sortDir == column.SortDesc)
+					} else {
+						cmp = defaultCompare(aVal, bVal)
+					}
+					if sortDir == column.SortDesc {
+						cmp = -cmp
+					}
+					return cmp < 0
+				})
+			}
+		}
+	}
+
+	// Process children of each group
 	for _, g := range groups {
-		if g.IsGroup && g.Children != nil {
-			// Sort children
+		if !g.IsGroup || g.Children == nil {
+			continue
+		}
+
+		// Check if children are sub-groups or leaf rows
+		if len(g.Children) > 0 && g.Children[0].IsGroup {
+			m.sortGroupsAtLevel(g.Children, level+1)
+		} else {
+			// Sort leaf rows
 			childRows := make([]row.RowNode[T], len(g.Children))
 			for i, c := range g.Children {
 				childRows[i] = *c
@@ -644,10 +688,19 @@ func (m *Model[T]) sortGroups(groups []*row.RowNode[T]) {
 			for i := range childRows {
 				g.Children[i] = &childRows[i]
 			}
-			// Recurse into sub-groups
-			m.sortGroups(g.Children)
 		}
 	}
+}
+
+// firstLeafValue walks down to the first leaf row and returns the column value.
+func (m *Model[T]) firstLeafValue(node *row.RowNode[T], col *column.ColDef[T]) any {
+	if !node.IsGroup {
+		return col.ValueGetter(node.Data)
+	}
+	if len(node.Children) > 0 {
+		return m.firstLeafValue(node.Children[0], col)
+	}
+	return nil
 }
 
 func (m *Model[T]) findCol(colID string) *column.ColDef[T] {
