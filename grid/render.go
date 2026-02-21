@@ -386,7 +386,7 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 		if renderer != nil {
 			cellContent = renderer.Render(ctx)
 		} else {
-			cellContent = data.TruncateOrPad(cellContent, contentWidth)
+			cellContent = ansi.Truncate(cellContent, contentWidth, "…")
 		}
 
 		cells = append(cells, style.Width(w).MaxWidth(w).Render(cellContent))
@@ -535,10 +535,24 @@ func (m Model[T]) colSeparator() string {
 }
 
 // applyCustomStyle merges a custom cell style with the current state style.
-// When the cell is focused or selected, the colors from the state style are
-// preserved while other properties (e.g. alignment) come from the custom style.
+// Inherit handles colors, alignment, and text decorations. Padding is not
+// inherited by lipgloss, so we carry it over manually when the custom style
+// has none. When the cell is focused or selected, the colors from the state
+// style are forced so the highlight remains visible.
 func applyCustomStyle(custom, state lipgloss.Style, isFocused, isSelected bool) lipgloss.Style {
 	result := custom.Inherit(state)
+
+	// lipgloss.Inherit skips padding. If custom didn't set any,
+	// preserve the base style's padding so content width and visual
+	// spacing remain correct.
+	t, r, b, l := result.GetPadding()
+	if t == 0 && r == 0 && b == 0 && l == 0 {
+		t, r, b, l = state.GetPadding()
+		if t > 0 || r > 0 || b > 0 || l > 0 {
+			result = result.Padding(t, r, b, l)
+		}
+	}
+
 	if isFocused || isSelected {
 		result = result.
 			Foreground(state.GetForeground()).
