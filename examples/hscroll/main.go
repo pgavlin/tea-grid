@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/grid"
 )
 
@@ -49,8 +49,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string { return m.grid.View() }
 
 func main() {
-	cols := []column.ColDef[Stock]{
-		{ColID: "ticker", HeaderName: "Ticker", ValueGetter: func(s Stock) any { return s.Ticker }, Width: 8, Pinned: column.PinLeft, Sortable: true},
+	cols := []data.ColDef[Stock]{
+		{ColID: "ticker", HeaderName: "Ticker", ValueGetter: func(s Stock) any { return s.Ticker }, Width: 8, Pinned: data.PinLeft, Sortable: true},
 		{ColID: "company", HeaderName: "Company", ValueGetter: func(s Stock) any { return s.Company }, Width: 22, Sortable: true},
 		{ColID: "sector", HeaderName: "Sector", ValueGetter: func(s Stock) any { return s.Sector }, Width: 16, Sortable: true},
 		{ColID: "price", HeaderName: "Price", ValueGetter: func(s Stock) any { return s.Price }, Width: 10, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("$%.2f", v.(float64)) }},

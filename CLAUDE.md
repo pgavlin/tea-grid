@@ -39,14 +39,12 @@ All state lives in `grid.Model[T]`. Messages flow through `Update` (in `grid/upd
 ### Package Dependency Graph
 
 ```
-grid  →  column, row, cell, filter, sort, selection, grouping
-cell  →  (standalone, defines CellRenderer/CellEditor interfaces)
-filter → (standalone, defines Filter interface)
-sort   →  column (uses SortDirection)
-grouping → column, row
-selection → (standalone)
-column → filter (ColDef has Filter field)
-row    → (standalone)
+grid      →  data, filter, sort, selection, grouping
+data      →  filter (ColDef has Filter field; also defines CellRenderer/CellEditor/RowNode)
+filter    →  (standalone, defines Filter interface)
+sort      →  data (uses SortDirection)
+grouping  →  data (uses RowNode, ColDef)
+selection →  (standalone)
 ```
 
 `grid/` is the integration package that composes all others. The sub-packages are independently usable and have no dependency on `grid/`.
@@ -55,7 +53,7 @@ row    → (standalone)
 
 - **Generics**: `Model[T]` is parameterized on the row data type. `ColDef[T]` uses `ValueGetter func(T) any` for type-safe data extraction.
 - **Functional options**: `grid.New[T](opts...)` using `Option[T] func(*Model[T])`.
-- **Interface-based extension**: `cell.CellRenderer[T]`, `cell.CellEditor[T]`, and `filter.Filter` are the main extension points.
+- **Interface-based extension**: `data.CellRenderer[T]`, `data.CellEditor[T]`, and `filter.Filter` are the main extension points.
 - **Display row pipeline** (`grid.go:recomputeDisplayRows`): raw rows → pin separation → external filter → column filters → quick filter → grouping → sorting → post-sort hook → flat display list. Results are cached; the `dirty` flag triggers recomputation.
 
 ### Grid File Responsibilities
@@ -85,4 +83,4 @@ In `grid.go:computeColWidths`: fixed-width columns allocated first, then remaini
 
 ### Reflection Usage
 
-`column.Columns[T]()` uses reflection once at init to derive `ColDef` slice from struct fields. In hot paths, everything uses the `ValueGetter` function closures — no reflection at runtime.
+`data.Columns[T]()` uses reflection once at init to derive `ColDef` slice from struct fields. In hot paths, everything uses the `ValueGetter` function closures — no reflection at runtime.

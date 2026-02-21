@@ -1,4 +1,4 @@
-package column
+package data
 
 import (
 	tea "github.com/charmbracelet/bubbletea"

@@ -10,7 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/grid"
 	"github.com/pgavlin/tea-grid/selection"
 )
@@ -83,7 +83,7 @@ func main() {
 	}
 
 	// Discover columns before adding internal keys.
-	cols := column.FromRows[Row](rows)
+	cols := data.FromRows[Row](rows)
 
 	// Assign row indices for use as row IDs.
 	for i := range rows {
@@ -92,7 +92,7 @@ func main() {
 
 	// Pin first column left.
 	if len(cols) > 0 {
-		cols[0].Pinned = column.PinLeft
+		cols[0].Pinned = data.PinLeft
 		cols[0].MinWidth = 16
 		cols[0].Flex = 2
 	}

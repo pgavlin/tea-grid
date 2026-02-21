@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/selection"
 	gridsort "github.com/pgavlin/tea-grid/sort"
@@ -23,8 +23,8 @@ type TestRow struct {
 	Active     bool
 }
 
-func testCols() []column.ColDef[TestRow] {
-	return []column.ColDef[TestRow]{
+func testCols() []data.ColDef[TestRow] {
+	return []data.ColDef[TestRow]{
 		{ColID: "Name", HeaderName: "Name", ValueGetter: func(r TestRow) any { return r.Name }, Sortable: true, Filterable: true, MinWidth: 4},
 		{ColID: "Department", HeaderName: "Department", ValueGetter: func(r TestRow) any { return r.Department }, Sortable: true, Filterable: true, MinWidth: 4},
 		{ColID: "Salary", HeaderName: "Salary", ValueGetter: func(r TestRow) any { return r.Salary }, Sortable: true, Filterable: true, MinWidth: 4},
@@ -181,7 +181,7 @@ func TestWithGroupDefaultExpanded(t *testing.T) {
 
 func TestWithDefaultSort(t *testing.T) {
 	criteria := []gridsort.SortCriterion{
-		{ColID: "Name", Direction: column.SortAsc},
+		{ColID: "Name", Direction: data.SortAsc},
 	}
 	m := New(
 		WithColumns[TestRow](testCols()),
@@ -231,7 +231,7 @@ func TestWithExternalFilter(t *testing.T) {
 
 func TestWithPostSort(t *testing.T) {
 	called := false
-	fn := func(rows []column.RowNode[TestRow]) []column.RowNode[TestRow] {
+	fn := func(rows []data.RowNode[TestRow]) []data.RowNode[TestRow] {
 		called = true
 		return rows
 	}
@@ -371,7 +371,7 @@ func TestSetRows_Rows_RoundTrip(t *testing.T) {
 
 func TestSetColumns_Columns_RoundTrip(t *testing.T) {
 	m := newTestGrid()
-	newCols := []column.ColDef[TestRow]{
+	newCols := []data.ColDef[TestRow]{
 		{ColID: "Name", HeaderName: "Name", ValueGetter: func(r TestRow) any { return r.Name }},
 	}
 	m.SetColumns(newCols)
@@ -462,7 +462,7 @@ func TestDirtyFlag(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestColumnSizing_FixedWidth(t *testing.T) {
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 20},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30},
 	}
@@ -476,7 +476,7 @@ func TestColumnSizing_FixedWidth(t *testing.T) {
 }
 
 func TestColumnSizing_FlexDistribution(t *testing.T) {
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
@@ -493,7 +493,7 @@ func TestColumnSizing_FlexDistribution(t *testing.T) {
 }
 
 func TestColumnSizing_MinWidthRespected(t *testing.T) {
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, MinWidth: 10, Flex: 1},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, MinWidth: 10, Flex: 1},
 	}
@@ -509,7 +509,7 @@ func TestColumnSizing_MinWidthRespected(t *testing.T) {
 }
 
 func TestColumnSizing_MaxWidthClamped(t *testing.T) {
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4, MaxWidth: 15},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
@@ -522,7 +522,7 @@ func TestColumnSizing_MaxWidthClamped(t *testing.T) {
 }
 
 func TestColumnSizing_MixedFixedAndFlex(t *testing.T) {
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 20},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
@@ -539,7 +539,7 @@ func TestColumnSizing_MixedFixedAndFlex(t *testing.T) {
 }
 
 func TestColumnSizing_BorderColumnSubtractsSpace(t *testing.T) {
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
@@ -554,7 +554,7 @@ func TestColumnSizing_BorderColumnSubtractsSpace(t *testing.T) {
 }
 
 func TestColumnSizing_SingleFlexColumn(t *testing.T) {
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
 	}
 	s := DefaultStyles()
@@ -566,7 +566,7 @@ func TestColumnSizing_SingleFlexColumn(t *testing.T) {
 }
 
 func TestColumnSizing_HiddenColumnsGetWidthZero(t *testing.T) {
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4, Hide: true},
 	}
@@ -648,7 +648,7 @@ func TestDisplayRows_MultipleFiltersAND(t *testing.T) {
 func TestDisplayRows_SortApplied(t *testing.T) {
 	m := newTestGrid(
 		WithDefaultSort[TestRow]([]gridsort.SortCriterion{
-			{ColID: "Name", Direction: column.SortAsc},
+			{ColID: "Name", Direction: data.SortAsc},
 		}),
 	)
 	names := make([]string, len(m.displayRows))
@@ -666,7 +666,7 @@ func TestDisplayRows_SortApplied(t *testing.T) {
 func TestDisplayRows_SortDescending(t *testing.T) {
 	m := newTestGrid(
 		WithDefaultSort[TestRow]([]gridsort.SortCriterion{
-			{ColID: "Name", Direction: column.SortDesc},
+			{ColID: "Name", Direction: data.SortDesc},
 		}),
 	)
 	if m.displayRows[0].Data.Name != "Eve" {
@@ -680,9 +680,9 @@ func TestDisplayRows_SortDescending(t *testing.T) {
 func TestDisplayRows_PostSortHook(t *testing.T) {
 	// Reverse the rows via post-sort
 	m := newTestGrid(
-		WithPostSort[TestRow](func(rows []column.RowNode[TestRow]) []column.RowNode[TestRow] {
+		WithPostSort[TestRow](func(rows []data.RowNode[TestRow]) []data.RowNode[TestRow] {
 			n := len(rows)
-			reversed := make([]column.RowNode[TestRow], n)
+			reversed := make([]data.RowNode[TestRow], n)
 			for i, rn := range rows {
 				reversed[n-1-i] = rn
 			}
@@ -699,7 +699,7 @@ func TestDisplayRows_PinnedRowsExcludedFromSortFilter(t *testing.T) {
 	m := newTestGrid(
 		WithPinnedTopRows[TestRow](func(r TestRow) bool { return r.Name == "Alice" }),
 		WithDefaultSort[TestRow]([]gridsort.SortCriterion{
-			{ColID: "Name", Direction: column.SortDesc},
+			{ColID: "Name", Direction: data.SortDesc},
 		}),
 	)
 	// Alice should be in pinnedTop, not in displayRows
@@ -971,7 +971,7 @@ func TestSort_EnterOnHeaderTogglesSortAsc(t *testing.T) {
 	if len(m.sortModel.SortOrder) != 1 {
 		t.Fatalf("expected 1 sort criterion, got %d", len(m.sortModel.SortOrder))
 	}
-	if m.sortModel.SortOrder[0].Direction != column.SortAsc {
+	if m.sortModel.SortOrder[0].Direction != data.SortAsc {
 		t.Errorf("expected SortAsc, got %d", m.sortModel.SortOrder[0].Direction)
 	}
 }
@@ -982,13 +982,13 @@ func TestSort_EnterOnHeaderCycles(t *testing.T) {
 
 	// First enter -> asc
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if m.sortModel.SortOrder[0].Direction != column.SortAsc {
+	if m.sortModel.SortOrder[0].Direction != data.SortAsc {
 		t.Errorf("expected SortAsc, got %d", m.sortModel.SortOrder[0].Direction)
 	}
 
 	// Second enter -> desc
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if m.sortModel.SortOrder[0].Direction != column.SortDesc {
+	if m.sortModel.SortOrder[0].Direction != data.SortDesc {
 		t.Errorf("expected SortDesc, got %d", m.sortModel.SortOrder[0].Direction)
 	}
 
@@ -1353,7 +1353,7 @@ func TestRender_DataRowsRendered(t *testing.T) {
 func TestRender_SortIndicators(t *testing.T) {
 	m := newTestGrid(
 		WithDefaultSort[TestRow]([]gridsort.SortCriterion{
-			{ColID: "Name", Direction: column.SortAsc},
+			{ColID: "Name", Direction: data.SortAsc},
 		}),
 	)
 	output := m.View()
@@ -1363,7 +1363,7 @@ func TestRender_SortIndicators(t *testing.T) {
 
 	// Change to desc
 	m.SetSort([]gridsort.SortCriterion{
-		{ColID: "Name", Direction: column.SortDesc},
+		{ColID: "Name", Direction: data.SortDesc},
 	})
 	output = m.View()
 	if !strings.Contains(output, m.styles.SortDesc) {
@@ -1486,11 +1486,11 @@ func TestPublicAPI_IsSelected(t *testing.T) {
 func TestPublicAPI_SetSort_SortOrder(t *testing.T) {
 	m := newTestGrid()
 	criteria := []gridsort.SortCriterion{
-		{ColID: "Salary", Direction: column.SortDesc},
+		{ColID: "Salary", Direction: data.SortDesc},
 	}
 	m.SetSort(criteria)
 	got := m.SortOrder()
-	if len(got) != 1 || got[0].ColID != "Salary" || got[0].Direction != column.SortDesc {
+	if len(got) != 1 || got[0].ColID != "Salary" || got[0].Direction != data.SortDesc {
 		t.Errorf("unexpected sort order: %v", got)
 	}
 	// Verify rows sorted by salary desc
@@ -1615,12 +1615,12 @@ func TestPublicAPI_ScrollToBottom(t *testing.T) {
 
 func TestPublicAPI_PinUnpinColumn(t *testing.T) {
 	m := newTestGrid()
-	m.PinColumn("Name", column.PinLeft)
-	if m.cols[0].Pinned != column.PinLeft {
+	m.PinColumn("Name", data.PinLeft)
+	if m.cols[0].Pinned != data.PinLeft {
 		t.Errorf("expected Name pinned left, got %d", m.cols[0].Pinned)
 	}
 	m.UnpinColumn("Name")
-	if m.cols[0].Pinned != column.PinNone {
+	if m.cols[0].Pinned != data.PinNone {
 		t.Errorf("expected Name unpinned, got %d", m.cols[0].Pinned)
 	}
 }
@@ -1635,7 +1635,7 @@ func TestPublicAPI_PinUnpinRow(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	m.PinRow("Alice", column.PinTop)
+	m.PinRow("Alice", data.PinTop)
 	// Recomputation should move Alice to pinnedTop
 	found := false
 	for _, rn := range m.pinnedTop {
@@ -1848,7 +1848,7 @@ func TestQuickFilter_BackspaceRemovesChar(t *testing.T) {
 func TestSort_NumericSort(t *testing.T) {
 	m := newTestGrid(
 		WithDefaultSort[TestRow]([]gridsort.SortCriterion{
-			{ColID: "Salary", Direction: column.SortAsc},
+			{ColID: "Salary", Direction: data.SortAsc},
 		}),
 	)
 	for i := 1; i < len(m.displayRows); i++ {
@@ -1929,7 +1929,7 @@ func TestSelectedRowNodes(t *testing.T) {
 
 func TestHorizontalScroll_ColumnsExceedViewport(t *testing.T) {
 	// Create columns whose MinWidths total > viewport width (80)
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, MinWidth: 30},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, MinWidth: 30},
 		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, MinWidth: 30},
@@ -1959,7 +1959,7 @@ func TestHorizontalScroll_ColumnsExceedViewport(t *testing.T) {
 
 func TestHorizontalScroll_LeftColUpdatesVisibleCols(t *testing.T) {
 	// Columns with varying widths; total exceeds viewport width
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 25},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 25},
 		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 25},
@@ -1990,7 +1990,7 @@ func TestHorizontalScroll_LeftColUpdatesVisibleCols(t *testing.T) {
 
 func TestHorizontalScroll_VaryingWidths(t *testing.T) {
 	// First column is very wide, rest are narrow
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 50},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 10},
 		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 10},
@@ -2036,7 +2036,7 @@ func TestHorizontalScroll_VaryingWidths(t *testing.T) {
 
 func TestUpdateVisibleColCount_CountsFromLeftCol(t *testing.T) {
 	// Set up a grid with fixed-width columns that exceed viewport
-	cols := []column.ColDef[TestRow]{
+	cols := []data.ColDef[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 30},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30},
 		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 30},

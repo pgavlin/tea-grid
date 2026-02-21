@@ -1,7 +1,7 @@
 package grid
 
 import (
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/selection"
 	"github.com/pgavlin/tea-grid/sort"
 )
@@ -10,14 +10,14 @@ import (
 type Option[T any] func(*Model[T])
 
 // WithColumns sets the column definitions.
-func WithColumns[T any](cols []column.ColDef[T]) Option[T] {
+func WithColumns[T any](cols []data.ColDef[T]) Option[T] {
 	return func(m *Model[T]) {
 		m.cols = cols
 	}
 }
 
 // WithColumnGroups sets the column groups for grouped headers.
-func WithColumnGroups[T any](groups []column.ColGroup[T]) Option[T] {
+func WithColumnGroups[T any](groups []data.ColGroup[T]) Option[T] {
 	return func(m *Model[T]) {
 		m.colGroups = groups
 	}
@@ -137,7 +137,7 @@ func WithMultiSort[T any](enabled bool) Option[T] {
 }
 
 // WithPostSort sets a post-sort transformation function.
-func WithPostSort[T any](fn func([]column.RowNode[T]) []column.RowNode[T]) Option[T] {
+func WithPostSort[T any](fn func([]data.RowNode[T]) []data.RowNode[T]) Option[T] {
 	return func(m *Model[T]) {
 		m.postSort = fn
 	}

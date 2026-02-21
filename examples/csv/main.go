@@ -11,7 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/grid"
 	"github.com/pgavlin/tea-grid/selection"
@@ -96,8 +96,8 @@ func inferType(col int, rows []Row) string {
 	return "string"
 }
 
-func buildColumns(headers []string, rows []Row) []column.ColDef[Row] {
-	cols := make([]column.ColDef[Row], len(headers))
+func buildColumns(headers []string, rows []Row) []data.ColDef[Row] {
+	cols := make([]data.ColDef[Row], len(headers))
 
 	rightAligned := lipgloss.NewStyle().Align(lipgloss.Right)
 
@@ -105,7 +105,7 @@ func buildColumns(headers []string, rows []Row) []column.ColDef[Row] {
 		idx := i // capture
 		typ := inferType(idx, rows)
 
-		col := column.ColDef[Row]{
+		col := data.ColDef[Row]{
 			ColID:      fmt.Sprintf("col%d", idx),
 			HeaderName: hdr,
 			Sortable:   true,
@@ -165,7 +165,7 @@ func buildColumns(headers []string, rows []Row) []column.ColDef[Row] {
 
 		// Pin first column left.
 		if i == 0 {
-			col.Pinned = column.PinLeft
+			col.Pinned = data.PinLeft
 			col.MinWidth = 16
 			col.Flex = 2
 		}

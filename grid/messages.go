@@ -1,7 +1,7 @@
 package grid
 
 import (
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/sort"
 )
 
@@ -19,7 +19,7 @@ type FocusChangedMsg struct {
 
 // SelectionChangedMsg is emitted when the selection set changes.
 type SelectionChangedMsg[T any] struct {
-	Selected []column.RowNode[T]
+	Selected []data.RowNode[T]
 }
 
 // SortChangedMsg is emitted when the sort order changes.

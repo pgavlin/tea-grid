@@ -1,4 +1,4 @@
-package column
+package data
 
 // RowNode wraps a user-supplied row value with runtime metadata.
 type RowNode[T any] struct {

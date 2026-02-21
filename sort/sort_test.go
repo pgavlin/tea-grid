@@ -3,7 +3,7 @@ package sort
 import (
 	"testing"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 )
 
 func TestToggleSortAddNew(t *testing.T) {
@@ -12,24 +12,24 @@ func TestToggleSortAddNew(t *testing.T) {
 	if len(m.SortOrder) != 1 {
 		t.Fatalf("expected 1 sort, got %d", len(m.SortOrder))
 	}
-	if m.SortOrder[0].ColID != "col1" || m.SortOrder[0].Direction != column.SortAsc {
+	if m.SortOrder[0].ColID != "col1" || m.SortOrder[0].Direction != data.SortAsc {
 		t.Errorf("expected col1 Asc, got %+v", m.SortOrder[0])
 	}
 }
 
 func TestToggleSortAscToDesc(t *testing.T) {
-	m := Model[string]{SortOrder: []SortCriterion{{ColID: "col1", Direction: column.SortAsc}}}
+	m := Model[string]{SortOrder: []SortCriterion{{ColID: "col1", Direction: data.SortAsc}}}
 	m.ToggleSort("col1")
 	if len(m.SortOrder) != 1 {
 		t.Fatalf("expected 1 sort, got %d", len(m.SortOrder))
 	}
-	if m.SortOrder[0].Direction != column.SortDesc {
+	if m.SortOrder[0].Direction != data.SortDesc {
 		t.Errorf("expected Desc, got %v", m.SortOrder[0].Direction)
 	}
 }
 
 func TestToggleSortDescToRemoved(t *testing.T) {
-	m := Model[string]{SortOrder: []SortCriterion{{ColID: "col1", Direction: column.SortDesc}}}
+	m := Model[string]{SortOrder: []SortCriterion{{ColID: "col1", Direction: data.SortDesc}}}
 	m.ToggleSort("col1")
 	if len(m.SortOrder) != 0 {
 		t.Fatalf("expected 0 sorts after desc toggle, got %d", len(m.SortOrder))
@@ -37,7 +37,7 @@ func TestToggleSortDescToRemoved(t *testing.T) {
 }
 
 func TestToggleSortReplaceOnNewColumn(t *testing.T) {
-	m := Model[string]{SortOrder: []SortCriterion{{ColID: "col1", Direction: column.SortAsc}}}
+	m := Model[string]{SortOrder: []SortCriterion{{ColID: "col1", Direction: data.SortAsc}}}
 	m.ToggleSort("col2")
 	if len(m.SortOrder) != 1 {
 		t.Fatalf("expected 1 sort, got %d", len(m.SortOrder))
@@ -48,34 +48,34 @@ func TestToggleSortReplaceOnNewColumn(t *testing.T) {
 }
 
 func TestAddSortAppend(t *testing.T) {
-	m := Model[string]{SortOrder: []SortCriterion{{ColID: "col1", Direction: column.SortAsc}}}
+	m := Model[string]{SortOrder: []SortCriterion{{ColID: "col1", Direction: data.SortAsc}}}
 	m.AddSort("col2")
 	if len(m.SortOrder) != 2 {
 		t.Fatalf("expected 2 sorts, got %d", len(m.SortOrder))
 	}
-	if m.SortOrder[1].ColID != "col2" || m.SortOrder[1].Direction != column.SortAsc {
+	if m.SortOrder[1].ColID != "col2" || m.SortOrder[1].Direction != data.SortAsc {
 		t.Errorf("expected col2 Asc, got %+v", m.SortOrder[1])
 	}
 }
 
 func TestAddSortCycleExisting(t *testing.T) {
 	m := Model[string]{SortOrder: []SortCriterion{
-		{ColID: "col1", Direction: column.SortAsc},
-		{ColID: "col2", Direction: column.SortAsc},
+		{ColID: "col1", Direction: data.SortAsc},
+		{ColID: "col2", Direction: data.SortAsc},
 	}}
 	m.AddSort("col2")
 	if len(m.SortOrder) != 2 {
 		t.Fatalf("expected 2 sorts, got %d", len(m.SortOrder))
 	}
-	if m.SortOrder[1].Direction != column.SortDesc {
+	if m.SortOrder[1].Direction != data.SortDesc {
 		t.Errorf("expected col2 Desc, got %v", m.SortOrder[1].Direction)
 	}
 }
 
 func TestAddSortRemoveOnThirdToggle(t *testing.T) {
 	m := Model[string]{SortOrder: []SortCriterion{
-		{ColID: "col1", Direction: column.SortAsc},
-		{ColID: "col2", Direction: column.SortDesc},
+		{ColID: "col1", Direction: data.SortAsc},
+		{ColID: "col2", Direction: data.SortDesc},
 	}}
 	m.AddSort("col2")
 	if len(m.SortOrder) != 1 {
@@ -88,8 +88,8 @@ func TestAddSortRemoveOnThirdToggle(t *testing.T) {
 
 func TestClear(t *testing.T) {
 	m := Model[string]{SortOrder: []SortCriterion{
-		{ColID: "col1", Direction: column.SortAsc},
-		{ColID: "col2", Direction: column.SortDesc},
+		{ColID: "col1", Direction: data.SortAsc},
+		{ColID: "col2", Direction: data.SortDesc},
 	}}
 	m.Clear()
 	if len(m.SortOrder) != 0 {
@@ -99,20 +99,20 @@ func TestClear(t *testing.T) {
 
 func TestDirectionFor(t *testing.T) {
 	m := Model[string]{SortOrder: []SortCriterion{
-		{ColID: "col1", Direction: column.SortAsc},
+		{ColID: "col1", Direction: data.SortAsc},
 	}}
-	if d := m.DirectionFor("col1"); d != column.SortAsc {
+	if d := m.DirectionFor("col1"); d != data.SortAsc {
 		t.Errorf("expected SortAsc, got %v", d)
 	}
-	if d := m.DirectionFor("unknown"); d != column.SortNone {
+	if d := m.DirectionFor("unknown"); d != data.SortNone {
 		t.Errorf("expected SortNone, got %v", d)
 	}
 }
 
 func TestIndexFor(t *testing.T) {
 	m := Model[string]{SortOrder: []SortCriterion{
-		{ColID: "col1", Direction: column.SortAsc},
-		{ColID: "col2", Direction: column.SortDesc},
+		{ColID: "col1", Direction: data.SortAsc},
+		{ColID: "col2", Direction: data.SortDesc},
 	}}
 	if idx := m.IndexFor("col1"); idx != 0 {
 		t.Errorf("expected 0, got %d", idx)

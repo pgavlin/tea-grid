@@ -2,13 +2,13 @@
 package sort
 
 import (
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 )
 
 // SortCriterion describes a single sort column and direction.
 type SortCriterion struct {
 	ColID     string
-	Direction column.SortDirection // Asc or Desc.
+	Direction data.SortDirection // Asc or Desc.
 }
 
 // Model holds the current sort state.
@@ -24,9 +24,9 @@ func (m *Model[T]) ToggleSort(colID string) {
 	for i, sc := range m.SortOrder {
 		if sc.ColID == colID {
 			switch sc.Direction {
-			case column.SortAsc:
-				m.SortOrder[i].Direction = column.SortDesc
-			case column.SortDesc:
+			case data.SortAsc:
+				m.SortOrder[i].Direction = data.SortDesc
+			case data.SortDesc:
 				// Remove from sort order
 				m.SortOrder = append(m.SortOrder[:i], m.SortOrder[i+1:]...)
 			}
@@ -34,7 +34,7 @@ func (m *Model[T]) ToggleSort(colID string) {
 		}
 	}
 	// Not currently sorted — set as primary sort (asc), replacing existing
-	m.SortOrder = []SortCriterion{{ColID: colID, Direction: column.SortAsc}}
+	m.SortOrder = []SortCriterion{{ColID: colID, Direction: data.SortAsc}}
 }
 
 // AddSort adds a column to multi-sort or toggles it if already present.
@@ -42,15 +42,15 @@ func (m *Model[T]) AddSort(colID string) {
 	for i, sc := range m.SortOrder {
 		if sc.ColID == colID {
 			switch sc.Direction {
-			case column.SortAsc:
-				m.SortOrder[i].Direction = column.SortDesc
-			case column.SortDesc:
+			case data.SortAsc:
+				m.SortOrder[i].Direction = data.SortDesc
+			case data.SortDesc:
 				m.SortOrder = append(m.SortOrder[:i], m.SortOrder[i+1:]...)
 			}
 			return
 		}
 	}
-	m.SortOrder = append(m.SortOrder, SortCriterion{ColID: colID, Direction: column.SortAsc})
+	m.SortOrder = append(m.SortOrder, SortCriterion{ColID: colID, Direction: data.SortAsc})
 }
 
 // Clear removes all sort criteria.
@@ -59,13 +59,13 @@ func (m *Model[T]) Clear() {
 }
 
 // DirectionFor returns the sort direction for the given column, or SortNone.
-func (m *Model[T]) DirectionFor(colID string) column.SortDirection {
+func (m *Model[T]) DirectionFor(colID string) data.SortDirection {
 	for _, sc := range m.SortOrder {
 		if sc.ColID == colID {
 			return sc.Direction
 		}
 	}
-	return column.SortNone
+	return data.SortNone
 }
 
 // IndexFor returns the sort index (0-based) for the given column, or -1.

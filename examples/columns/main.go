@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/grid"
 	"github.com/pgavlin/tea-grid/selection"
@@ -38,12 +38,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string { return m.grid.View() }
 
 func main() {
-	cols := []column.ColDef[Employee]{
+	cols := []data.ColDef[Employee]{
 		{
 			ColID:       "name",
 			HeaderName:  "Employee Name",
 			ValueGetter: func(e Employee) any { return e.Name },
-			Pinned:      column.PinLeft,
+			Pinned:      data.PinLeft,
 			MinWidth:    20,
 			Flex:        2,
 			Filterable:  true,

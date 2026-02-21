@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 )
 
 // View renders the grid as a string.
@@ -217,9 +217,9 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 		// Add sort indicator
 		dir := m.sortModel.DirectionFor(col.ColID)
 		switch dir {
-		case column.SortAsc:
+		case data.SortAsc:
 			header += " " + m.styles.SortAsc
-		case column.SortDesc:
+		case data.SortDesc:
 			header += " " + m.styles.SortDesc
 		}
 
@@ -234,7 +234,7 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 		if contentWidth < 1 {
 			contentWidth = 1
 		}
-		header = column.TruncateOrPad(header, contentWidth)
+		header = data.TruncateOrPad(header, contentWidth)
 
 		cells = append(cells, style.Width(w).MaxWidth(w).Render(header))
 	}
@@ -247,7 +247,7 @@ func (m Model[T]) renderHeaderBorder() string {
 }
 
 // renderRow renders a single row.
-func (m Model[T]) renderRow(rn *column.RowNode[T], displayIndex int, isPinned bool) string {
+func (m Model[T]) renderRow(rn *data.RowNode[T], displayIndex int, isPinned bool) string {
 	if rn.IsGroup {
 		return m.renderGroupRow(rn)
 	}
@@ -290,7 +290,7 @@ func (m Model[T]) renderRow(rn *column.RowNode[T], displayIndex int, isPinned bo
 }
 
 // renderCells renders cells for a row across specified column indices.
-func (m Model[T]) renderCells(rn *column.RowNode[T], colIndices []int, displayIndex int, isPinned bool) string {
+func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayIndex int, isPinned bool) string {
 	var cells []string
 
 	skipUntil := -1
@@ -366,7 +366,7 @@ func (m Model[T]) renderCells(rn *column.RowNode[T], colIndices []int, displayIn
 
 		// Use custom renderer if available, otherwise default to formatted text
 		cellContent := formatted
-		ctx := column.CellContext[T]{
+		ctx := data.CellContext[T]{
 			Value:          val,
 			FormattedValue: formatted,
 			Data:           rn.Data,
@@ -380,7 +380,7 @@ func (m Model[T]) renderCells(rn *column.RowNode[T], colIndices []int, displayIn
 			Height:         1,
 		}
 
-		var renderer column.CellRenderer[T]
+		var renderer data.CellRenderer[T]
 		if col.CellRendererSelector != nil {
 			renderer = col.CellRendererSelector(rn.Data)
 		}
@@ -390,7 +390,7 @@ func (m Model[T]) renderCells(rn *column.RowNode[T], colIndices []int, displayIn
 		if renderer != nil {
 			cellContent = renderer.Render(ctx)
 		} else {
-			cellContent = column.TruncateOrPad(cellContent, contentWidth)
+			cellContent = data.TruncateOrPad(cellContent, contentWidth)
 		}
 
 		cells = append(cells, style.Width(w).MaxWidth(w).Render(cellContent))
@@ -400,7 +400,7 @@ func (m Model[T]) renderCells(rn *column.RowNode[T], colIndices []int, displayIn
 }
 
 // renderGroupRow renders a synthetic group row.
-func (m Model[T]) renderGroupRow(rn *column.RowNode[T]) string {
+func (m Model[T]) renderGroupRow(rn *data.RowNode[T]) string {
 	indent := strings.Repeat(" ", rn.GroupLevel*m.styles.GroupIndent)
 
 	indicator := m.styles.GroupCollapsed

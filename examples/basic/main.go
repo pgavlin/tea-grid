@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/grid"
 )
 
@@ -36,7 +36,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string { return m.grid.View() }
 
 func main() {
-	cols := column.FromType[Employee]()
+	cols := data.FromType[Employee]()
 
 	rows := []Employee{
 		{"Alice Johnson", "Engineering", 145000, true},

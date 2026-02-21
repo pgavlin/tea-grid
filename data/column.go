@@ -1,5 +1,5 @@
-// Package column defines column types for the tea-grid component.
-package column
+// Package data defines column, row, and cell types for the tea-grid component.
+package data
 
 import (
 	"fmt"

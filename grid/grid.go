@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/grouping"
 	"github.com/pgavlin/tea-grid/selection"
@@ -20,7 +20,7 @@ import (
 // editState holds the state for an active cell edit.
 type editState[T any] struct {
 	position CellPosition
-	editor   column.CellEditor[T]
+	editor   data.CellEditor[T]
 	oldValue any
 }
 
@@ -31,20 +31,20 @@ type Model[T any] struct {
 	Help   help.Model
 
 	// Column definitions
-	cols      []column.ColDef[T]
-	colGroups []column.ColGroup[T]
+	cols      []data.ColDef[T]
+	colGroups []data.ColGroup[T]
 
 	// Row data
-	rows      []column.RowNode[T] // All row nodes
-	pinnedTop []column.RowNode[T] // Rows pinned to top
-	pinnedBot []column.RowNode[T] // Rows pinned to bottom
+	rows      []data.RowNode[T] // All row nodes
+	pinnedTop []data.RowNode[T] // Rows pinned to top
+	pinnedBot []data.RowNode[T] // Rows pinned to bottom
 
 	// Row ID function
 	rowIDFunc func(T) string
 	nextRowID int
 
 	// Computed display rows (cached)
-	displayRows []column.RowNode[T]
+	displayRows []data.RowNode[T]
 	dirty       bool // true if display rows need recomputing
 
 	// Column widths (computed)
@@ -59,7 +59,7 @@ type Model[T any] struct {
 
 	// Sorting
 	sortModel gridsort.Model[T]
-	postSort  func([]column.RowNode[T]) []column.RowNode[T]
+	postSort  func([]data.RowNode[T]) []data.RowNode[T]
 
 	// Filtering
 	quickFilterEnabled bool
@@ -83,8 +83,8 @@ type Model[T any] struct {
 	pinnedBotFunc        func(T) bool
 	staticPinnedTop      []T
 	staticPinnedBot      []T
-	staticPinnedTopNodes []column.RowNode[T]
-	staticPinnedBotNodes []column.RowNode[T]
+	staticPinnedTopNodes []data.RowNode[T]
+	staticPinnedBotNodes []data.RowNode[T]
 
 	// Row height
 	defaultRowHeight int
@@ -163,7 +163,7 @@ func (m Model[T]) Rows() []T {
 }
 
 // SetColumns replaces the column definitions.
-func (m *Model[T]) SetColumns(cols []column.ColDef[T]) {
+func (m *Model[T]) SetColumns(cols []data.ColDef[T]) {
 	m.cols = cols
 	m.dirty = true
 	m.computeColWidths()
@@ -171,15 +171,15 @@ func (m *Model[T]) SetColumns(cols []column.ColDef[T]) {
 }
 
 // Columns returns the column definitions.
-func (m Model[T]) Columns() []column.ColDef[T] {
+func (m Model[T]) Columns() []data.ColDef[T] {
 	return m.cols
 }
 
 // UpdateRow updates the data for a row with the given ID.
-func (m *Model[T]) UpdateRow(id string, data T) {
+func (m *Model[T]) UpdateRow(id string, d T) {
 	for i := range m.rows {
 		if m.rows[i].ID == id {
-			m.rows[i].Data = data
+			m.rows[i].Data = d
 			m.dirty = true
 			m.recomputeDisplayRows()
 			return
@@ -188,8 +188,8 @@ func (m *Model[T]) UpdateRow(id string, data T) {
 }
 
 // InsertRow inserts a row at the given index.
-func (m *Model[T]) InsertRow(index int, data T) {
-	rn := m.makeRowNode(data)
+func (m *Model[T]) InsertRow(index int, d T) {
+	rn := m.makeRowNode(d)
 	if index >= len(m.rows) {
 		m.rows = append(m.rows, rn)
 	} else {
@@ -252,13 +252,13 @@ func (m Model[T]) SelectedRows() []T {
 	return result
 }
 
-func (m Model[T]) SelectedRowNodes() []*column.RowNode[T] {
+func (m Model[T]) SelectedRowNodes() []*data.RowNode[T] {
 	ids := m.sel.SelectedIDs()
 	idSet := make(map[string]bool, len(ids))
 	for _, id := range ids {
 		idSet[id] = true
 	}
-	var result []*column.RowNode[T]
+	var result []*data.RowNode[T]
 	for i := range m.rows {
 		if idSet[m.rows[i].ID] {
 			result = append(result, &m.rows[i])
@@ -268,13 +268,13 @@ func (m Model[T]) SelectedRowNodes() []*column.RowNode[T] {
 }
 
 // selectedRowNodes returns row nodes for all selected IDs (used for emitting SelectionChangedMsg).
-func (m Model[T]) selectedRowNodes() []column.RowNode[T] {
+func (m Model[T]) selectedRowNodes() []data.RowNode[T] {
 	ids := m.sel.SelectedIDs()
 	idSet := make(map[string]bool, len(ids))
 	for _, id := range ids {
 		idSet[id] = true
 	}
-	var result []column.RowNode[T]
+	var result []data.RowNode[T]
 	for _, rn := range m.rows {
 		if idSet[rn.ID] {
 			result = append(result, rn)
@@ -373,7 +373,7 @@ func (m *Model[T]) ScrollToBottom()       { m.vp.scrollToBottom(len(m.displayRow
 
 // --- Pinning ---
 
-func (m *Model[T]) PinColumn(colID string, dir column.Pin) {
+func (m *Model[T]) PinColumn(colID string, dir data.Pin) {
 	for i := range m.cols {
 		if m.cols[i].ColID == colID {
 			m.cols[i].Pinned = dir
@@ -384,10 +384,10 @@ func (m *Model[T]) PinColumn(colID string, dir column.Pin) {
 }
 
 func (m *Model[T]) UnpinColumn(colID string) {
-	m.PinColumn(colID, column.PinNone)
+	m.PinColumn(colID, data.PinNone)
 }
 
-func (m *Model[T]) PinRow(id string, pos column.Pin) {
+func (m *Model[T]) PinRow(id string, pos data.Pin) {
 	for i := range m.rows {
 		if m.rows[i].ID == id {
 			m.rows[i].Pinned = pos
@@ -399,7 +399,7 @@ func (m *Model[T]) PinRow(id string, pos column.Pin) {
 }
 
 func (m *Model[T]) UnpinRow(id string) {
-	m.PinRow(id, column.PinNone)
+	m.PinRow(id, data.PinNone)
 }
 
 // --- Help ---
@@ -430,23 +430,23 @@ func (m Model[T]) FullHelp() [][]key.Binding {
 // --- Internal ---
 
 func (m *Model[T]) setRowData(rows []T) {
-	m.rows = make([]column.RowNode[T], len(rows))
-	for i, data := range rows {
-		m.rows[i] = m.makeRowNode(data)
+	m.rows = make([]data.RowNode[T], len(rows))
+	for i, d := range rows {
+		m.rows[i] = m.makeRowNode(d)
 	}
 	m.dirty = true
 }
 
-func (m *Model[T]) makeRowNode(data T) column.RowNode[T] {
-	rn := column.RowNode[T]{
-		Data:      data,
+func (m *Model[T]) makeRowNode(d T) data.RowNode[T] {
+	rn := data.RowNode[T]{
+		Data:      d,
 		RowHeight: m.defaultRowHeight,
 	}
 	if m.dynamicRowHeight != nil {
-		rn.RowHeight = m.dynamicRowHeight(data)
+		rn.RowHeight = m.dynamicRowHeight(d)
 	}
 	if m.rowIDFunc != nil {
-		rn.ID = m.rowIDFunc(data)
+		rn.ID = m.rowIDFunc(d)
 	} else {
 		rn.ID = fmt.Sprintf("row-%d", m.nextRowID)
 		m.nextRowID++
@@ -456,15 +456,15 @@ func (m *Model[T]) makeRowNode(data T) column.RowNode[T] {
 
 func (m *Model[T]) buildStaticPinnedNodes() {
 	m.staticPinnedTopNodes = nil
-	for _, data := range m.staticPinnedTop {
-		rn := m.makeRowNode(data)
-		rn.Pinned = column.PinTop
+	for _, d := range m.staticPinnedTop {
+		rn := m.makeRowNode(d)
+		rn.Pinned = data.PinTop
 		m.staticPinnedTopNodes = append(m.staticPinnedTopNodes, rn)
 	}
 	m.staticPinnedBotNodes = nil
-	for _, data := range m.staticPinnedBot {
-		rn := m.makeRowNode(data)
-		rn.Pinned = column.PinBottom
+	for _, d := range m.staticPinnedBot {
+		rn := m.makeRowNode(d)
+		rn.Pinned = data.PinBottom
 		m.staticPinnedBotNodes = append(m.staticPinnedBotNodes, rn)
 	}
 }
@@ -509,7 +509,7 @@ func (m *Model[T]) recomputeDisplayRows() {
 	}
 
 	// Start with all rows
-	filtered := make([]column.RowNode[T], 0, len(m.rows))
+	filtered := make([]data.RowNode[T], 0, len(m.rows))
 
 	// Separate pinned rows
 	m.pinnedTop = nil
@@ -519,23 +519,23 @@ func (m *Model[T]) recomputeDisplayRows() {
 		rn := m.rows[i]
 
 		// Check static pinning
-		if rn.Pinned == column.PinTop {
+		if rn.Pinned == data.PinTop {
 			m.pinnedTop = append(m.pinnedTop, rn)
 			continue
 		}
-		if rn.Pinned == column.PinBottom {
+		if rn.Pinned == data.PinBottom {
 			m.pinnedBot = append(m.pinnedBot, rn)
 			continue
 		}
 
 		// Check dynamic pinning
 		if m.pinnedTopFunc != nil && m.pinnedTopFunc(rn.Data) {
-			rn.Pinned = column.PinTop
+			rn.Pinned = data.PinTop
 			m.pinnedTop = append(m.pinnedTop, rn)
 			continue
 		}
 		if m.pinnedBotFunc != nil && m.pinnedBotFunc(rn.Data) {
-			rn.Pinned = column.PinBottom
+			rn.Pinned = data.PinBottom
 			m.pinnedBot = append(m.pinnedBot, rn)
 			continue
 		}
@@ -633,7 +633,7 @@ func (m *Model[T]) passesQuickFilter(data T) bool {
 	return true
 }
 
-func (m *Model[T]) sortRows(rows []column.RowNode[T]) {
+func (m *Model[T]) sortRows(rows []data.RowNode[T]) {
 	if len(m.sortModel.SortOrder) == 0 {
 		return
 	}
@@ -654,7 +654,7 @@ func (m *Model[T]) sortRows(rows []column.RowNode[T]) {
 				cmp = defaultCompare(a, b)
 			}
 
-			if sc.Direction == column.SortDesc {
+			if sc.Direction == data.SortDesc {
 				cmp = -cmp
 			}
 			if cmp != 0 {
@@ -665,22 +665,22 @@ func (m *Model[T]) sortRows(rows []column.RowNode[T]) {
 	})
 }
 
-func (m *Model[T]) sortGroups(groups []*column.RowNode[T]) {
+func (m *Model[T]) sortGroups(groups []*data.RowNode[T]) {
 	m.sortGroupsAtLevel(groups, 0)
 }
 
-func (m *Model[T]) sortGroupsAtLevel(groups []*column.RowNode[T], level int) {
+func (m *Model[T]) sortGroupsAtLevel(groups []*data.RowNode[T], level int) {
 	// Sort the group nodes themselves by the grouping column's sort criteria
 	if level < len(m.groupModel.GroupColumns) {
 		groupColID := m.groupModel.GroupColumns[level]
-		var sortDir column.SortDirection
+		var sortDir data.SortDirection
 		for _, sc := range m.sortModel.SortOrder {
 			if sc.ColID == groupColID {
 				sortDir = sc.Direction
 				break
 			}
 		}
-		if sortDir != column.SortNone {
+		if sortDir != data.SortNone {
 			col := m.findCol(groupColID)
 			if col != nil && col.ValueGetter != nil {
 				sort.SliceStable(groups, func(i, j int) bool {
@@ -693,7 +693,7 @@ func (m *Model[T]) sortGroupsAtLevel(groups []*column.RowNode[T], level int) {
 					} else {
 						cmp = defaultCompare(aVal, bVal)
 					}
-					if sortDir == column.SortDesc {
+					if sortDir == data.SortDesc {
 						cmp = -cmp
 					}
 					return cmp < 0
@@ -713,7 +713,7 @@ func (m *Model[T]) sortGroupsAtLevel(groups []*column.RowNode[T], level int) {
 			m.sortGroupsAtLevel(g.Children, level+1)
 		} else {
 			// Sort leaf rows
-			childRows := make([]column.RowNode[T], len(g.Children))
+			childRows := make([]data.RowNode[T], len(g.Children))
 			for i, c := range g.Children {
 				childRows[i] = *c
 			}
@@ -726,7 +726,7 @@ func (m *Model[T]) sortGroupsAtLevel(groups []*column.RowNode[T], level int) {
 }
 
 // firstLeafValue walks down to the first leaf row and returns the column value.
-func (m *Model[T]) firstLeafValue(node *column.RowNode[T], col *column.ColDef[T]) any {
+func (m *Model[T]) firstLeafValue(node *data.RowNode[T], col *data.ColDef[T]) any {
 	if !node.IsGroup {
 		return col.ValueGetter(node.Data)
 	}
@@ -736,7 +736,7 @@ func (m *Model[T]) firstLeafValue(node *column.RowNode[T], col *column.ColDef[T]
 	return nil
 }
 
-func (m *Model[T]) findCol(colID string) *column.ColDef[T] {
+func (m *Model[T]) findCol(colID string) *data.ColDef[T] {
 	for i := range m.cols {
 		if m.cols[i].ColID == colID {
 			return &m.cols[i]
@@ -854,9 +854,9 @@ func (m *Model[T]) visibleColIndices() (left, center, right []int) {
 			continue
 		}
 		switch col.Pinned {
-		case column.PinLeft:
+		case data.PinLeft:
 			left = append(left, i)
-		case column.PinRight:
+		case data.PinRight:
 			right = append(right, i)
 		default:
 			center = append(center, i)
@@ -876,7 +876,7 @@ func (m *Model[T]) updateVisibleColCount() {
 	available := m.width
 	// Subtract pinned column widths
 	for i, col := range m.cols {
-		if !col.Hide && (col.Pinned == column.PinLeft || col.Pinned == column.PinRight) {
+		if !col.Hide && (col.Pinned == data.PinLeft || col.Pinned == data.PinRight) {
 			available -= m.colWidths[i]
 			if m.styles.BorderColumn {
 				available--

@@ -3,7 +3,7 @@ package grouping
 import (
 	"testing"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 )
 
 type testRow struct {
@@ -12,8 +12,8 @@ type testRow struct {
 	Salary     float64
 }
 
-func testCols() []column.ColDef[testRow] {
-	return []column.ColDef[testRow]{
+func testCols() []data.ColDef[testRow] {
+	return []data.ColDef[testRow]{
 		{
 			ColID:       "Name",
 			HeaderName:  "Name",
@@ -32,8 +32,8 @@ func testCols() []column.ColDef[testRow] {
 	}
 }
 
-func testRows() []column.RowNode[testRow] {
-	data := []testRow{
+func testRows() []data.RowNode[testRow] {
+	rows := []testRow{
 		{"Alice", "Eng", 100},
 		{"Bob", "Eng", 200},
 		{"Carol", "Eng", 150},
@@ -41,9 +41,9 @@ func testRows() []column.RowNode[testRow] {
 		{"Eve", "Sales", 180},
 		{"Frank", "Sales", 160},
 	}
-	nodes := make([]column.RowNode[testRow], len(data))
-	for i, d := range data {
-		nodes[i] = column.RowNode[testRow]{Data: d, ID: d.Name}
+	nodes := make([]data.RowNode[testRow], len(rows))
+	for i, d := range rows {
+		nodes[i] = data.RowNode[testRow]{Data: d, ID: d.Name}
 	}
 	return nodes
 }
@@ -100,13 +100,13 @@ func TestBuildGroupsChildParentPointers(t *testing.T) {
 
 func TestBuildGroupsMultiLevel(t *testing.T) {
 	// Create rows with two groupable dimensions
-	rows := []column.RowNode[testRow]{
+	rows := []data.RowNode[testRow]{
 		{Data: testRow{"Alice", "Eng", 100}, ID: "1"},
 		{Data: testRow{"Bob", "Eng", 200}, ID: "2"},
 		{Data: testRow{"Carol", "Sales", 150}, ID: "3"},
 		{Data: testRow{"Dave", "Sales", 120}, ID: "4"},
 	}
-	cols := []column.ColDef[testRow]{
+	cols := []data.ColDef[testRow]{
 		{ColID: "Department", ValueGetter: func(r testRow) any { return r.Department }},
 		{ColID: "Name", ValueGetter: func(r testRow) any { return r.Name }},
 	}
@@ -164,7 +164,7 @@ func TestBuildGroupsMissingColumn(t *testing.T) {
 func TestBuildGroupsEmpty(t *testing.T) {
 	cols := testCols()
 	expanded := map[string]bool{}
-	result := BuildGroups([]column.RowNode[testRow]{}, cols, []string{"Department"}, expanded, -1)
+	result := BuildGroups([]data.RowNode[testRow]{}, cols, []string{"Department"}, expanded, -1)
 
 	if len(result) != 0 {
 		t.Fatalf("empty rows: expected 0, got %d", len(result))

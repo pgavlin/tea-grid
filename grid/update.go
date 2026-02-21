@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/pgavlin/tea-grid/column"
+	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
 )
 
@@ -397,7 +397,7 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	}
 }
 
-// startFilterEdit begins editing the column filter for the focused column.
+// startFilterEdit begins editing the column filter for the focused data.
 func (m Model[T]) startFilterEdit() (Model[T], tea.Cmd) {
 	colIdx := m.focusedCell.Col
 	if colIdx < 0 || colIdx >= len(m.cols) {
@@ -547,7 +547,7 @@ func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 		formatted = col.ValueFormatter(val, rn.Data)
 	}
 
-	ctx := column.CellContext[T]{
+	ctx := data.CellContext[T]{
 		Value:          val,
 		FormattedValue: formatted,
 		Data:           rn.Data,
@@ -561,7 +561,7 @@ func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 	// Use column's editor or default text editor
 	editor := col.CellEditor
 	if editor == nil {
-		editor = column.NewTextEditor[T]()
+		editor = data.NewTextEditor[T]()
 	}
 	initCmd := editor.Init(ctx)
 
