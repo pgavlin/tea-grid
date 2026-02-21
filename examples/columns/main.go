@@ -105,7 +105,6 @@ func main() {
 		grid.WithRows(rows),
 		grid.WithRowID(func(e Employee) string { return e.Name }),
 		grid.WithSelection[Employee](selection.SelectMulti),
-		grid.WithSelectionColumn[Employee](true),
 		grid.WithQuickFilter[Employee](true),
 		grid.WithGrouping[Employee]("department"),
 		grid.WithGroupDefaultExpanded[Employee](-1),

@@ -80,13 +80,6 @@ func WithSelection[T any](mode selection.Mode) Option[T] {
 	}
 }
 
-// WithSelectionColumn enables/disables the checkbox column for multi-select.
-func WithSelectionColumn[T any](enabled bool) Option[T] {
-	return func(m *Model[T]) {
-		m.showSelectionCol = enabled
-	}
-}
-
 // WithEditable enables/disables cell editing globally.
 func WithEditable[T any](enabled bool) Option[T] {
 	return func(m *Model[T]) {

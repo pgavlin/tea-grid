@@ -54,8 +54,7 @@ type Model[T any] struct {
 	vp viewport
 
 	// Selection
-	sel              selection.Model
-	showSelectionCol bool
+	sel selection.Model
 
 	// Sorting
 	sortModel gridsort.Model[T]
