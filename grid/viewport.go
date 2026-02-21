@@ -50,26 +50,6 @@ func (v *viewport) visibleRowRange(totalRows int) (start, end int) {
 	return start, end
 }
 
-// scrollUp scrolls up by n rows.
-func (v *viewport) scrollUp(n int) {
-	v.topRow -= n
-	if v.topRow < 0 {
-		v.topRow = 0
-	}
-}
-
-// scrollDown scrolls down by n rows, clamping to maxTop.
-func (v *viewport) scrollDown(n int, totalRows int) {
-	v.topRow += n
-	maxTop := totalRows - v.visibleRows
-	if maxTop < 0 {
-		maxTop = 0
-	}
-	if v.topRow > maxTop {
-		v.topRow = maxTop
-	}
-}
-
 // scrollToTop scrolls to the first row.
 func (v *viewport) scrollToTop() {
 	v.topRow = 0

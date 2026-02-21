@@ -828,29 +828,6 @@ func TestViewport_VisibleRowRange(t *testing.T) {
 	}
 }
 
-func TestViewport_ScrollUpDown(t *testing.T) {
-	v := viewport{topRow: 5, visibleRows: 10}
-	v.scrollUp(3)
-	if v.topRow != 2 {
-		t.Errorf("expected topRow=2 after scrollUp(3), got %d", v.topRow)
-	}
-	v.scrollUp(10) // Clamp to 0
-	if v.topRow != 0 {
-		t.Errorf("expected topRow=0 after over-scrollUp, got %d", v.topRow)
-	}
-
-	v.topRow = 0
-	v.scrollDown(5, 20)
-	if v.topRow != 5 {
-		t.Errorf("expected topRow=5 after scrollDown(5), got %d", v.topRow)
-	}
-	v.scrollDown(100, 20) // Clamp
-	maxTop := 20 - 10
-	if v.topRow != maxTop {
-		t.Errorf("expected topRow=%d after over-scrollDown, got %d", maxTop, v.topRow)
-	}
-}
-
 func TestViewport_ScrollToTopBottom(t *testing.T) {
 	v := viewport{topRow: 5, visibleRows: 10}
 	v.scrollToTop()

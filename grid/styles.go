@@ -49,10 +49,6 @@ type Styles struct {
 	EditorInput lipgloss.Style // Cell editor input.
 	EditorError lipgloss.Style // Validation error.
 
-	// Scrollbar
-	Scrollbar      lipgloss.Style
-	ScrollbarThumb lipgloss.Style
-
 	// Alternating rows
 	EvenRow lipgloss.Style
 	OddRow  lipgloss.Style
@@ -119,9 +115,6 @@ func DefaultStyles() Styles {
 			Foreground(lipgloss.Color("230")),
 		EditorError: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")),
-
-		Scrollbar:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		ScrollbarThumb: lipgloss.NewStyle().Foreground(lipgloss.Color("248")),
 
 		EvenRow: lipgloss.NewStyle(),
 		OddRow:  lipgloss.NewStyle().Background(lipgloss.Color("235")),

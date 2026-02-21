@@ -8,8 +8,7 @@ type RowNode[T any] struct {
 	// Runtime state (managed by the grid)
 	ID         string // Unique row ID.
 	RowIndex   int    // Current display index (post sort/filter/group).
-	Selected   bool
-	Expanded   bool // For group rows.
+	Expanded   bool   // For group rows.
 	RowHeight  int  // In terminal lines. Default: 1.
 	Pinned     Pin  // Top, Bottom, or None.
 	IsGroup    bool // True if this is a synthetic group row.
