@@ -141,7 +141,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
 				col := m.cols[m.focusedCell.Col]
 				if col.Sortable {
-					m.sortModel.ToggleSort(col.ColID)
+					m.sortModel.ToggleSort(col.ColumnID)
 					m.dirty = true
 					m.recomputeDisplayRows()
 					return m, func() tea.Msg {
@@ -165,7 +165,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
 				col := m.cols[m.focusedCell.Col]
 				if col.Sortable {
-					m.sortModel.AddSort(col.ColID)
+					m.sortModel.AddSort(col.ColumnID)
 					m.dirty = true
 					m.recomputeDisplayRows()
 					return m, func() tea.Msg {
@@ -181,7 +181,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
 			col := m.cols[m.focusedCell.Col]
 			if col.Sortable {
-				m.sortModel.ToggleSort(col.ColID)
+				m.sortModel.ToggleSort(col.ColumnID)
 				m.dirty = true
 				m.recomputeDisplayRows()
 				return m, func() tea.Msg {
@@ -195,7 +195,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		if m.sortModel.MultiSort && m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
 			col := m.cols[m.focusedCell.Col]
 			if col.Sortable {
-				m.sortModel.AddSort(col.ColID)
+				m.sortModel.AddSort(col.ColumnID)
 				m.dirty = true
 				m.recomputeDisplayRows()
 				return m, func() tea.Msg {
@@ -209,7 +209,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	case key.Matches(msg, m.KeyMap.ToggleGroupColumn):
 		if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
 			col := m.cols[m.focusedCell.Col]
-			m.groupModel.ToggleGroupColumn(col.ColID)
+			m.groupModel.ToggleGroupColumn(col.ColumnID)
 			m.dirty = true
 			m.recomputeDisplayRows()
 			return m, func() tea.Msg {
@@ -373,7 +373,7 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		m.recomputeDisplayRows()
 		m.updateViewportSize()
 		return m, func() tea.Msg {
-			return FilterChangedMsg{ColID: col.ColID, Active: col.Filter.Active()}
+			return FilterChangedMsg{ColumnID: col.ColumnID, Active: col.Filter.Active()}
 		}
 
 	case key.Matches(msg, m.KeyMap.CancelEdit):
@@ -386,7 +386,7 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		m.recomputeDisplayRows()
 		m.updateViewportSize()
 		return m, func() tea.Msg {
-			return FilterChangedMsg{ColID: col.ColID, Active: false}
+			return FilterChangedMsg{ColumnID: col.ColumnID, Active: false}
 		}
 
 	default:

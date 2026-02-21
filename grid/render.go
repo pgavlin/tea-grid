@@ -142,7 +142,7 @@ func (m Model[T]) renderGroupHeaders() string {
 			width := 0
 			for _, child := range group.Children {
 				for _, idx := range colIndices {
-					if m.cols[idx].ColID == child.ColID {
+					if m.cols[idx].ColumnID == child.ColumnID {
 						width += m.colWidths[idx]
 					}
 				}
@@ -215,7 +215,7 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 		}
 
 		// Add sort indicator
-		dir := m.sortModel.DirectionFor(col.ColID)
+		dir := m.sortModel.DirectionFor(col.ColumnID)
 		switch dir {
 		case data.SortAsc:
 			header += " " + m.styles.SortAsc

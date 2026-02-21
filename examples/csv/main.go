@@ -106,7 +106,7 @@ func buildColumns(headers []string, rows []Row) []data.Column[Row] {
 		typ := inferType(idx, rows)
 
 		col := data.Column[Row]{
-			ColID:      fmt.Sprintf("col%d", idx),
+			ColumnID:      fmt.Sprintf("col%d", idx),
 			HeaderName: hdr,
 			Sortable:   true,
 			Filterable: true,

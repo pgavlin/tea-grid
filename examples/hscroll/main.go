@@ -50,18 +50,18 @@ func (m model) View() string { return m.grid.View() }
 
 func main() {
 	cols := []data.Column[Stock]{
-		{ColID: "ticker", HeaderName: "Ticker", ValueGetter: func(s Stock) any { return s.Ticker }, Width: 8, Pinned: data.PinLeft, Sortable: true},
-		{ColID: "company", HeaderName: "Company", ValueGetter: func(s Stock) any { return s.Company }, Width: 22, Sortable: true},
-		{ColID: "sector", HeaderName: "Sector", ValueGetter: func(s Stock) any { return s.Sector }, Width: 16, Sortable: true},
-		{ColID: "price", HeaderName: "Price", ValueGetter: func(s Stock) any { return s.Price }, Width: 10, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("$%.2f", v.(float64)) }},
-		{ColID: "open", HeaderName: "Open", ValueGetter: func(s Stock) any { return s.Open }, Width: 10, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("$%.2f", v.(float64)) }},
-		{ColID: "high", HeaderName: "High", ValueGetter: func(s Stock) any { return s.High }, Width: 10, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("$%.2f", v.(float64)) }},
-		{ColID: "low", HeaderName: "Low", ValueGetter: func(s Stock) any { return s.Low }, Width: 10, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("$%.2f", v.(float64)) }},
-		{ColID: "volume", HeaderName: "Volume", ValueGetter: func(s Stock) any { return s.Volume }, Width: 12, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("%d", v.(int)) }},
-		{ColID: "mktcap", HeaderName: "Mkt Cap", ValueGetter: func(s Stock) any { return s.MarketCap }, Width: 10, Sortable: true},
-		{ColID: "pe", HeaderName: "P/E", ValueGetter: func(s Stock) any { return s.PE }, Width: 8, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("%.1f", v.(float64)) }},
-		{ColID: "dividend", HeaderName: "Div %", ValueGetter: func(s Stock) any { return s.Dividend }, Width: 8, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("%.2f%%", v.(float64)) }},
-		{ColID: "ytd", HeaderName: "YTD %", ValueGetter: func(s Stock) any { return s.YTD }, Width: 8, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("%+.1f%%", v.(float64)) }},
+		{ColumnID: "ticker", HeaderName: "Ticker", ValueGetter: func(s Stock) any { return s.Ticker }, Width: 8, Pinned: data.PinLeft, Sortable: true},
+		{ColumnID: "company", HeaderName: "Company", ValueGetter: func(s Stock) any { return s.Company }, Width: 22, Sortable: true},
+		{ColumnID: "sector", HeaderName: "Sector", ValueGetter: func(s Stock) any { return s.Sector }, Width: 16, Sortable: true},
+		{ColumnID: "price", HeaderName: "Price", ValueGetter: func(s Stock) any { return s.Price }, Width: 10, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("$%.2f", v.(float64)) }},
+		{ColumnID: "open", HeaderName: "Open", ValueGetter: func(s Stock) any { return s.Open }, Width: 10, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("$%.2f", v.(float64)) }},
+		{ColumnID: "high", HeaderName: "High", ValueGetter: func(s Stock) any { return s.High }, Width: 10, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("$%.2f", v.(float64)) }},
+		{ColumnID: "low", HeaderName: "Low", ValueGetter: func(s Stock) any { return s.Low }, Width: 10, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("$%.2f", v.(float64)) }},
+		{ColumnID: "volume", HeaderName: "Volume", ValueGetter: func(s Stock) any { return s.Volume }, Width: 12, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("%d", v.(int)) }},
+		{ColumnID: "mktcap", HeaderName: "Mkt Cap", ValueGetter: func(s Stock) any { return s.MarketCap }, Width: 10, Sortable: true},
+		{ColumnID: "pe", HeaderName: "P/E", ValueGetter: func(s Stock) any { return s.PE }, Width: 8, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("%.1f", v.(float64)) }},
+		{ColumnID: "dividend", HeaderName: "Div %", ValueGetter: func(s Stock) any { return s.Dividend }, Width: 8, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("%.2f%%", v.(float64)) }},
+		{ColumnID: "ytd", HeaderName: "YTD %", ValueGetter: func(s Stock) any { return s.YTD }, Width: 8, Sortable: true, ValueFormatter: func(v any, _ Stock) string { return fmt.Sprintf("%+.1f%%", v.(float64)) }},
 	}
 
 	rows := []Stock{

@@ -53,22 +53,22 @@ func TestFromTypeExportedFields(t *testing.T) {
 		t.Fatalf("expected 2 columns, got %d", len(cols))
 	}
 
-	if cols[0].ColID != "Name" || cols[0].HeaderName != "Name" {
-		t.Errorf("first col: got ColID=%q HeaderName=%q", cols[0].ColID, cols[0].HeaderName)
+	if cols[0].ColumnID != "Name" || cols[0].HeaderName != "Name" {
+		t.Errorf("first col: got ColumnID=%q HeaderName=%q", cols[0].ColumnID, cols[0].HeaderName)
 	}
-	if cols[1].ColID != "Age" || cols[1].HeaderName != "Age" {
-		t.Errorf("second col: got ColID=%q HeaderName=%q", cols[1].ColID, cols[1].HeaderName)
+	if cols[1].ColumnID != "Age" || cols[1].HeaderName != "Age" {
+		t.Errorf("second col: got ColumnID=%q HeaderName=%q", cols[1].ColumnID, cols[1].HeaderName)
 	}
 
 	for _, c := range cols {
 		if !c.Sortable {
-			t.Errorf("col %q: Sortable should be true", c.ColID)
+			t.Errorf("col %q: Sortable should be true", c.ColumnID)
 		}
 		if !c.Filterable {
-			t.Errorf("col %q: Filterable should be true", c.ColID)
+			t.Errorf("col %q: Filterable should be true", c.ColumnID)
 		}
 		if c.MinWidth != 4 {
-			t.Errorf("col %q: MinWidth should be 4, got %d", c.ColID, c.MinWidth)
+			t.Errorf("col %q: MinWidth should be 4, got %d", c.ColumnID, c.MinWidth)
 		}
 	}
 }
@@ -122,11 +122,11 @@ func TestFromTypeUnexportedSkipped(t *testing.T) {
 	if len(cols) != 2 {
 		t.Fatalf("expected 2 columns (exported only), got %d", len(cols))
 	}
-	if cols[0].ColID != "Exported" {
-		t.Errorf("first col should be Exported, got %q", cols[0].ColID)
+	if cols[0].ColumnID != "Exported" {
+		t.Errorf("first col should be Exported, got %q", cols[0].ColumnID)
 	}
-	if cols[1].ColID != "Another" {
-		t.Errorf("second col should be Another, got %q", cols[1].ColID)
+	if cols[1].ColumnID != "Another" {
+		t.Errorf("second col should be Another, got %q", cols[1].ColumnID)
 	}
 }
 
@@ -231,7 +231,7 @@ func TestFromRowsMapStringAny(t *testing.T) {
 	// Find columns by ID.
 	colMap := make(map[string]Column[map[string]any])
 	for _, c := range cols {
-		colMap[c.ColID] = c
+		colMap[c.ColumnID] = c
 	}
 
 	nameCol, ok := colMap["name"]
@@ -260,7 +260,7 @@ func TestFromRowsMapInfersTypes(t *testing.T) {
 
 	colMap := make(map[string]Column[map[string]any])
 	for _, c := range cols {
-		colMap[c.ColID] = c
+		colMap[c.ColumnID] = c
 	}
 
 	// Bool column gets BoolFilter.
@@ -319,14 +319,14 @@ func TestFromRowsMapPreservesKeyOrder(t *testing.T) {
 	if len(cols) < 3 {
 		t.Fatalf("expected 3 columns, got %d", len(cols))
 	}
-	if cols[0].ColID != "alpha" {
-		t.Errorf("first column: expected alpha, got %q", cols[0].ColID)
+	if cols[0].ColumnID != "alpha" {
+		t.Errorf("first column: expected alpha, got %q", cols[0].ColumnID)
 	}
-	if cols[1].ColID != "beta" {
-		t.Errorf("second column: expected beta, got %q", cols[1].ColID)
+	if cols[1].ColumnID != "beta" {
+		t.Errorf("second column: expected beta, got %q", cols[1].ColumnID)
 	}
-	if cols[2].ColID != "gamma" {
-		t.Errorf("third column: expected gamma, got %q", cols[2].ColID)
+	if cols[2].ColumnID != "gamma" {
+		t.Errorf("third column: expected gamma, got %q", cols[2].ColumnID)
 	}
 }
 
@@ -363,7 +363,7 @@ func TestFromRowsSliceOfStructs(t *testing.T) {
 
 	ids := make(map[string]bool)
 	for _, c := range cols {
-		ids[c.ColID] = true
+		ids[c.ColumnID] = true
 	}
 
 	expected := []string{"Name", "Age", "Email", "Price", "InStock"}
@@ -383,7 +383,7 @@ func TestFromRowsSliceValueGetter(t *testing.T) {
 
 	colMap := make(map[string]Column[[]any])
 	for _, c := range cols {
-		colMap[c.ColID] = c
+		colMap[c.ColumnID] = c
 	}
 
 	// Name exists on both types.
@@ -418,7 +418,7 @@ func TestFromRowsSliceFieldTypes(t *testing.T) {
 
 	colMap := make(map[string]Column[[]any])
 	for _, c := range cols {
-		colMap[c.ColID] = c
+		colMap[c.ColumnID] = c
 	}
 
 	// int field gets NumberFilter.
@@ -447,11 +447,11 @@ func TestFromRowsStructFallback(t *testing.T) {
 	if len(cols) != 2 {
 		t.Fatalf("expected 2 columns, got %d", len(cols))
 	}
-	if cols[0].ColID != "Name" {
-		t.Errorf("first col: expected Name, got %q", cols[0].ColID)
+	if cols[0].ColumnID != "Name" {
+		t.Errorf("first col: expected Name, got %q", cols[0].ColumnID)
 	}
-	if cols[1].ColID != "Age" {
-		t.Errorf("second col: expected Age, got %q", cols[1].ColID)
+	if cols[1].ColumnID != "Age" {
+		t.Errorf("second col: expected Age, got %q", cols[1].ColumnID)
 	}
 
 	// Verify ValueGetter works.

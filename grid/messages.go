@@ -29,7 +29,7 @@ type SortChangedMsg struct {
 
 // FilterChangedMsg is emitted when a column filter changes.
 type FilterChangedMsg struct {
-	ColID  string
+	ColumnID  string
 	Active bool
 }
 

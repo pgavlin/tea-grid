@@ -10,7 +10,7 @@ import (
 
 // Model holds the current grouping state.
 type Model[T any] struct {
-	GroupColumns    []string        // ColIDs of columns being grouped, in order.
+	GroupColumns    []string        // ColumnIDs of columns being grouped, in order.
 	Expanded        map[string]bool // GroupKey -> expanded state.
 	DefaultExpanded int             // Number of levels expanded by default. -1 = all.
 }
@@ -86,7 +86,7 @@ func BuildGroups[T any](
 	// Find the column definition for the first group column
 	var groupCol *data.Column[T]
 	for i := range cols {
-		if cols[i].ColID == groupCols[0] {
+		if cols[i].ColumnID == groupCols[0] {
 			groupCol = &cols[i]
 			break
 		}

@@ -7,7 +7,7 @@ import (
 
 // SortCriterion describes a single sort column and direction.
 type SortCriterion struct {
-	ColID     string
+	ColumnID     string
 	Direction data.SortDirection // Asc or Desc.
 }
 
@@ -22,7 +22,7 @@ type Model[T any] struct {
 // Returns the updated sort order.
 func (m *Model[T]) ToggleSort(colID string) {
 	for i, sc := range m.SortOrder {
-		if sc.ColID == colID {
+		if sc.ColumnID == colID {
 			switch sc.Direction {
 			case data.SortAsc:
 				m.SortOrder[i].Direction = data.SortDesc
@@ -34,13 +34,13 @@ func (m *Model[T]) ToggleSort(colID string) {
 		}
 	}
 	// Not currently sorted — set as primary sort (asc), replacing existing
-	m.SortOrder = []SortCriterion{{ColID: colID, Direction: data.SortAsc}}
+	m.SortOrder = []SortCriterion{{ColumnID: colID, Direction: data.SortAsc}}
 }
 
 // AddSort adds a column to multi-sort or toggles it if already present.
 func (m *Model[T]) AddSort(colID string) {
 	for i, sc := range m.SortOrder {
-		if sc.ColID == colID {
+		if sc.ColumnID == colID {
 			switch sc.Direction {
 			case data.SortAsc:
 				m.SortOrder[i].Direction = data.SortDesc
@@ -50,7 +50,7 @@ func (m *Model[T]) AddSort(colID string) {
 			return
 		}
 	}
-	m.SortOrder = append(m.SortOrder, SortCriterion{ColID: colID, Direction: data.SortAsc})
+	m.SortOrder = append(m.SortOrder, SortCriterion{ColumnID: colID, Direction: data.SortAsc})
 }
 
 // Clear removes all sort criteria.
@@ -61,7 +61,7 @@ func (m *Model[T]) Clear() {
 // DirectionFor returns the sort direction for the given column, or SortNone.
 func (m *Model[T]) DirectionFor(colID string) data.SortDirection {
 	for _, sc := range m.SortOrder {
-		if sc.ColID == colID {
+		if sc.ColumnID == colID {
 			return sc.Direction
 		}
 	}
@@ -71,7 +71,7 @@ func (m *Model[T]) DirectionFor(colID string) data.SortDirection {
 // IndexFor returns the sort index (0-based) for the given column, or -1.
 func (m *Model[T]) IndexFor(colID string) int {
 	for i, sc := range m.SortOrder {
-		if sc.ColID == colID {
+		if sc.ColumnID == colID {
 			return i
 		}
 	}

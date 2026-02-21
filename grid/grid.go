@@ -317,7 +317,7 @@ func (m *Model[T]) SetQuickFilter(text string) {
 
 func (m *Model[T]) SetColumnFilter(colID string, f filter.Filter) {
 	for i := range m.cols {
-		if m.cols[i].ColID == colID {
+		if m.cols[i].ColumnID == colID {
 			m.cols[i].Filter = f
 			m.dirty = true
 			m.recomputeDisplayRows()
@@ -375,7 +375,7 @@ func (m *Model[T]) ScrollToBottom()       { m.vp.scrollToBottom(len(m.displayRow
 
 func (m *Model[T]) PinColumn(colID string, dir data.Pin) {
 	for i := range m.cols {
-		if m.cols[i].ColID == colID {
+		if m.cols[i].ColumnID == colID {
 			m.cols[i].Pinned = dir
 			m.computeColWidths()
 			return
@@ -640,7 +640,7 @@ func (m *Model[T]) sortRows(rows []data.RowNode[T]) {
 
 	sort.SliceStable(rows, func(i, j int) bool {
 		for _, sc := range m.sortModel.SortOrder {
-			col := m.findCol(sc.ColID)
+			col := m.findCol(sc.ColumnID)
 			if col == nil || col.ValueGetter == nil {
 				continue
 			}
@@ -672,16 +672,16 @@ func (m *Model[T]) sortGroups(groups []*data.RowNode[T]) {
 func (m *Model[T]) sortGroupsAtLevel(groups []*data.RowNode[T], level int) {
 	// Sort the group nodes themselves by the grouping column's sort criteria
 	if level < len(m.groupModel.GroupColumns) {
-		groupColID := m.groupModel.GroupColumns[level]
+		groupColumnID := m.groupModel.GroupColumns[level]
 		var sortDir data.SortDirection
 		for _, sc := range m.sortModel.SortOrder {
-			if sc.ColID == groupColID {
+			if sc.ColumnID == groupColumnID {
 				sortDir = sc.Direction
 				break
 			}
 		}
 		if sortDir != data.SortNone {
-			col := m.findCol(groupColID)
+			col := m.findCol(groupColumnID)
 			if col != nil && col.ValueGetter != nil {
 				sort.SliceStable(groups, func(i, j int) bool {
 					aVal := m.firstLeafValue(groups[i], col)
@@ -738,7 +738,7 @@ func (m *Model[T]) firstLeafValue(node *data.RowNode[T], col *data.Column[T]) an
 
 func (m *Model[T]) findCol(colID string) *data.Column[T] {
 	for i := range m.cols {
-		if m.cols[i].ColID == colID {
+		if m.cols[i].ColumnID == colID {
 			return &m.cols[i]
 		}
 	}

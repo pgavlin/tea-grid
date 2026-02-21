@@ -15,17 +15,17 @@ type testRow struct {
 func testCols() []data.Column[testRow] {
 	return []data.Column[testRow]{
 		{
-			ColID:       "Name",
+			ColumnID:       "Name",
 			HeaderName:  "Name",
 			ValueGetter: func(r testRow) any { return r.Name },
 		},
 		{
-			ColID:       "Department",
+			ColumnID:       "Department",
 			HeaderName:  "Department",
 			ValueGetter: func(r testRow) any { return r.Department },
 		},
 		{
-			ColID:       "Salary",
+			ColumnID:       "Salary",
 			HeaderName:  "Salary",
 			ValueGetter: func(r testRow) any { return r.Salary },
 		},
@@ -107,8 +107,8 @@ func TestBuildGroupsMultiLevel(t *testing.T) {
 		{Data: testRow{"Dave", "Sales", 120}, ID: "4"},
 	}
 	cols := []data.Column[testRow]{
-		{ColID: "Department", ValueGetter: func(r testRow) any { return r.Department }},
-		{ColID: "Name", ValueGetter: func(r testRow) any { return r.Name }},
+		{ColumnID: "Department", ValueGetter: func(r testRow) any { return r.Department }},
+		{ColumnID: "Name", ValueGetter: func(r testRow) any { return r.Name }},
 	}
 	expanded := map[string]bool{}
 	groups := BuildGroups(rows, cols, []string{"Department", "Name"}, expanded, -1)
