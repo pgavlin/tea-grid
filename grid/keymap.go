@@ -24,8 +24,9 @@ type KeyMap struct {
 	GoToHeader key.Binding
 
 	// Selection
-	Select    key.Binding
-	SelectAll key.Binding
+	Select      key.Binding
+	SelectAll   key.Binding
+	DeselectAll key.Binding
 
 	// Sorting (when header is focused)
 	ToggleSort      key.Binding
@@ -118,6 +119,10 @@ func DefaultKeyMap() KeyMap {
 		SelectAll: key.NewBinding(
 			key.WithKeys("ctrl+a"),
 			key.WithHelp("ctrl+a", "select all"),
+		),
+		DeselectAll: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "deselect all"),
 		),
 		ToggleSort: key.NewBinding(
 			key.WithKeys("enter"),

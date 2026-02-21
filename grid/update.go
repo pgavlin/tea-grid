@@ -99,6 +99,10 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
 		}
 
+	case key.Matches(msg, m.KeyMap.DeselectAll):
+		m.sel.DeselectAll()
+		return m, nil
+
 	// Sort column from any row
 	case key.Matches(msg, m.KeyMap.SortColumn):
 		if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
@@ -157,12 +161,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	// Column filter
 	case key.Matches(msg, m.KeyMap.ColumnFilter):
 		return m.startFilterEdit()
-
-	// Cancel/Escape
-	case key.Matches(msg, m.KeyMap.CancelEdit):
-		// Deselect all on escape
-		m.sel.DeselectAll()
-		return m, nil
 
 	// Expand/collapse all
 	case key.Matches(msg, m.KeyMap.ExpandAll):
