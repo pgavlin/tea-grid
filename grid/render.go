@@ -402,7 +402,8 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 	return strings.Join(cells, m.colSeparator())
 }
 
-// renderGroupRow renders a synthetic group row with per-column aggregation values.
+// renderGroupRow renders a synthetic group row spanning all columns,
+// followed by an aggregation row if any columns define aggregation functions.
 func (m Model[T]) renderGroupRow(rn *data.RowNode[T], displayIndex int) string {
 	indent := strings.Repeat(" ", rn.GroupLevel*m.styles.GroupIndent)
 
@@ -416,41 +417,67 @@ func (m Model[T]) renderGroupRow(rn *data.RowNode[T], displayIndex int) string {
 
 	isFocused := m.focused && m.focusedCell.Row == displayIndex
 
+	style := m.styles.GroupRow
+	if isFocused {
+		style = m.styles.CellFocused
+	}
+
+	contentWidth := m.width - style.GetHorizontalFrameSize()
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
+
+	cellContent := data.TruncateOrPad(label, contentWidth)
+	labelLine := style.Width(m.width).MaxWidth(m.width).Render(cellContent)
+
+	// Check if any columns have aggregation
+	hasAgg := false
+	for i := range m.cols {
+		if m.cols[i].AggFuncCustom != nil || m.cols[i].AggFunc != "" {
+			hasAgg = true
+			break
+		}
+	}
+	if !hasAgg {
+		return labelLine
+	}
+
+	// Render aggregation row aligned with columns
+	aggLine := m.renderAggRow(rn)
+	return labelLine + "\n" + aggLine
+}
+
+// renderAggRow renders an aggregation row with values aligned to their columns.
+func (m Model[T]) renderAggRow(rn *data.RowNode[T]) string {
 	left, center, right := m.visibleColIndices()
 
 	var parts []string
 
 	if len(left) > 0 {
-		parts = append(parts, m.renderGroupCells(rn, left, label, isFocused))
+		parts = append(parts, m.renderAggCells(rn, left))
 		parts = append(parts, m.styles.PinSeparator)
 	}
 
 	visibleCenter := m.visibleCenterCols(center)
-	parts = append(parts, m.renderGroupCells(rn, visibleCenter, label, isFocused))
+	parts = append(parts, m.renderAggCells(rn, visibleCenter))
 
 	if len(right) > 0 {
 		parts = append(parts, m.styles.PinSeparator)
-		parts = append(parts, m.renderGroupCells(rn, right, label, isFocused))
+		parts = append(parts, m.renderAggCells(rn, right))
 	}
 
 	return strings.Join(parts, "")
 }
 
-// renderGroupCells renders cells for a group row across specified column indices.
-// The label is placed in the first column cell; columns with AggFunc/AggFuncCustom
-// show the aggregated value; all other columns are blank.
-func (m Model[T]) renderGroupCells(rn *data.RowNode[T], colIndices []int, label string, isFocused bool) string {
+// renderAggCells renders aggregation cells for specified column indices.
+// Columns with an aggregation function show the computed value; others are blank.
+func (m Model[T]) renderAggCells(rn *data.RowNode[T], colIndices []int) string {
 	var cells []string
-	labelPlaced := false
+	style := m.styles.GroupRow
 
 	for _, idx := range colIndices {
 		col := m.cols[idx]
 		w := m.colWidths[idx]
-
-		style := m.styles.GroupRow
-		if isFocused {
-			style = m.styles.CellFocused
-		}
 
 		contentWidth := w - style.GetHorizontalFrameSize()
 		if contentWidth < 1 {
@@ -458,12 +485,7 @@ func (m Model[T]) renderGroupCells(rn *data.RowNode[T], colIndices []int, label 
 		}
 
 		var cellContent string
-		if !labelPlaced {
-			// First visible column gets the group label
-			cellContent = data.TruncateOrPad(label, contentWidth)
-			labelPlaced = true
-		} else if col.AggFuncCustom != nil || col.AggFunc != "" {
-			// Column has aggregation — compute and display
+		if col.AggFuncCustom != nil || col.AggFunc != "" {
 			values := collectLeafValues(rn, &col)
 			var aggResult any
 			if col.AggFuncCustom != nil {
@@ -478,7 +500,6 @@ func (m Model[T]) renderGroupCells(rn *data.RowNode[T], colIndices []int, label 
 			}
 			cellContent = data.TruncateOrPad(formatted, contentWidth)
 		} else {
-			// Empty cell
 			cellContent = data.TruncateOrPad("", contentWidth)
 		}
 
