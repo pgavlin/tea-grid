@@ -272,24 +272,7 @@ func (m Model[T]) renderRow(rn *data.RowNode[T], displayIndex int, isPinned bool
 		parts = append(parts, m.renderCells(rn, right, displayIndex, isPinned))
 	}
 
-	line := strings.Join(parts, "")
-
-	// Apply row-level styles
-	if isPinned {
-		line = m.styles.PinnedRow.Render(line)
-	} else if displayIndex >= 0 {
-		if displayIndex%2 == 0 {
-			if m.styles.EvenRow.Value() != "" {
-				line = m.styles.EvenRow.Render(line)
-			}
-		} else {
-			if m.styles.OddRow.Value() != "" {
-				line = m.styles.OddRow.Render(line)
-			}
-		}
-	}
-
-	return line
+	return strings.Join(parts, "")
 }
 
 // renderCells renders cells for a row across specified column indices.
@@ -347,7 +330,17 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 		isSelected := m.sel.IsSelected(rn.ID)
 		isFocused := m.focused && m.focusedCell.Row == displayIndex && m.focusedCell.Col == idx
 
+		// Select base style based on row context
 		style := m.styles.Cell
+		if isPinned {
+			style = m.styles.CellPinned
+		} else if displayIndex >= 0 && displayIndex%2 != 0 {
+			style = m.styles.CellOddRow
+		} else if displayIndex >= 0 {
+			style = m.styles.CellEvenRow
+		}
+
+		// Override for focus/selection
 		if isFocused {
 			style = m.styles.CellFocused
 		} else if isSelected {
@@ -545,12 +538,13 @@ func (m Model[T]) colSeparator() string {
 // When the cell is focused or selected, the colors from the state style are
 // preserved while other properties (e.g. alignment) come from the custom style.
 func applyCustomStyle(custom, state lipgloss.Style, isFocused, isSelected bool) lipgloss.Style {
-	if !isFocused && !isSelected {
-		return custom
+	result := custom.Inherit(state)
+	if isFocused || isSelected {
+		result = result.
+			Foreground(state.GetForeground()).
+			Background(state.GetBackground())
 	}
-	return custom.
-		Foreground(state.GetForeground()).
-		Background(state.GetBackground())
+	return result
 }
 
 // scrollSeparators computes the left and right separator strings for the center

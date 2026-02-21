@@ -19,11 +19,13 @@ type Styles struct {
 	Cell         lipgloss.Style // Default cell style.
 	CellFocused  lipgloss.Style // Focused cell highlight.
 	CellSelected lipgloss.Style // Selected row highlight.
+	CellEvenRow  lipgloss.Style // Base cell style for even-indexed rows.
+	CellOddRow   lipgloss.Style // Base cell style for odd-indexed rows.
+	CellPinned   lipgloss.Style // Base cell style for pinned rows.
 
 	// Pinning
 	PinnedLeft   lipgloss.Style // Pinned-left region.
 	PinnedRight  lipgloss.Style // Pinned-right region.
-	PinnedRow    lipgloss.Style // Pinned row (top/bottom).
 	PinSeparator string         // Vertical separator between pinned and scrollable.
 	ScrollLeft   string         // Indicator that columns exist off-screen to the left (default: "◀").
 	ScrollRight  string         // Indicator that columns exist off-screen to the right (default: "▶").
@@ -48,10 +50,6 @@ type Styles struct {
 	// Editing
 	EditorInput lipgloss.Style // Cell editor input.
 	EditorError lipgloss.Style // Validation error.
-
-	// Alternating rows
-	EvenRow lipgloss.Style
-	OddRow  lipgloss.Style
 
 	// Per-cell styling callback
 	StyleFunc func(row, col int, data any) lipgloss.Style
@@ -82,10 +80,17 @@ func DefaultStyles() Styles {
 		CellSelected: lipgloss.NewStyle().
 			Padding(0, 1).
 			Background(lipgloss.Color("236")),
+		CellEvenRow: lipgloss.NewStyle().
+			Padding(0, 1),
+		CellOddRow: lipgloss.NewStyle().
+			Padding(0, 1).
+			Background(lipgloss.Color("235")),
+		CellPinned: lipgloss.NewStyle().
+			Padding(0, 1).
+			Bold(true),
 
-		PinnedLeft:   lipgloss.NewStyle(),
-		PinnedRight:  lipgloss.NewStyle(),
-		PinnedRow:    lipgloss.NewStyle().Bold(true),
+		PinnedLeft:  lipgloss.NewStyle(),
+		PinnedRight: lipgloss.NewStyle(),
 		PinSeparator: "│",
 		ScrollLeft:   "◀",
 		ScrollRight:  "▶",
@@ -115,8 +120,5 @@ func DefaultStyles() Styles {
 			Foreground(lipgloss.Color("230")),
 		EditorError: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")),
-
-		EvenRow: lipgloss.NewStyle(),
-		OddRow:  lipgloss.NewStyle().Background(lipgloss.Color("235")),
 	}
 }

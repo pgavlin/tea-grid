@@ -828,15 +828,17 @@ type Styles struct {
     SortDesc    string         // Descending sort indicator (default: "▼").
 
     // Cells
-    Cell        lipgloss.Style // Default cell style.
-    CellFocused lipgloss.Style // Focused cell highlight.
+    Cell         lipgloss.Style // Default cell style.
+    CellFocused  lipgloss.Style // Focused cell highlight.
     CellSelected lipgloss.Style // Selected row highlight.
+    CellEvenRow  lipgloss.Style // Base cell style for even-indexed rows.
+    CellOddRow   lipgloss.Style // Base cell style for odd-indexed rows.
+    CellPinned   lipgloss.Style // Base cell style for pinned rows.
 
     // Pinning
-    PinnedLeft  lipgloss.Style // Pinned-left region.
-    PinnedRight lipgloss.Style // Pinned-right region.
-    PinnedRow   lipgloss.Style // Pinned row (top/bottom).
-    PinSeparator string        // Vertical separator between pinned and scrollable.
+    PinnedLeft   lipgloss.Style // Pinned-left region.
+    PinnedRight  lipgloss.Style // Pinned-right region.
+    PinSeparator string         // Vertical separator between pinned and scrollable.
 
     // Grouping
     GroupRow       lipgloss.Style
@@ -861,10 +863,6 @@ type Styles struct {
     // Scrollbar
     Scrollbar         lipgloss.Style
     ScrollbarThumb    lipgloss.Style
-
-    // Alternating rows
-    EvenRow lipgloss.Style
-    OddRow  lipgloss.Style
 
     // Per-cell styling callback (overrides the above for fine-grained control)
     StyleFunc func(row, col int, data any) lipgloss.Style
