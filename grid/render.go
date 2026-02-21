@@ -140,7 +140,7 @@ func (m Model[T]) renderGroupHeaders() string {
 		var parts []string
 		for _, group := range m.colGroups {
 			width := 0
-			for _, child := range group.Children {
+			for _, child := range group.Columns {
 				for _, idx := range colIndices {
 					if m.cols[idx].ColumnID == child.ColumnID {
 						width += m.colWidths[idx]
@@ -148,8 +148,8 @@ func (m Model[T]) renderGroupHeaders() string {
 				}
 			}
 			if width > 0 {
-				if m.styles.BorderColumn && len(group.Children) > 1 {
-					width += len(group.Children) - 1
+				if m.styles.BorderColumn && len(group.Columns) > 1 {
+					width += len(group.Columns) - 1
 				}
 				parts = append(parts, m.styles.HeaderCell.Width(width).Render(group.HeaderName))
 			}

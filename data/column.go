@@ -84,7 +84,7 @@ type Column[T any] struct {
 // ColumnGroup produces a single level of grouped headers.
 type ColumnGroup[T any] struct {
 	HeaderName string
-	Children   []Column[T] // Leaf columns in this group.
+	Columns []Column[T] // Leaf columns in this group.
 }
 
 // FromType returns a []Column[T] derived from T's exported struct fields.
