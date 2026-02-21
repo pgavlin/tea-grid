@@ -553,7 +553,7 @@ func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 		Data:           rn.Data,
 		RowNode:        &rn,
 		Column:         &col,
-		ColIndex:       pos.Col,
+		ColumnIndex:       pos.Col,
 		RowIndex:       pos.Row,
 		Width:          m.colWidths[pos.Col],
 	}

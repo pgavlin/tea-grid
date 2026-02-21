@@ -372,7 +372,7 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 			Data:           rn.Data,
 			RowNode:        rn,
 			Column:         &col,
-			ColIndex:       idx,
+			ColumnIndex:       idx,
 			RowIndex:       displayIndex,
 			IsSelected:     isSelected,
 			IsFocused:      isFocused,
