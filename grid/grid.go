@@ -417,6 +417,7 @@ func (m Model[T]) FullHelp() [][]key.Binding {
 // --- Internal ---
 
 func (m *Model[T]) setRowData(rows []T) {
+	oldRows := m.rows
 	m.rows = make([]data.RowNode[T], len(rows))
 	for i, d := range rows {
 		rn := data.RowNode[T]{
@@ -428,14 +429,14 @@ func (m *Model[T]) setRowData(rows []T) {
 		}
 		if m.rowIDFunc != nil {
 			rn.ID = m.rowIDFunc(d)
+		} else if i < len(oldRows) {
+			// Reuse the existing ID for stable identity
+			rn.ID = oldRows[i].ID
 		} else {
-			rn.ID = fmt.Sprintf("row-%d", i)
+			rn.ID = fmt.Sprintf("row-%d", m.nextRowID)
+			m.nextRowID++
 		}
 		m.rows[i] = rn
-	}
-	// Ensure nextRowID won't collide with position-based IDs
-	if len(rows) > m.nextRowID {
-		m.nextRowID = len(rows)
 	}
 	m.dirty = true
 }

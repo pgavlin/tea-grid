@@ -507,6 +507,177 @@ func TestSetRows_PrunesStaleSelection(t *testing.T) {
 	}
 }
 
+func TestAutoID_SetRowsSameLength_PreservesIDs(t *testing.T) {
+	m := newTestGrid()
+	origIDs := make([]string, len(m.rows))
+	for i, rn := range m.rows {
+		origIDs[i] = rn.ID
+	}
+
+	// Replace with completely different data of the same length
+	m.SetRows([]TestRow{
+		{"Xander", "HR", 60000, true},
+		{"Yara", "Legal", 70000, false},
+		{"Zach", "Ops", 80000, true},
+		{"Wendy", "Finance", 90000, false},
+		{"Victor", "IT", 100000, true},
+	})
+
+	for i, rn := range m.rows {
+		if rn.ID != origIDs[i] {
+			t.Errorf("index %d: expected ID %q, got %q", i, origIDs[i], rn.ID)
+		}
+	}
+}
+
+func TestAutoID_SetRowsGrows_ReusesExistingAndAllocatesNew(t *testing.T) {
+	m := newTestGrid() // 5 rows
+	origIDs := make([]string, len(m.rows))
+	for i, rn := range m.rows {
+		origIDs[i] = rn.ID
+	}
+
+	// Grow to 7 rows
+	m.SetRows([]TestRow{
+		{"Alice", "Engineering", 95000, true},
+		{"Bob", "Sales", 75000, false},
+		{"Carol", "Engineering", 110000, true},
+		{"Dave", "Marketing", 80000, true},
+		{"Eve", "Sales", 90000, false},
+		{"Frank", "Engineering", 120000, true},
+		{"Grace", "Sales", 85000, false},
+	})
+
+	if len(m.rows) != 7 {
+		t.Fatalf("expected 7 rows, got %d", len(m.rows))
+	}
+
+	// First 5 rows should keep their original IDs
+	for i := 0; i < 5; i++ {
+		if m.rows[i].ID != origIDs[i] {
+			t.Errorf("index %d: expected ID %q preserved, got %q", i, origIDs[i], m.rows[i].ID)
+		}
+	}
+
+	// New rows should have unique IDs different from the originals
+	allIDs := make(map[string]bool)
+	for _, rn := range m.rows {
+		if allIDs[rn.ID] {
+			t.Errorf("duplicate ID: %s", rn.ID)
+		}
+		allIDs[rn.ID] = true
+	}
+}
+
+func TestAutoID_SetRowsShrinks_PreservesRemainingIDs(t *testing.T) {
+	m := newTestGrid() // 5 rows
+	origIDs := make([]string, len(m.rows))
+	for i, rn := range m.rows {
+		origIDs[i] = rn.ID
+	}
+
+	// Shrink to 3 rows
+	m.SetRows([]TestRow{
+		{"Alice", "Engineering", 95000, true},
+		{"Bob", "Sales", 75000, false},
+		{"Carol", "Engineering", 110000, true},
+	})
+
+	if len(m.rows) != 3 {
+		t.Fatalf("expected 3 rows, got %d", len(m.rows))
+	}
+
+	for i, rn := range m.rows {
+		if rn.ID != origIDs[i] {
+			t.Errorf("index %d: expected ID %q preserved, got %q", i, origIDs[i], rn.ID)
+		}
+	}
+}
+
+func TestAutoID_RepeatedSetRows_NeverDuplicates(t *testing.T) {
+	m := newTestGrid() // 5 rows
+
+	// Shrink then grow repeatedly
+	m.SetRows([]TestRow{{"A", "X", 1, true}})
+	m.SetRows([]TestRow{{"A", "X", 1, true}, {"B", "Y", 2, false}, {"C", "Z", 3, true}})
+	m.SetRows([]TestRow{{"A", "X", 1, true}})
+	m.SetRows([]TestRow{
+		{"A", "X", 1, true},
+		{"B", "Y", 2, false},
+		{"C", "Z", 3, true},
+		{"D", "W", 4, false},
+		{"E", "V", 5, true},
+		{"F", "U", 6, false},
+		{"G", "T", 7, true},
+	})
+
+	allIDs := make(map[string]bool)
+	for _, rn := range m.rows {
+		if allIDs[rn.ID] {
+			t.Errorf("duplicate ID after repeated SetRows: %s", rn.ID)
+		}
+		allIDs[rn.ID] = true
+	}
+}
+
+func TestAutoID_InsertRow_DoesNotCollideWithSetRows(t *testing.T) {
+	m := newTestGrid() // 5 rows
+	existingIDs := make(map[string]bool)
+	for _, rn := range m.rows {
+		existingIDs[rn.ID] = true
+	}
+
+	m.InsertRow(5, TestRow{"Frank", "Engineering", 120000, true})
+
+	newID := m.rows[5].ID
+	if existingIDs[newID] {
+		t.Errorf("InsertRow generated ID %q that collides with existing row", newID)
+	}
+
+	// SetRows after InsertRow should not produce collisions
+	m.SetRows([]TestRow{
+		{"A", "X", 1, true},
+		{"B", "Y", 2, false},
+		{"C", "Z", 3, true},
+		{"D", "W", 4, false},
+		{"E", "V", 5, true},
+		{"F", "U", 6, false},
+		{"G", "T", 7, true},
+	})
+
+	allIDs := make(map[string]bool)
+	for _, rn := range m.rows {
+		if allIDs[rn.ID] {
+			t.Errorf("duplicate ID: %s", rn.ID)
+		}
+		allIDs[rn.ID] = true
+	}
+}
+
+func TestAutoID_SelectionSurvivesSetRows(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+
+	// Select the second row
+	id1 := m.rows[1].ID
+	m.SelectRow(id1)
+	if !m.IsSelected(id1) {
+		t.Fatal("expected row to be selected")
+	}
+
+	// Replace with same-length data — ID is preserved so selection should survive
+	m.SetRows([]TestRow{
+		{"Xander", "HR", 60000, true},
+		{"Yara", "Legal", 70000, false},
+		{"Zach", "Ops", 80000, true},
+		{"Wendy", "Finance", 90000, false},
+		{"Victor", "IT", 100000, true},
+	})
+
+	if !m.IsSelected(id1) {
+		t.Error("expected selection to survive SetRows when auto-ID is preserved")
+	}
+}
+
 func TestRemoveRow_DeselectsRemovedRow(t *testing.T) {
 	m := New[TestRow](
 		WithColumns[TestRow](testCols()),
