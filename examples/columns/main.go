@@ -38,7 +38,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string { return m.grid.View() }
 
 func main() {
-	cols := []data.ColDef[Employee]{
+	cols := []data.Column[Employee]{
 		{
 			ColID:       "name",
 			HeaderName:  "Employee Name",

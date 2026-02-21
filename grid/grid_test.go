@@ -23,8 +23,8 @@ type TestRow struct {
 	Active     bool
 }
 
-func testCols() []data.ColDef[TestRow] {
-	return []data.ColDef[TestRow]{
+func testCols() []data.Column[TestRow] {
+	return []data.Column[TestRow]{
 		{ColID: "Name", HeaderName: "Name", ValueGetter: func(r TestRow) any { return r.Name }, Sortable: true, Filterable: true, MinWidth: 4},
 		{ColID: "Department", HeaderName: "Department", ValueGetter: func(r TestRow) any { return r.Department }, Sortable: true, Filterable: true, MinWidth: 4},
 		{ColID: "Salary", HeaderName: "Salary", ValueGetter: func(r TestRow) any { return r.Salary }, Sortable: true, Filterable: true, MinWidth: 4},
@@ -371,7 +371,7 @@ func TestSetRows_Rows_RoundTrip(t *testing.T) {
 
 func TestSetColumns_Columns_RoundTrip(t *testing.T) {
 	m := newTestGrid()
-	newCols := []data.ColDef[TestRow]{
+	newCols := []data.Column[TestRow]{
 		{ColID: "Name", HeaderName: "Name", ValueGetter: func(r TestRow) any { return r.Name }},
 	}
 	m.SetColumns(newCols)
@@ -462,7 +462,7 @@ func TestDirtyFlag(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestColumnSizing_FixedWidth(t *testing.T) {
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 20},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30},
 	}
@@ -476,7 +476,7 @@ func TestColumnSizing_FixedWidth(t *testing.T) {
 }
 
 func TestColumnSizing_FlexDistribution(t *testing.T) {
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
@@ -493,7 +493,7 @@ func TestColumnSizing_FlexDistribution(t *testing.T) {
 }
 
 func TestColumnSizing_MinWidthRespected(t *testing.T) {
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, MinWidth: 10, Flex: 1},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, MinWidth: 10, Flex: 1},
 	}
@@ -509,7 +509,7 @@ func TestColumnSizing_MinWidthRespected(t *testing.T) {
 }
 
 func TestColumnSizing_MaxWidthClamped(t *testing.T) {
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4, MaxWidth: 15},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
@@ -522,7 +522,7 @@ func TestColumnSizing_MaxWidthClamped(t *testing.T) {
 }
 
 func TestColumnSizing_MixedFixedAndFlex(t *testing.T) {
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 20},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
@@ -539,7 +539,7 @@ func TestColumnSizing_MixedFixedAndFlex(t *testing.T) {
 }
 
 func TestColumnSizing_BorderColumnSubtractsSpace(t *testing.T) {
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
@@ -554,7 +554,7 @@ func TestColumnSizing_BorderColumnSubtractsSpace(t *testing.T) {
 }
 
 func TestColumnSizing_SingleFlexColumn(t *testing.T) {
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
 	}
 	s := DefaultStyles()
@@ -566,7 +566,7 @@ func TestColumnSizing_SingleFlexColumn(t *testing.T) {
 }
 
 func TestColumnSizing_HiddenColumnsGetWidthZero(t *testing.T) {
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4, Hide: true},
 	}
@@ -1929,7 +1929,7 @@ func TestSelectedRowNodes(t *testing.T) {
 
 func TestHorizontalScroll_ColumnsExceedViewport(t *testing.T) {
 	// Create columns whose MinWidths total > viewport width (80)
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, MinWidth: 30},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, MinWidth: 30},
 		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, MinWidth: 30},
@@ -1959,7 +1959,7 @@ func TestHorizontalScroll_ColumnsExceedViewport(t *testing.T) {
 
 func TestHorizontalScroll_LeftColUpdatesVisibleCols(t *testing.T) {
 	// Columns with varying widths; total exceeds viewport width
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 25},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 25},
 		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 25},
@@ -1990,7 +1990,7 @@ func TestHorizontalScroll_LeftColUpdatesVisibleCols(t *testing.T) {
 
 func TestHorizontalScroll_VaryingWidths(t *testing.T) {
 	// First column is very wide, rest are narrow
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 50},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 10},
 		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 10},
@@ -2036,7 +2036,7 @@ func TestHorizontalScroll_VaryingWidths(t *testing.T) {
 
 func TestUpdateVisibleColCount_CountsFromLeftCol(t *testing.T) {
 	// Set up a grid with fixed-width columns that exceed viewport
-	cols := []data.ColDef[TestRow]{
+	cols := []data.Column[TestRow]{
 		{ColID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 30},
 		{ColID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30},
 		{ColID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 30},

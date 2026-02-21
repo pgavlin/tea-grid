@@ -10,7 +10,7 @@ type CellContext[T any] struct {
 	FormattedValue string // After ValueFormatter.
 	Data           T      // The full row data.
 	RowNode        *RowNode[T]
-	ColDef         *ColDef[T]
+	Column         *Column[T]
 	ColIndex       int
 	RowIndex       int
 	IsSelected     bool

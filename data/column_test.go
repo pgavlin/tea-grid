@@ -229,7 +229,7 @@ func TestFromRowsMapStringAny(t *testing.T) {
 	}
 
 	// Find columns by ID.
-	colMap := make(map[string]ColDef[map[string]any])
+	colMap := make(map[string]Column[map[string]any])
 	for _, c := range cols {
 		colMap[c.ColID] = c
 	}
@@ -258,7 +258,7 @@ func TestFromRowsMapInfersTypes(t *testing.T) {
 	}
 	cols := FromRows(rows)
 
-	colMap := make(map[string]ColDef[map[string]any])
+	colMap := make(map[string]Column[map[string]any])
 	for _, c := range cols {
 		colMap[c.ColID] = c
 	}
@@ -381,7 +381,7 @@ func TestFromRowsSliceValueGetter(t *testing.T) {
 	}
 	cols := FromRows(rows)
 
-	colMap := make(map[string]ColDef[[]any])
+	colMap := make(map[string]Column[[]any])
 	for _, c := range cols {
 		colMap[c.ColID] = c
 	}
@@ -416,7 +416,7 @@ func TestFromRowsSliceFieldTypes(t *testing.T) {
 	}
 	cols := FromRows(rows)
 
-	colMap := make(map[string]ColDef[[]any])
+	colMap := make(map[string]Column[[]any])
 	for _, c := range cols {
 		colMap[c.ColID] = c
 	}

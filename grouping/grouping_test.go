@@ -12,8 +12,8 @@ type testRow struct {
 	Salary     float64
 }
 
-func testCols() []data.ColDef[testRow] {
-	return []data.ColDef[testRow]{
+func testCols() []data.Column[testRow] {
+	return []data.Column[testRow]{
 		{
 			ColID:       "Name",
 			HeaderName:  "Name",
@@ -106,7 +106,7 @@ func TestBuildGroupsMultiLevel(t *testing.T) {
 		{Data: testRow{"Carol", "Sales", 150}, ID: "3"},
 		{Data: testRow{"Dave", "Sales", 120}, ID: "4"},
 	}
-	cols := []data.ColDef[testRow]{
+	cols := []data.Column[testRow]{
 		{ColID: "Department", ValueGetter: func(r testRow) any { return r.Department }},
 		{ColID: "Name", ValueGetter: func(r testRow) any { return r.Name }},
 	}

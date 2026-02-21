@@ -32,8 +32,8 @@ const (
 	SortDesc
 )
 
-// ColDef defines a single column in the grid.
-type ColDef[T any] struct {
+// Column defines a single column in the grid.
+type Column[T any] struct {
 	// Identity
 	ColID      string // Unique identifier. Required.
 	HeaderName string // Display name in the header row.
@@ -84,16 +84,16 @@ type ColDef[T any] struct {
 // ColGroup produces a single level of grouped headers.
 type ColGroup[T any] struct {
 	HeaderName string
-	Children   []ColDef[T] // Leaf columns in this group.
+	Children   []Column[T] // Leaf columns in this group.
 }
 
-// FromType returns a []ColDef[T] derived from T's exported struct fields.
-// For each exported field, it produces a ColDef with:
+// FromType returns a []Column[T] derived from T's exported struct fields.
+// For each exported field, it produces a Column with:
 //   - ColID and HeaderName set to the field name
 //   - ValueGetter set to a function that retrieves the field's value from T
 //
 // Panics if T is not a struct type.
-func FromType[T any]() []ColDef[T] {
+func FromType[T any]() []Column[T] {
 	var zero T
 	t := reflect.TypeOf(zero)
 	if t.Kind() == reflect.Ptr {
@@ -103,14 +103,14 @@ func FromType[T any]() []ColDef[T] {
 		panic("column.Columns: T must be a struct type")
 	}
 
-	var cols []ColDef[T]
+	var cols []Column[T]
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		if !field.IsExported() {
 			continue
 		}
 		idx := i // capture for closure
-		col := ColDef[T]{
+		col := Column[T]{
 			ColID:      field.Name,
 			HeaderName: field.Name,
 			ValueGetter: func(data T) any {
@@ -140,7 +140,7 @@ var timeFormats = []string{
 	"2006-01-02",
 }
 
-// FromRows returns a []ColDef[T] inferred from the provided rows.
+// FromRows returns a []Column[T] inferred from the provided rows.
 // It supports:
 //   - map[string]any: discovers keys and infers value types
 //   - []any (slice): discovers struct fields from heterogeneous elements
@@ -148,7 +148,7 @@ var timeFormats = []string{
 //
 // For interface types, the first non-nil row is inspected to determine the
 // actual kind. Returns nil for unsupported types or empty rows.
-func FromRows[T any](rows []T) []ColDef[T] {
+func FromRows[T any](rows []T) []Column[T] {
 	var zero T
 	t := reflect.TypeOf(&zero).Elem()
 
@@ -196,7 +196,7 @@ func FromRows[T any](rows []T) []ColDef[T] {
 
 // columnsFromMap discovers columns from map-typed rows (map[string]any).
 // Keys are collected in first-appearance order across all rows.
-func columnsFromMap[T any](rows []T) []ColDef[T] {
+func columnsFromMap[T any](rows []T) []Column[T] {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -221,19 +221,19 @@ func columnsFromMap[T any](rows []T) []ColDef[T] {
 		}
 	}
 
-	cols := make([]ColDef[T], 0, len(keys))
+	cols := make([]Column[T], 0, len(keys))
 	for _, key := range keys {
 		category := inferMapColumnType(key, rows)
-		col := makeMapColDef[T](key, category)
+		col := makeMapColumn[T](key, category)
 		applyTypeDefaults(&col, category, collectDistinctValues(col.ValueGetter, rows))
 		cols = append(cols, col)
 	}
 	return cols
 }
 
-// makeMapColDef builds a ColDef for a map column with the given key and type category.
-func makeMapColDef[T any](key, category string) ColDef[T] {
-	col := ColDef[T]{
+// makeMapColumn builds a Column for a map column with the given key and type category.
+func makeMapColumn[T any](key, category string) Column[T] {
+	col := Column[T]{
 		ColID:      key,
 		HeaderName: key,
 		Sortable:   true,
@@ -383,7 +383,7 @@ func inferMapColumnType[T any](key string, rows []T) string {
 
 // columnsFromSlice discovers columns from slice-typed rows ([]any).
 // Each element is expected to be a struct; fields are collected in first-appearance order.
-func columnsFromSlice[T any](rows []T) []ColDef[T] {
+func columnsFromSlice[T any](rows []T) []Column[T] {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -429,7 +429,7 @@ func columnsFromSlice[T any](rows []T) []ColDef[T] {
 		}
 	}
 
-	cols := make([]ColDef[T], 0, len(fields))
+	cols := make([]Column[T], 0, len(fields))
 	for _, fi := range fields {
 		category := classifyReflectType(fi.goType)
 		fieldName := fi.name // capture
@@ -438,7 +438,7 @@ func columnsFromSlice[T any](rows []T) []ColDef[T] {
 			return sliceFieldValue(row, fieldName)
 		}
 
-		col := ColDef[T]{
+		col := Column[T]{
 			ColID:       fieldName,
 			HeaderName:  fieldName,
 			ValueGetter: getter,
@@ -512,8 +512,8 @@ func classifyReflectType(t reflect.Type) string {
 	}
 }
 
-// applyTypeDefaults sets Filter and sizing on a ColDef based on the type category.
-func applyTypeDefaults[T any](col *ColDef[T], category string, distinctValues []string) {
+// applyTypeDefaults sets Filter and sizing on a Column based on the type category.
+func applyTypeDefaults[T any](col *Column[T], category string, distinctValues []string) {
 	rightAligned := lipgloss.NewStyle().Align(lipgloss.Right)
 
 	switch category {

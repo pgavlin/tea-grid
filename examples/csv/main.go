@@ -96,8 +96,8 @@ func inferType(col int, rows []Row) string {
 	return "string"
 }
 
-func buildColumns(headers []string, rows []Row) []data.ColDef[Row] {
-	cols := make([]data.ColDef[Row], len(headers))
+func buildColumns(headers []string, rows []Row) []data.Column[Row] {
+	cols := make([]data.Column[Row], len(headers))
 
 	rightAligned := lipgloss.NewStyle().Align(lipgloss.Right)
 
@@ -105,7 +105,7 @@ func buildColumns(headers []string, rows []Row) []data.ColDef[Row] {
 		idx := i // capture
 		typ := inferType(idx, rows)
 
-		col := data.ColDef[Row]{
+		col := data.Column[Row]{
 			ColID:      fmt.Sprintf("col%d", idx),
 			HeaderName: hdr,
 			Sortable:   true,

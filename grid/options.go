@@ -10,7 +10,7 @@ import (
 type Option[T any] func(*Model[T])
 
 // WithColumns sets the column definitions.
-func WithColumns[T any](cols []data.ColDef[T]) Option[T] {
+func WithColumns[T any](cols []data.Column[T]) Option[T] {
 	return func(m *Model[T]) {
 		m.cols = cols
 	}

@@ -70,7 +70,7 @@ func (m *Model[T]) CollapseAll(groups []*data.RowNode[T]) {
 // Returns the top-level group nodes.
 func BuildGroups[T any](
 	rows []data.RowNode[T],
-	cols []data.ColDef[T],
+	cols []data.Column[T],
 	groupCols []string,
 	expanded map[string]bool,
 	defaultExpanded int,
@@ -84,7 +84,7 @@ func BuildGroups[T any](
 	}
 
 	// Find the column definition for the first group column
-	var groupCol *data.ColDef[T]
+	var groupCol *data.Column[T]
 	for i := range cols {
 		if cols[i].ColID == groupCols[0] {
 			groupCol = &cols[i]

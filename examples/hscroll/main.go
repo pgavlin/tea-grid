@@ -49,7 +49,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string { return m.grid.View() }
 
 func main() {
-	cols := []data.ColDef[Stock]{
+	cols := []data.Column[Stock]{
 		{ColID: "ticker", HeaderName: "Ticker", ValueGetter: func(s Stock) any { return s.Ticker }, Width: 8, Pinned: data.PinLeft, Sortable: true},
 		{ColID: "company", HeaderName: "Company", ValueGetter: func(s Stock) any { return s.Company }, Width: 22, Sortable: true},
 		{ColID: "sector", HeaderName: "Sector", ValueGetter: func(s Stock) any { return s.Sector }, Width: 16, Sortable: true},

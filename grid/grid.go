@@ -31,7 +31,7 @@ type Model[T any] struct {
 	Help   help.Model
 
 	// Column definitions
-	cols      []data.ColDef[T]
+	cols      []data.Column[T]
 	colGroups []data.ColGroup[T]
 
 	// Row data
@@ -163,7 +163,7 @@ func (m Model[T]) Rows() []T {
 }
 
 // SetColumns replaces the column definitions.
-func (m *Model[T]) SetColumns(cols []data.ColDef[T]) {
+func (m *Model[T]) SetColumns(cols []data.Column[T]) {
 	m.cols = cols
 	m.dirty = true
 	m.computeColWidths()
@@ -171,7 +171,7 @@ func (m *Model[T]) SetColumns(cols []data.ColDef[T]) {
 }
 
 // Columns returns the column definitions.
-func (m Model[T]) Columns() []data.ColDef[T] {
+func (m Model[T]) Columns() []data.Column[T] {
 	return m.cols
 }
 
@@ -726,7 +726,7 @@ func (m *Model[T]) sortGroupsAtLevel(groups []*data.RowNode[T], level int) {
 }
 
 // firstLeafValue walks down to the first leaf row and returns the column value.
-func (m *Model[T]) firstLeafValue(node *data.RowNode[T], col *data.ColDef[T]) any {
+func (m *Model[T]) firstLeafValue(node *data.RowNode[T], col *data.Column[T]) any {
 	if !node.IsGroup {
 		return col.ValueGetter(node.Data)
 	}
@@ -736,7 +736,7 @@ func (m *Model[T]) firstLeafValue(node *data.RowNode[T], col *data.ColDef[T]) an
 	return nil
 }
 
-func (m *Model[T]) findCol(colID string) *data.ColDef[T] {
+func (m *Model[T]) findCol(colID string) *data.Column[T] {
 	for i := range m.cols {
 		if m.cols[i].ColID == colID {
 			return &m.cols[i]
