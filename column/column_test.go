@@ -30,9 +30,12 @@ type multiType struct {
 
 // --- Constants ---
 
-func TestPinDirectionConstants(t *testing.T) {
+func TestPinConstants(t *testing.T) {
 	if PinNone == PinLeft || PinNone == PinRight || PinLeft == PinRight {
-		t.Fatal("PinDirection constants must be distinct")
+		t.Fatal("Pin constants must be distinct")
+	}
+	if PinNone == PinTop || PinNone == PinBottom || PinTop == PinBottom {
+		t.Fatal("Pin constants must be distinct")
 	}
 }
 

@@ -12,13 +12,15 @@ import (
 	"github.com/pgavlin/tea-grid/filter"
 )
 
-// PinDirection indicates whether a column is pinned to the left or right edge.
-type PinDirection int
+// Pin indicates the pin position for columns (left/right) or rows (top/bottom).
+type Pin int
 
 const (
-	PinNone PinDirection = iota
-	PinLeft
-	PinRight
+	PinNone   Pin = iota
+	PinLeft       // Column: pinned to left edge.
+	PinRight      // Column: pinned to right edge.
+	PinTop        // Row: pinned to top.
+	PinBottom     // Row: pinned to bottom.
 )
 
 // SortDirection indicates the sort direction for a column.
@@ -47,25 +49,25 @@ type ColDef[T any] struct {
 	Flex     int // Flex weight for distributing remaining space. 0 = no flex.
 
 	// Sorting
-	Sortable   bool                            // Default: true.
-	Comparator func(a, b any, isDesc bool) int // Custom sort.
+	Sortable   bool                  // Default: true.
+	Comparator func(a, b any) int   // Custom sort.
 
 	// Filtering
 	Filterable bool          // Default: true.
 	Filter     filter.Filter // Column filter.
 
 	// Pinning
-	Pinned     PinDirection // Left, Right, or None.
-	LockPinned bool         // Prevent user from changing pin state.
+	Pinned     Pin  // Left, Right, or None.
+	LockPinned bool // Prevent user from changing pin state.
 
 	// Cell rendering
-	CellRenderer         any                                    // Custom renderer (implements cell.CellRenderer[T]).
-	CellRendererSelector func(T) any                            // Dynamic renderer per row (returns cell.CellRenderer[T]).
+	CellRenderer         CellRenderer[T]                        // Custom renderer.
+	CellRendererSelector func(T) CellRenderer[T]                // Dynamic renderer per row.
 	CellStyle            func(value any, data T) lipgloss.Style // Per-cell styling.
 
 	// Cell editing
 	Editable    bool                     // Default: false.
-	CellEditor  any                      // Custom editor (implements cell.CellEditor[T]).
+	CellEditor  CellEditor[T]            // Custom editor.
 	ValueSetter func(data *T, value any) // Write the edited value back.
 
 	// Column spanning

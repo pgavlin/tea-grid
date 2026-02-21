@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/pgavlin/tea-grid/column"
-	"github.com/pgavlin/tea-grid/row"
 )
 
 type testRow struct {
@@ -33,7 +32,7 @@ func testCols() []column.ColDef[testRow] {
 	}
 }
 
-func testRows() []row.RowNode[testRow] {
+func testRows() []column.RowNode[testRow] {
 	data := []testRow{
 		{"Alice", "Eng", 100},
 		{"Bob", "Eng", 200},
@@ -42,9 +41,9 @@ func testRows() []row.RowNode[testRow] {
 		{"Eve", "Sales", 180},
 		{"Frank", "Sales", 160},
 	}
-	nodes := make([]row.RowNode[testRow], len(data))
+	nodes := make([]column.RowNode[testRow], len(data))
 	for i, d := range data {
-		nodes[i] = row.RowNode[testRow]{Data: d, ID: d.Name}
+		nodes[i] = column.RowNode[testRow]{Data: d, ID: d.Name}
 	}
 	return nodes
 }
@@ -101,7 +100,7 @@ func TestBuildGroupsChildParentPointers(t *testing.T) {
 
 func TestBuildGroupsMultiLevel(t *testing.T) {
 	// Create rows with two groupable dimensions
-	rows := []row.RowNode[testRow]{
+	rows := []column.RowNode[testRow]{
 		{Data: testRow{"Alice", "Eng", 100}, ID: "1"},
 		{Data: testRow{"Bob", "Eng", 200}, ID: "2"},
 		{Data: testRow{"Carol", "Sales", 150}, ID: "3"},
@@ -165,7 +164,7 @@ func TestBuildGroupsMissingColumn(t *testing.T) {
 func TestBuildGroupsEmpty(t *testing.T) {
 	cols := testCols()
 	expanded := map[string]bool{}
-	result := BuildGroups([]row.RowNode[testRow]{}, cols, []string{"Department"}, expanded, -1)
+	result := BuildGroups([]column.RowNode[testRow]{}, cols, []string{"Department"}, expanded, -1)
 
 	if len(result) != 0 {
 		t.Fatalf("empty rows: expected 0, got %d", len(result))

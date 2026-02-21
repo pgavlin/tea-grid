@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/pgavlin/tea-grid/cell"
+	"github.com/pgavlin/tea-grid/column"
 	"github.com/pgavlin/tea-grid/filter"
 )
 
@@ -123,12 +123,16 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		if m.focusedCell.Row >= 0 && m.focusedCell.Row < totalRows {
 			rn := m.displayRows[m.focusedCell.Row]
 			m.sel.Toggle(rn.ID)
-			return m, nil
+			return m, func() tea.Msg {
+				return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
+			}
 		}
 
 	case key.Matches(msg, m.KeyMap.SelectAll):
 		m.SelectAll()
-		return m, nil
+		return m, func() tea.Msg {
+			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
+		}
 
 	// Sorting (header mode)
 	case key.Matches(msg, m.KeyMap.ToggleSort):
@@ -140,8 +144,8 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 					m.sortModel.ToggleSort(col.ColID)
 					m.dirty = true
 					m.recomputeDisplayRows()
-					if m.onSortChanged != nil {
-						m.onSortChanged(m.sortModel.SortOrder)
+					return m, func() tea.Msg {
+						return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
 					}
 				}
 			}
@@ -164,8 +168,8 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 					m.sortModel.AddSort(col.ColID)
 					m.dirty = true
 					m.recomputeDisplayRows()
-					if m.onSortChanged != nil {
-						m.onSortChanged(m.sortModel.SortOrder)
+					return m, func() tea.Msg {
+						return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
 					}
 				}
 			}
@@ -180,8 +184,8 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 				m.sortModel.ToggleSort(col.ColID)
 				m.dirty = true
 				m.recomputeDisplayRows()
-				if m.onSortChanged != nil {
-					m.onSortChanged(m.sortModel.SortOrder)
+				return m, func() tea.Msg {
+					return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
 				}
 			}
 		}
@@ -194,8 +198,8 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 				m.sortModel.AddSort(col.ColID)
 				m.dirty = true
 				m.recomputeDisplayRows()
-				if m.onSortChanged != nil {
-					m.onSortChanged(m.sortModel.SortOrder)
+				return m, func() tea.Msg {
+					return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
 				}
 			}
 		}
@@ -208,9 +212,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			m.groupModel.ToggleGroupColumn(col.ColID)
 			m.dirty = true
 			m.recomputeDisplayRows()
-			if m.onGroupColumnsChanged != nil {
-				m.onGroupColumnsChanged(m.groupModel.GroupColumns)
-			}
 			return m, func() tea.Msg {
 				return GroupColumnsChangedMsg{GroupColumns: m.groupModel.GroupColumns}
 			}
@@ -287,21 +288,28 @@ func (m Model[T]) handleEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		}
 
 		m.editState = nil
+		data := m.displayRows[pos.Row].Data
 
-		if m.onCellValueChanged != nil {
-			m.onCellValueChanged(CellValueChangedMsg[T]{
-				Position: pos,
-				OldValue: oldValue,
-				NewValue: newValue,
-				Data:     m.displayRows[pos.Row].Data,
-			})
-		}
-
-		return m, nil
+		return m, tea.Batch(
+			func() tea.Msg {
+				return CellEditingStoppedMsg{Position: pos}
+			},
+			func() tea.Msg {
+				return CellValueChangedMsg[T]{
+					Position: pos,
+					OldValue: oldValue,
+					NewValue: newValue,
+					Data:     data,
+				}
+			},
+		)
 
 	case key.Matches(msg, m.KeyMap.CancelEdit):
+		pos := m.editState.position
 		m.editState = nil
-		return m, nil
+		return m, func() tea.Msg {
+			return CellEditingCancelledMsg{Position: pos}
+		}
 
 	default:
 		// Route to editor
@@ -539,7 +547,7 @@ func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 		formatted = col.ValueFormatter(val, rn.Data)
 	}
 
-	ctx := cell.CellContext[T]{
+	ctx := column.CellContext[T]{
 		Value:          val,
 		FormattedValue: formatted,
 		Data:           rn.Data,
@@ -551,16 +559,11 @@ func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 	}
 
 	// Use column's editor or default text editor
-	var editor cell.CellEditor[T]
-	if col.CellEditor != nil {
-		if ce, ok := col.CellEditor.(cell.CellEditor[T]); ok {
-			editor = ce
-		}
-	}
+	editor := col.CellEditor
 	if editor == nil {
-		editor = cell.NewTextEditor[T]()
+		editor = column.NewTextEditor[T]()
 	}
-	cmd := editor.Init(ctx)
+	initCmd := editor.Init(ctx)
 
 	m.editState = &editState[T]{
 		position: pos,
@@ -568,11 +571,11 @@ func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 		oldValue: val,
 	}
 
-	_ = cmd
-
-	return m, func() tea.Msg {
+	startCmd := func() tea.Msg {
 		return CellEditingStartedMsg{Position: pos}
 	}
+
+	return m, tea.Batch(initCmd, startCmd)
 }
 
 // expandCurrentGroup expands the currently focused group.

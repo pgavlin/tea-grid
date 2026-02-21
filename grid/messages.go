@@ -2,7 +2,6 @@ package grid
 
 import (
 	"github.com/pgavlin/tea-grid/column"
-	"github.com/pgavlin/tea-grid/row"
 	"github.com/pgavlin/tea-grid/sort"
 )
 
@@ -18,15 +17,9 @@ type FocusChangedMsg struct {
 	Previous CellPosition
 }
 
-// RowSelectedMsg is emitted when a row is selected or deselected.
-type RowSelectedMsg[T any] struct {
-	Row      row.RowNode[T]
-	Selected bool
-}
-
 // SelectionChangedMsg is emitted when the selection set changes.
 type SelectionChangedMsg[T any] struct {
-	Selected []row.RowNode[T]
+	Selected []column.RowNode[T]
 }
 
 // SortChangedMsg is emitted when the sort order changes.
@@ -85,12 +78,3 @@ type GroupColumnsChangedMsg struct {
 	GroupColumns []string
 }
 
-// RowsSetMsg is emitted when the row data is replaced.
-type RowsSetMsg[T any] struct {
-	Rows []T
-}
-
-// ColumnsSetMsg is emitted when the column definitions are replaced.
-type ColumnsSetMsg[T any] struct {
-	Cols []column.ColDef[T]
-}

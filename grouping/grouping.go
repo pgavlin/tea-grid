@@ -6,7 +6,6 @@ import (
 	"math"
 
 	"github.com/pgavlin/tea-grid/column"
-	"github.com/pgavlin/tea-grid/row"
 )
 
 // Model holds the current grouping state.
@@ -37,7 +36,7 @@ func (m *Model[T]) SetExpanded(groupKey string, expanded bool) {
 }
 
 // ExpandAll expands all groups.
-func (m *Model[T]) ExpandAll(groups []*row.RowNode[T]) {
+func (m *Model[T]) ExpandAll(groups []*column.RowNode[T]) {
 	for _, g := range groups {
 		if g.IsGroup {
 			m.Expanded[g.GroupKey] = true
@@ -58,7 +57,7 @@ func (m *Model[T]) ToggleGroupColumn(colID string) {
 }
 
 // CollapseAll collapses all groups.
-func (m *Model[T]) CollapseAll(groups []*row.RowNode[T]) {
+func (m *Model[T]) CollapseAll(groups []*column.RowNode[T]) {
 	for _, g := range groups {
 		if g.IsGroup {
 			m.Expanded[g.GroupKey] = false
@@ -70,14 +69,14 @@ func (m *Model[T]) CollapseAll(groups []*row.RowNode[T]) {
 // BuildGroups organizes rows into a group tree based on GroupColumns.
 // Returns the top-level group nodes.
 func BuildGroups[T any](
-	rows []row.RowNode[T],
+	rows []column.RowNode[T],
 	cols []column.ColDef[T],
 	groupCols []string,
 	expanded map[string]bool,
 	defaultExpanded int,
-) []*row.RowNode[T] {
+) []*column.RowNode[T] {
 	if len(groupCols) == 0 {
-		result := make([]*row.RowNode[T], len(rows))
+		result := make([]*column.RowNode[T], len(rows))
 		for i := range rows {
 			result[i] = &rows[i]
 		}
@@ -93,7 +92,7 @@ func BuildGroups[T any](
 		}
 	}
 	if groupCol == nil {
-		result := make([]*row.RowNode[T], len(rows))
+		result := make([]*column.RowNode[T], len(rows))
 		for i := range rows {
 			result[i] = &rows[i]
 		}
@@ -101,7 +100,7 @@ func BuildGroups[T any](
 	}
 
 	// Group rows by the column value
-	groupMap := make(map[string][]*row.RowNode[T])
+	groupMap := make(map[string][]*column.RowNode[T])
 	var groupOrder []string
 	for i := range rows {
 		val := groupCol.ValueGetter(rows[i].Data)
@@ -113,10 +112,10 @@ func BuildGroups[T any](
 	}
 
 	// Create group nodes
-	var groups []*row.RowNode[T]
+	var groups []*column.RowNode[T]
 	for _, key := range groupOrder {
 		children := groupMap[key]
-		groupNode := &row.RowNode[T]{
+		groupNode := &column.RowNode[T]{
 			IsGroup:    true,
 			GroupKey:   key,
 			GroupLevel: 0,
@@ -137,7 +136,7 @@ func BuildGroups[T any](
 
 		// Recursively group children if there are more group columns
 		if len(groupCols) > 1 {
-			childRows := make([]row.RowNode[T], len(children))
+			childRows := make([]column.RowNode[T], len(children))
 			for i, c := range children {
 				childRows[i] = *c
 			}
@@ -156,8 +155,8 @@ func BuildGroups[T any](
 }
 
 // FlattenGroups flattens the group tree into a display list, respecting expanded state.
-func FlattenGroups[T any](groups []*row.RowNode[T]) []row.RowNode[T] {
-	var result []row.RowNode[T]
+func FlattenGroups[T any](groups []*column.RowNode[T]) []column.RowNode[T] {
+	var result []column.RowNode[T]
 	for _, g := range groups {
 		if g.IsGroup {
 			result = append(result, *g)

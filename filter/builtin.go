@@ -8,18 +8,19 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/pgavlin/tea-grid/internal/lineedit"
 )
 
 // --- TextFilter ---
 
 // TextFilter performs substring or regex matching on string values.
 type TextFilter struct {
-	text     string
+	editor   lineedit.Model
 	regex    bool
 	compiled *regexp.Regexp
 
 	// Editing state
-	cursor  int
 	width   int
 	editing bool
 }
@@ -30,7 +31,7 @@ func NewTextFilter() *TextFilter {
 }
 
 func (f *TextFilter) SetText(text string) {
-	f.text = text
+	f.editor.SetText(text)
 	f.compiled = nil
 	if f.regex {
 		f.compiled, _ = regexp.Compile(text)
@@ -39,8 +40,8 @@ func (f *TextFilter) SetText(text string) {
 
 func (f *TextFilter) SetRegex(regex bool) {
 	f.regex = regex
-	if regex && f.text != "" {
-		f.compiled, _ = regexp.Compile(f.text)
+	if regex && f.editor.Text() != "" {
+		f.compiled, _ = regexp.Compile(f.editor.Text())
 	} else {
 		f.compiled = nil
 	}
@@ -51,17 +52,17 @@ func (f *TextFilter) Matches(value any) bool {
 	if f.regex && f.compiled != nil {
 		return f.compiled.MatchString(s)
 	}
-	return strings.Contains(strings.ToLower(s), strings.ToLower(f.text))
+	return strings.Contains(strings.ToLower(s), strings.ToLower(f.editor.Text()))
 }
 
 func (f *TextFilter) View() string {
 	if f.editing {
-		return renderEditorLine(f.text, f.cursor, f.width, "")
+		return f.editor.RenderLine(f.width, "")
 	}
-	if f.text == "" {
+	if f.editor.Text() == "" {
 		return ""
 	}
-	return f.text
+	return f.editor.Text()
 }
 
 func (f *TextFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
@@ -69,7 +70,7 @@ func (f *TextFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	case FilterFocusMsg:
 		f.editing = true
 		f.width = msg.Width
-		f.cursor = len(f.text)
+		f.editor.CursorToEnd()
 		return f, nil
 	case FilterBlurMsg:
 		f.editing = false
@@ -78,37 +79,7 @@ func (f *TextFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 		if !f.editing {
 			return f, nil
 		}
-		switch msg.Type {
-		case tea.KeyBackspace:
-			if f.cursor > 0 {
-				f.text = f.text[:f.cursor-1] + f.text[f.cursor:]
-				f.cursor--
-				f.updateCompiled()
-			}
-		case tea.KeyDelete:
-			if f.cursor < len(f.text) {
-				f.text = f.text[:f.cursor] + f.text[f.cursor+1:]
-				f.updateCompiled()
-			}
-		case tea.KeyLeft:
-			if f.cursor > 0 {
-				f.cursor--
-			}
-		case tea.KeyRight:
-			if f.cursor < len(f.text) {
-				f.cursor++
-			}
-		case tea.KeyHome, tea.KeyCtrlA:
-			f.cursor = 0
-		case tea.KeyEnd, tea.KeyCtrlE:
-			f.cursor = len(f.text)
-		case tea.KeySpace:
-			f.text = f.text[:f.cursor] + " " + f.text[f.cursor:]
-			f.cursor++
-			f.updateCompiled()
-		case tea.KeyRunes:
-			f.text = f.text[:f.cursor] + string(msg.Runes) + f.text[f.cursor:]
-			f.cursor += len(msg.Runes)
+		if f.editor.HandleKeyMsg(msg) {
 			f.updateCompiled()
 		}
 	}
@@ -117,13 +88,13 @@ func (f *TextFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 
 func (f *TextFilter) updateCompiled() {
 	f.compiled = nil
-	if f.regex && f.text != "" {
-		f.compiled, _ = regexp.Compile(f.text)
+	if f.regex && f.editor.Text() != "" {
+		f.compiled, _ = regexp.Compile(f.editor.Text())
 	}
 }
 
 func (f *TextFilter) Active() bool {
-	return f.text != ""
+	return f.editor.Text() != ""
 }
 
 func (f *TextFilter) Clear() {
@@ -135,14 +106,13 @@ func (f *TextFilter) Clear() {
 // NumberFilter performs comparison operations on numeric values.
 // Supports operators: =, !=, <, >, <=, >=, and ranges (e.g., "10..50").
 type NumberFilter struct {
-	text    string
+	editor  lineedit.Model
 	op      string
 	val     float64
 	val2    float64 // for range
 	isRange bool
 
 	// Editing state
-	cursor  int
 	width   int
 	editing bool
 }
@@ -153,12 +123,12 @@ func NewNumberFilter() *NumberFilter {
 }
 
 func (f *NumberFilter) SetText(text string) {
-	f.text = text
+	f.editor.SetText(text)
 	f.parseText()
 }
 
 func (f *NumberFilter) parseText() {
-	text := strings.TrimSpace(f.text)
+	text := strings.TrimSpace(f.editor.Text())
 	f.isRange = false
 	f.op = ""
 
@@ -232,12 +202,12 @@ func (f *NumberFilter) Matches(value any) bool {
 
 func (f *NumberFilter) View() string {
 	if f.editing {
-		return renderEditorLine(f.text, f.cursor, f.width, "")
+		return f.editor.RenderLine(f.width, "")
 	}
-	if f.text == "" {
+	if f.editor.Text() == "" {
 		return ""
 	}
-	return f.text
+	return f.editor.Text()
 }
 
 func (f *NumberFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
@@ -245,7 +215,7 @@ func (f *NumberFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	case FilterFocusMsg:
 		f.editing = true
 		f.width = msg.Width
-		f.cursor = len(f.text)
+		f.editor.CursorToEnd()
 		return f, nil
 	case FilterBlurMsg:
 		f.editing = false
@@ -254,37 +224,7 @@ func (f *NumberFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 		if !f.editing {
 			return f, nil
 		}
-		switch msg.Type {
-		case tea.KeyBackspace:
-			if f.cursor > 0 {
-				f.text = f.text[:f.cursor-1] + f.text[f.cursor:]
-				f.cursor--
-				f.parseText()
-			}
-		case tea.KeyDelete:
-			if f.cursor < len(f.text) {
-				f.text = f.text[:f.cursor] + f.text[f.cursor+1:]
-				f.parseText()
-			}
-		case tea.KeyLeft:
-			if f.cursor > 0 {
-				f.cursor--
-			}
-		case tea.KeyRight:
-			if f.cursor < len(f.text) {
-				f.cursor++
-			}
-		case tea.KeyHome, tea.KeyCtrlA:
-			f.cursor = 0
-		case tea.KeyEnd, tea.KeyCtrlE:
-			f.cursor = len(f.text)
-		case tea.KeySpace:
-			f.text = f.text[:f.cursor] + " " + f.text[f.cursor:]
-			f.cursor++
-			f.parseText()
-		case tea.KeyRunes:
-			f.text = f.text[:f.cursor] + string(msg.Runes) + f.text[f.cursor:]
-			f.cursor += len(msg.Runes)
+		if f.editor.HandleKeyMsg(msg) {
 			f.parseText()
 		}
 	}
@@ -292,7 +232,7 @@ func (f *NumberFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 }
 
 func (f *NumberFilter) Active() bool {
-	return f.text != ""
+	return f.editor.Text() != ""
 }
 
 func (f *NumberFilter) Clear() {
@@ -307,15 +247,14 @@ type SetFilter struct {
 	allValues []string
 
 	// Editing state
-	editing      bool
-	searchText   string
-	searchCursor int
-	filtered     []string // allValues filtered by searchText
-	selectedIdx  int      // cursor in filtered list
-	scrollTop    int      // first visible item
-	width        int
-	maxLines     int
-	inList       bool // false = typing in search, true = navigating list
+	editing     bool
+	search      lineedit.Model
+	filtered    []string // allValues filtered by searchText
+	selectedIdx int      // cursor in filtered list
+	scrollTop   int      // first visible item
+	width       int
+	maxLines    int
+	inList      bool // false = typing in search, true = navigating list
 }
 
 // NewSetFilter creates a new SetFilter.
@@ -370,7 +309,7 @@ func (f *SetFilter) View() string {
 	var lines []string
 
 	// Line 1: search input
-	searchLine := renderEditorLine(f.searchText, f.searchCursor, f.width, "")
+	searchLine := f.search.RenderLine(f.width, "")
 	if f.inList {
 		// Dim the search line when in list mode
 		searchLine = "\x1b[2m" + searchLine + "\x1b[22m"
@@ -397,7 +336,7 @@ func (f *SetFilter) View() string {
 
 		entry := checkbox + " " + val
 		// Truncate or pad to width
-		entry = truncateOrPad(entry, f.width)
+		entry = lineedit.TruncateOrPad(entry, f.width)
 
 		if f.inList && i == f.selectedIdx {
 			entry = "\x1b[7m" + entry + "\x1b[27m"
@@ -415,8 +354,8 @@ func (f *SetFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 		f.editing = true
 		f.width = msg.Width
 		f.maxLines = msg.MaxLines
-		f.searchText = ""
-		f.searchCursor = 0
+		f.search.SetText("")
+		f.search.SetCursor(0)
 		f.selectedIdx = 0
 		f.scrollTop = 0
 		f.inList = false
@@ -439,41 +378,14 @@ func (f *SetFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 
 func (f *SetFilter) updateSearchMode(msg tea.KeyMsg) (Filter, tea.Cmd) {
 	switch msg.Type {
-	case tea.KeyBackspace:
-		if f.searchCursor > 0 {
-			f.searchText = f.searchText[:f.searchCursor-1] + f.searchText[f.searchCursor:]
-			f.searchCursor--
-			f.refilter()
-		}
-	case tea.KeyDelete:
-		if f.searchCursor < len(f.searchText) {
-			f.searchText = f.searchText[:f.searchCursor] + f.searchText[f.searchCursor+1:]
-			f.refilter()
-		}
-	case tea.KeyLeft:
-		if f.searchCursor > 0 {
-			f.searchCursor--
-		}
-	case tea.KeyRight:
-		if f.searchCursor < len(f.searchText) {
-			f.searchCursor++
-		}
-	case tea.KeyHome, tea.KeyCtrlA:
-		f.searchCursor = 0
-	case tea.KeyEnd, tea.KeyCtrlE:
-		f.searchCursor = len(f.searchText)
 	case tea.KeyDown, tea.KeyTab:
 		if len(f.filtered) > 0 {
 			f.inList = true
 		}
-	case tea.KeySpace:
-		f.searchText = f.searchText[:f.searchCursor] + " " + f.searchText[f.searchCursor:]
-		f.searchCursor++
-		f.refilter()
-	case tea.KeyRunes:
-		f.searchText = f.searchText[:f.searchCursor] + string(msg.Runes) + f.searchText[f.searchCursor:]
-		f.searchCursor += len(msg.Runes)
-		f.refilter()
+	default:
+		if f.search.HandleKeyMsg(msg) {
+			f.refilter()
+		}
 	}
 	return f, nil
 }
@@ -500,19 +412,18 @@ func (f *SetFilter) updateListMode(msg tea.KeyMsg) (Filter, tea.Cmd) {
 	case tea.KeyRunes:
 		// Switch back to search mode and process the rune
 		f.inList = false
-		f.searchText = f.searchText[:f.searchCursor] + string(msg.Runes) + f.searchText[f.searchCursor:]
-		f.searchCursor += len(msg.Runes)
+		f.search.Insert(string(msg.Runes))
 		f.refilter()
 	}
 	return f, nil
 }
 
 func (f *SetFilter) refilter() {
-	if f.searchText == "" {
+	if f.search.Text() == "" {
 		f.filtered = make([]string, len(f.allValues))
 		copy(f.filtered, f.allValues)
 	} else {
-		lower := strings.ToLower(f.searchText)
+		lower := strings.ToLower(f.search.Text())
 		f.filtered = nil
 		for _, v := range f.allValues {
 			if strings.Contains(strings.ToLower(v), lower) {
@@ -596,7 +507,7 @@ func (f *BoolFilter) View() string {
 			falseR = "(\u25cf)"
 		}
 		line := anyR + " Any  " + trueR + " True  " + falseR + " False"
-		return truncateOrPad(line, f.width)
+		return lineedit.TruncateOrPad(line, f.width)
 	}
 	switch f.state {
 	case 1:
@@ -644,12 +555,11 @@ func (f *BoolFilter) Clear() {
 // TimeFilter filters time.Time values by a date/time range.
 // Accepts "start..end" format where either bound can be omitted.
 type TimeFilter struct {
-	text  string
-	start *time.Time
-	end   *time.Time
+	editor lineedit.Model
+	start  *time.Time
+	end    *time.Time
 
 	// Editing state
-	cursor  int
 	width   int
 	editing bool
 }
@@ -660,7 +570,7 @@ func NewTimeFilter() *TimeFilter {
 }
 
 func (f *TimeFilter) SetText(text string) {
-	f.text = text
+	f.editor.SetText(text)
 	f.start = nil
 	f.end = nil
 
@@ -735,12 +645,12 @@ func (f *TimeFilter) Matches(value any) bool {
 
 func (f *TimeFilter) View() string {
 	if f.editing {
-		return renderEditorLine(f.text, f.cursor, f.width, "")
+		return f.editor.RenderLine(f.width, "")
 	}
-	if f.text == "" {
+	if f.editor.Text() == "" {
 		return ""
 	}
-	return f.text
+	return f.editor.Text()
 }
 
 func (f *TimeFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
@@ -748,7 +658,7 @@ func (f *TimeFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	case FilterFocusMsg:
 		f.editing = true
 		f.width = msg.Width
-		f.cursor = len(f.text)
+		f.editor.CursorToEnd()
 		return f, nil
 	case FilterBlurMsg:
 		f.editing = false
@@ -757,38 +667,8 @@ func (f *TimeFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 		if !f.editing {
 			return f, nil
 		}
-		switch msg.Type {
-		case tea.KeyBackspace:
-			if f.cursor > 0 {
-				f.text = f.text[:f.cursor-1] + f.text[f.cursor:]
-				f.cursor--
-				f.SetText(f.text)
-			}
-		case tea.KeyDelete:
-			if f.cursor < len(f.text) {
-				f.text = f.text[:f.cursor] + f.text[f.cursor+1:]
-				f.SetText(f.text)
-			}
-		case tea.KeyLeft:
-			if f.cursor > 0 {
-				f.cursor--
-			}
-		case tea.KeyRight:
-			if f.cursor < len(f.text) {
-				f.cursor++
-			}
-		case tea.KeyHome, tea.KeyCtrlA:
-			f.cursor = 0
-		case tea.KeyEnd, tea.KeyCtrlE:
-			f.cursor = len(f.text)
-		case tea.KeySpace:
-			f.text = f.text[:f.cursor] + " " + f.text[f.cursor:]
-			f.cursor++
-			f.SetText(f.text)
-		case tea.KeyRunes:
-			f.text = f.text[:f.cursor] + string(msg.Runes) + f.text[f.cursor:]
-			f.cursor += len(msg.Runes)
-			f.SetText(f.text)
+		if f.editor.HandleKeyMsg(msg) {
+			f.SetText(f.editor.Text())
 		}
 	}
 	return f, nil
@@ -802,89 +682,3 @@ func (f *TimeFilter) Clear() {
 	f.SetText("")
 }
 
-// --- Helpers ---
-
-// ANSI escape sequences to toggle reverse video without resetting other attributes.
-const (
-	reverseOn  = "\x1b[7m"
-	reverseOff = "\x1b[27m"
-)
-
-// renderEditorLine renders a single-line editor value as a viewport of the
-// given width, ensuring the cursor is always visible.
-func renderEditorLine(value string, cursor, width int, suffix string) string {
-	if width <= 0 {
-		return ""
-	}
-
-	suffixRunes := []rune(suffix)
-	viewWidth := width - len(suffixRunes)
-	if viewWidth < 1 {
-		viewWidth = 1
-	}
-
-	runes := []rune(value)
-
-	var cursorRune rune = ' '
-	if cursor < len(runes) {
-		cursorRune = runes[cursor]
-	}
-
-	start := 0
-	if cursor >= viewWidth {
-		start = cursor - viewWidth + 1
-	}
-
-	end := start + viewWidth
-	if end > len(runes)+1 {
-		end = len(runes) + 1
-	}
-
-	var before, after string
-	if start < len(runes) {
-		beforeEnd := cursor
-		if beforeEnd > len(runes) {
-			beforeEnd = len(runes)
-		}
-		if start < beforeEnd {
-			before = string(runes[start:beforeEnd])
-		}
-	}
-
-	afterStart := cursor + 1
-	if afterStart < len(runes) {
-		afterEnd := end
-		if afterEnd > len(runes) {
-			afterEnd = len(runes)
-		}
-		if afterStart < afterEnd {
-			after = string(runes[afterStart:afterEnd])
-		}
-	}
-
-	rendered := before + reverseOn + string(cursorRune) + reverseOff + after
-
-	visibleLen := len([]rune(before)) + 1 + len([]rune(after))
-	if visibleLen < viewWidth {
-		rendered += strings.Repeat(" ", viewWidth-visibleLen)
-	}
-
-	return rendered + suffix
-}
-
-func truncateOrPad(s string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	runes := []rune(s)
-	if len(runes) > width {
-		if width > 1 {
-			return string(runes[:width-1]) + "…"
-		}
-		return string(runes[:width])
-	}
-	if len(runes) < width {
-		return s + strings.Repeat(" ", width-len(runes))
-	}
-	return s
-}

@@ -2,7 +2,6 @@ package grid
 
 import (
 	"github.com/pgavlin/tea-grid/column"
-	"github.com/pgavlin/tea-grid/row"
 	"github.com/pgavlin/tea-grid/selection"
 	"github.com/pgavlin/tea-grid/sort"
 )
@@ -24,10 +23,11 @@ func WithColumnGroups[T any](groups []column.ColGroup[T]) Option[T] {
 	}
 }
 
-// WithRows sets the row data.
+// WithRows sets the row data. The data is stored and applied after all options
+// have been processed, ensuring that WithRowID and other options are available.
 func WithRows[T any](rows []T) Option[T] {
 	return func(m *Model[T]) {
-		m.setRowData(rows)
+		m.pendingRows = rows
 	}
 }
 
@@ -137,7 +137,7 @@ func WithMultiSort[T any](enabled bool) Option[T] {
 }
 
 // WithPostSort sets a post-sort transformation function.
-func WithPostSort[T any](fn func([]row.RowNode[T]) []row.RowNode[T]) Option[T] {
+func WithPostSort[T any](fn func([]column.RowNode[T]) []column.RowNode[T]) Option[T] {
 	return func(m *Model[T]) {
 		m.postSort = fn
 	}
@@ -185,30 +185,3 @@ func WithDynamicRowHeight[T any](fn func(T) int) Option[T] {
 	}
 }
 
-// WithOnSelectionChanged sets a callback for selection changes.
-func WithOnSelectionChanged[T any](fn func([]T)) Option[T] {
-	return func(m *Model[T]) {
-		m.onSelectionChanged = fn
-	}
-}
-
-// WithOnCellValueChanged sets a callback for cell value changes.
-func WithOnCellValueChanged[T any](fn func(CellValueChangedMsg[T])) Option[T] {
-	return func(m *Model[T]) {
-		m.onCellValueChanged = fn
-	}
-}
-
-// WithOnSortChanged sets a callback for sort changes.
-func WithOnSortChanged[T any](fn func([]sort.SortCriterion)) Option[T] {
-	return func(m *Model[T]) {
-		m.onSortChanged = fn
-	}
-}
-
-// WithOnGroupColumnsChanged sets a callback for group column changes.
-func WithOnGroupColumnsChanged[T any](fn func([]string)) Option[T] {
-	return func(m *Model[T]) {
-		m.onGroupColumnsChanged = fn
-	}
-}

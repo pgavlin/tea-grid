@@ -1,4 +1,4 @@
-package cell
+package column
 
 import (
 	"strings"
@@ -6,6 +6,12 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+)
+
+// ANSI escape sequences used in tests to match rendered output.
+const (
+	testReverseOn  = "\x1b[7m"
+	testReverseOff = "\x1b[27m"
 )
 
 // --- TruncateOrPad ---
@@ -56,7 +62,7 @@ func TestTruncateOrPadUnicode(t *testing.T) {
 func TestRenderEditorLineCursorAtStart(t *testing.T) {
 	result := RenderEditorLine("abc", 0, 10, "")
 	// The first character 'a' should be wrapped in reverse video
-	if !strings.Contains(result, reverseOn+"a"+reverseOff) {
+	if !strings.Contains(result, testReverseOn+"a"+testReverseOff) {
 		t.Errorf("cursor at 0: expected 'a' in reverse, got %q", result)
 	}
 }
@@ -64,14 +70,14 @@ func TestRenderEditorLineCursorAtStart(t *testing.T) {
 func TestRenderEditorLineCursorAtEnd(t *testing.T) {
 	result := RenderEditorLine("abc", 3, 10, "")
 	// Cursor at end shows space in reverse
-	if !strings.Contains(result, reverseOn+" "+reverseOff) {
+	if !strings.Contains(result, testReverseOn+" "+testReverseOff) {
 		t.Errorf("cursor at end: expected space in reverse, got %q", result)
 	}
 }
 
 func TestRenderEditorLineCursorMiddle(t *testing.T) {
 	result := RenderEditorLine("abc", 1, 10, "")
-	if !strings.Contains(result, reverseOn+"b"+reverseOff) {
+	if !strings.Contains(result, testReverseOn+"b"+testReverseOff) {
 		t.Errorf("cursor at 1: expected 'b' in reverse, got %q", result)
 	}
 }
@@ -86,7 +92,7 @@ func TestRenderEditorLineZeroWidth(t *testing.T) {
 func TestRenderEditorLineEmptyString(t *testing.T) {
 	result := RenderEditorLine("", 0, 5, "")
 	// Should show space cursor plus padding
-	if !strings.Contains(result, reverseOn+" "+reverseOff) {
+	if !strings.Contains(result, testReverseOn+" "+testReverseOff) {
 		t.Errorf("empty string: expected space cursor, got %q", result)
 	}
 }
@@ -579,8 +585,8 @@ func TestTimeEditorInit(t *testing.T) {
 	tm := time.Date(2024, 6, 15, 10, 30, 0, 0, time.UTC)
 	ctx := CellContext[string]{Value: tm, Width: 30}
 	e.Init(ctx)
-	if e.text != "2024-06-15 10:30" {
-		t.Errorf("Init: expected formatted time, got %q", e.text)
+	if e.editor.Text() != "2024-06-15 10:30" {
+		t.Errorf("Init: expected formatted time, got %q", e.editor.Text())
 	}
 }
 
@@ -597,7 +603,7 @@ func TestTimeEditorValueParsesBack(t *testing.T) {
 
 func TestTimeEditorValidateGood(t *testing.T) {
 	e := NewTimeEditor[string]()
-	e.text = "2024-06-15"
+	e.editor.SetText("2024-06-15")
 	if msg := e.Validate(); msg != "" {
 		t.Errorf("valid date should pass, got %q", msg)
 	}
@@ -605,7 +611,7 @@ func TestTimeEditorValidateGood(t *testing.T) {
 
 func TestTimeEditorValidateBad(t *testing.T) {
 	e := NewTimeEditor[string]()
-	e.text = "not a date"
+	e.editor.SetText("not a date")
 	if msg := e.Validate(); msg == "" {
 		t.Error("invalid date should fail validation")
 	}
@@ -620,9 +626,56 @@ func TestTimeEditorMultipleFormats(t *testing.T) {
 	}
 	for _, f := range formats {
 		e := NewTimeEditor[string]()
-		e.text = f
+		e.editor.SetText(f)
 		if msg := e.Validate(); msg != "" {
 			t.Errorf("format %q should be valid, got %q", f, msg)
 		}
+	}
+}
+
+
+func TestRowNodeZeroValue(t *testing.T) {
+	var rn RowNode[string]
+	if rn.IsGroup {
+		t.Error("zero value IsGroup should be false")
+	}
+	if rn.Expanded {
+		t.Error("zero value Expanded should be false")
+	}
+	if rn.GroupLevel != 0 {
+		t.Error("zero value GroupLevel should be 0")
+	}
+	if rn.Children != nil {
+		t.Error("zero value Children should be nil")
+	}
+	if rn.Parent != nil {
+		t.Error("zero value Parent should be nil")
+	}
+}
+
+func TestRowNodeTreeStructure(t *testing.T) {
+	parent := &RowNode[string]{
+		ID:      "parent",
+		IsGroup: true,
+	}
+
+	child1 := &RowNode[string]{ID: "c1", Data: "child1", Parent: parent}
+	child2 := &RowNode[string]{ID: "c2", Data: "child2", Parent: parent}
+	parent.Children = []*RowNode[string]{child1, child2}
+
+	if len(parent.Children) != 2 {
+		t.Fatalf("parent should have 2 children, got %d", len(parent.Children))
+	}
+	if child1.Parent != parent {
+		t.Error("child1 Parent should point to parent")
+	}
+	if child2.Parent != parent {
+		t.Error("child2 Parent should point to parent")
+	}
+	if parent.Children[0].Data != "child1" {
+		t.Error("first child data mismatch")
+	}
+	if parent.Children[1].Data != "child2" {
+		t.Error("second child data mismatch")
 	}
 }

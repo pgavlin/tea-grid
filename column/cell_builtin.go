@@ -1,4 +1,4 @@
-package cell
+package column
 
 import (
 	"fmt"
@@ -8,6 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/pgavlin/tea-grid/internal/lineedit"
 )
 
 // --- Built-in Renderers ---
@@ -201,8 +203,7 @@ func (r ProgressRenderer[T]) Render(ctx CellContext[T]) string {
 
 // TextEditorModel is a single-line text input editor.
 type TextEditorModel[T any] struct {
-	value  string
-	cursor int
+	editor lineedit.Model
 	width  int
 }
 
@@ -211,53 +212,25 @@ func NewTextEditor[T any]() *TextEditorModel[T] {
 }
 
 func (e *TextEditorModel[T]) Init(ctx CellContext[T]) tea.Cmd {
-	e.value = ctx.FormattedValue
-	e.cursor = len(e.value)
+	e.editor.SetText(ctx.FormattedValue)
+	e.editor.CursorToEnd()
 	e.width = ctx.Width
 	return nil
 }
 
 func (e *TextEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch msg.Type {
-		case tea.KeyBackspace:
-			if e.cursor > 0 {
-				e.value = e.value[:e.cursor-1] + e.value[e.cursor:]
-				e.cursor--
-			}
-		case tea.KeyDelete:
-			if e.cursor < len(e.value) {
-				e.value = e.value[:e.cursor] + e.value[e.cursor+1:]
-			}
-		case tea.KeyLeft:
-			if e.cursor > 0 {
-				e.cursor--
-			}
-		case tea.KeyRight:
-			if e.cursor < len(e.value) {
-				e.cursor++
-			}
-		case tea.KeyHome, tea.KeyCtrlA:
-			e.cursor = 0
-		case tea.KeyEnd, tea.KeyCtrlE:
-			e.cursor = len(e.value)
-		case tea.KeySpace:
-			e.value = e.value[:e.cursor] + " " + e.value[e.cursor:]
-			e.cursor++
-		case tea.KeyRunes:
-			e.value = e.value[:e.cursor] + string(msg.Runes) + e.value[e.cursor:]
-			e.cursor += len(msg.Runes)
-		}
+		e.editor.HandleKeyMsg(msg)
 	}
 	return e, nil
 }
 
 func (e *TextEditorModel[T]) View() string {
-	return RenderEditorLine(e.value, e.cursor, e.width, "")
+	return e.editor.RenderLine(e.width, "")
 }
 
 func (e *TextEditorModel[T]) Value() any {
-	return e.value
+	return e.editor.Text()
 }
 
 func (e *TextEditorModel[T]) Validate() string {
@@ -443,8 +416,7 @@ func (e *BoolEditorModel[T]) Validate() string {
 
 // TimeEditorModel edits time.Time values via text input.
 type TimeEditorModel[T any] struct {
-	text     string
-	cursor   int
+	editor   lineedit.Model
 	width    int
 	parseErr string
 }
@@ -470,46 +442,18 @@ var timeEditFormats = []string{
 
 func (e *TimeEditorModel[T]) Init(ctx CellContext[T]) tea.Cmd {
 	if t, ok := ctx.Value.(time.Time); ok {
-		e.text = t.Format("2006-01-02 15:04")
+		e.editor.SetText(t.Format("2006-01-02 15:04"))
 	} else {
-		e.text = ctx.FormattedValue
+		e.editor.SetText(ctx.FormattedValue)
 	}
-	e.cursor = len(e.text)
+	e.editor.CursorToEnd()
 	e.width = ctx.Width
 	return nil
 }
 
 func (e *TimeEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch msg.Type {
-		case tea.KeyBackspace:
-			if e.cursor > 0 {
-				e.text = e.text[:e.cursor-1] + e.text[e.cursor:]
-				e.cursor--
-			}
-		case tea.KeyDelete:
-			if e.cursor < len(e.text) {
-				e.text = e.text[:e.cursor] + e.text[e.cursor+1:]
-			}
-		case tea.KeyLeft:
-			if e.cursor > 0 {
-				e.cursor--
-			}
-		case tea.KeyRight:
-			if e.cursor < len(e.text) {
-				e.cursor++
-			}
-		case tea.KeyHome, tea.KeyCtrlA:
-			e.cursor = 0
-		case tea.KeyEnd, tea.KeyCtrlE:
-			e.cursor = len(e.text)
-		case tea.KeySpace:
-			e.text = e.text[:e.cursor] + " " + e.text[e.cursor:]
-			e.cursor++
-		case tea.KeyRunes:
-			e.text = e.text[:e.cursor] + string(msg.Runes) + e.text[e.cursor:]
-			e.cursor += len(msg.Runes)
-		}
+		e.editor.HandleKeyMsg(msg)
 		e.parseErr = ""
 	}
 	return e, nil
@@ -520,12 +464,13 @@ func (e *TimeEditorModel[T]) View() string {
 	if e.parseErr != "" {
 		suffix = " (" + e.parseErr + ")"
 	}
-	return RenderEditorLine(e.text, e.cursor, e.width, suffix)
+	return e.editor.RenderLine(e.width, suffix)
 }
 
 func (e *TimeEditorModel[T]) Value() any {
+	text := e.editor.Text()
 	for _, format := range timeEditFormats {
-		if t, err := time.Parse(format, e.text); err == nil {
+		if t, err := time.Parse(format, text); err == nil {
 			return t
 		}
 	}
@@ -533,8 +478,9 @@ func (e *TimeEditorModel[T]) Value() any {
 }
 
 func (e *TimeEditorModel[T]) Validate() string {
+	text := e.editor.Text()
 	for _, format := range timeEditFormats {
-		if _, err := time.Parse(format, e.text); err == nil {
+		if _, err := time.Parse(format, text); err == nil {
 			return ""
 		}
 	}
@@ -544,100 +490,19 @@ func (e *TimeEditorModel[T]) Validate() string {
 
 // --- Helpers ---
 
-// ANSI escape sequences to toggle reverse video without resetting other attributes.
-const (
-	reverseOn  = "\x1b[7m"
-	reverseOff = "\x1b[27m"
-)
-
 // RenderEditorLine renders a single-line editor value as a viewport of the
-// given width, ensuring the cursor is always visible. The cursor character is
-// rendered with inverted colors via reverse video. suffix is appended after the
-// viewport (e.g. an error message) and counts against the available width.
+// given width, ensuring the cursor is always visible. This is a convenience
+// wrapper around lineedit.Model for callers that have separate text/cursor state.
 func RenderEditorLine(value string, cursor, width int, suffix string) string {
-	if width <= 0 {
-		return ""
-	}
-
-	// Reserve space for suffix
-	suffixRunes := []rune(suffix)
-	viewWidth := width - len(suffixRunes)
-	if viewWidth < 1 {
-		viewWidth = 1
-	}
-
-	runes := []rune(value)
-
-	// Determine the cursor rune (space if at end of value)
-	var cursorRune rune = ' '
-	if cursor < len(runes) {
-		cursorRune = runes[cursor]
-	}
-
-	// Compute viewport window [start, start+viewWidth) that keeps cursor visible.
-	// The cursor must fall within [start, start+viewWidth).
-	start := 0
-	if cursor >= viewWidth {
-		start = cursor - viewWidth + 1
-	}
-
-	end := start + viewWidth
-	if end > len(runes)+1 { // +1 to account for cursor-at-end space
-		end = len(runes) + 1
-	}
-
-	// Build the visible portion
-	var before, after string
-	if start < len(runes) {
-		beforeEnd := cursor
-		if beforeEnd > len(runes) {
-			beforeEnd = len(runes)
-		}
-		if start < beforeEnd {
-			before = string(runes[start:beforeEnd])
-		}
-	}
-
-	afterStart := cursor + 1
-	if afterStart < len(runes) {
-		afterEnd := end
-		if afterEnd > len(runes) {
-			afterEnd = len(runes)
-		}
-		if afterStart < afterEnd {
-			after = string(runes[afterStart:afterEnd])
-		}
-	}
-
-	// Use raw ANSI reverse on/off so we only toggle reverse video without
-	// resetting the parent style (e.g. EditorInput background).
-	rendered := before + reverseOn + string(cursorRune) + reverseOff + after
-
-	// Pad to fill viewport width if needed
-	visibleLen := len([]rune(before)) + 1 + len([]rune(after))
-	if visibleLen < viewWidth {
-		rendered += strings.Repeat(" ", viewWidth-visibleLen)
-	}
-
-	return rendered + suffix
+	var m lineedit.Model
+	m.SetText(value)
+	m.SetCursor(cursor)
+	return m.RenderLine(width, suffix)
 }
 
 // TruncateOrPad truncates or pads a string to the given width.
 func TruncateOrPad(s string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	runes := []rune(s)
-	if len(runes) > width {
-		if width > 1 {
-			return string(runes[:width-1]) + "…"
-		}
-		return string(runes[:width])
-	}
-	if len(runes) < width {
-		return s + strings.Repeat(" ", width-len(runes))
-	}
-	return s
+	return lineedit.TruncateOrPad(s, width)
 }
 
 func addThousandsSep(s string) string {

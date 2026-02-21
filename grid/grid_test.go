@@ -8,7 +8,6 @@ import (
 
 	"github.com/pgavlin/tea-grid/column"
 	"github.com/pgavlin/tea-grid/filter"
-	"github.com/pgavlin/tea-grid/row"
 	"github.com/pgavlin/tea-grid/selection"
 	gridsort "github.com/pgavlin/tea-grid/sort"
 )
@@ -232,7 +231,7 @@ func TestWithExternalFilter(t *testing.T) {
 
 func TestWithPostSort(t *testing.T) {
 	called := false
-	fn := func(rows []row.RowNode[TestRow]) []row.RowNode[TestRow] {
+	fn := func(rows []column.RowNode[TestRow]) []column.RowNode[TestRow] {
 		called = true
 		return rows
 	}
@@ -681,9 +680,9 @@ func TestDisplayRows_SortDescending(t *testing.T) {
 func TestDisplayRows_PostSortHook(t *testing.T) {
 	// Reverse the rows via post-sort
 	m := newTestGrid(
-		WithPostSort[TestRow](func(rows []row.RowNode[TestRow]) []row.RowNode[TestRow] {
+		WithPostSort[TestRow](func(rows []column.RowNode[TestRow]) []column.RowNode[TestRow] {
 			n := len(rows)
-			reversed := make([]row.RowNode[TestRow], n)
+			reversed := make([]column.RowNode[TestRow], n)
 			for i, rn := range rows {
 				reversed[n-1-i] = rn
 			}
@@ -1031,18 +1030,21 @@ func TestSort_ShiftSAddsMultiSort(t *testing.T) {
 	}
 }
 
-func TestSort_Callback(t *testing.T) {
-	var callbackCriteria []gridsort.SortCriterion
-	m := newTestGrid(WithOnSortChanged[TestRow](func(c []gridsort.SortCriterion) {
-		callbackCriteria = c
-	}))
+func TestSort_EmitsSortChangedMsg(t *testing.T) {
+	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
-	if callbackCriteria == nil {
-		t.Error("expected sort callback to fire")
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd == nil {
+		t.Fatal("expected a command to be emitted")
 	}
-	if len(callbackCriteria) != 1 {
-		t.Errorf("expected 1 criterion in callback, got %d", len(callbackCriteria))
+	msg := cmd()
+	sc, ok := msg.(SortChangedMsg)
+	if !ok {
+		t.Fatalf("expected SortChangedMsg, got %T", msg)
+	}
+	if len(sc.SortOrder) != 1 {
+		t.Errorf("expected 1 criterion in SortChangedMsg, got %d", len(sc.SortOrder))
 	}
 }
 
@@ -1147,19 +1149,15 @@ func TestColumnFilter_CtrlFOpensWithFilter(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestGrouping_GTogglesGroupColumn(t *testing.T) {
-	var callbackCols []string
-	m := newTestGrid(
-		WithOnGroupColumnsChanged[TestRow](func(cols []string) {
-			callbackCols = cols
-		}),
-	)
+	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 1} // Department
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
 	if len(m.groupModel.GroupColumns) != 1 || m.groupModel.GroupColumns[0] != "Department" {
 		t.Errorf("expected GroupColumns=[Department], got %v", m.groupModel.GroupColumns)
 	}
-	if callbackCols == nil {
-		t.Error("expected group columns changed callback to fire")
+	if cmd == nil {
+		t.Error("expected GroupColumnsChangedMsg command")
 	}
 
 	// Toggle again to remove
@@ -1219,17 +1217,17 @@ func TestGrouping_LeftCollapses(t *testing.T) {
 	}
 }
 
-func TestGrouping_CallbackFires(t *testing.T) {
-	var called bool
-	m := newTestGrid(
-		WithOnGroupColumnsChanged[TestRow](func(cols []string) {
-			called = true
-		}),
-	)
+func TestGrouping_EmitsGroupColumnsChangedMsg(t *testing.T) {
+	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
-	if !called {
-		t.Error("expected group columns changed callback to fire")
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	if cmd == nil {
+		t.Fatal("expected a command to be emitted")
+	}
+	msg := cmd()
+	if _, ok := msg.(GroupColumnsChangedMsg); !ok {
+		t.Fatalf("expected GroupColumnsChangedMsg, got %T", msg)
 	}
 }
 
@@ -1637,7 +1635,7 @@ func TestPublicAPI_PinUnpinRow(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	m.PinRow("Alice", row.PinTop)
+	m.PinRow("Alice", column.PinTop)
 	// Recomputation should move Alice to pinnedTop
 	found := false
 	for _, rn := range m.pinnedTop {
