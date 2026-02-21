@@ -74,9 +74,9 @@ func TestNew_Defaults(t *testing.T) {
 	if m.filterEditColIdx != -1 {
 		t.Errorf("expected filterEditColIdx=-1, got %d", m.filterEditColIdx)
 	}
-	// After New(), recomputeDisplayRows is called which clears dirty
+	// After New(), recomputeDisplayRows is called once to initialize display rows
 	if m.dirty {
-		t.Error("expected dirty=false after New (recompute runs at end of New)")
+		t.Error("expected dirty=false after New (initial recompute runs at end of New)")
 	}
 	if m.editable {
 		t.Error("expected editable=false by default")
@@ -453,8 +453,10 @@ func TestDirtyFlag(t *testing.T) {
 		t.Error("expected dirty=false after full init")
 	}
 	m.SetRows(testData())
-	// SetRows calls recomputeDisplayRows which clears dirty
-	// but the flag is set then cleared; let's just verify it works without error
+	// SetRows sets dirty=true; recomputation is deferred to Update/View
+	if !m.dirty {
+		t.Error("expected dirty=true after SetRows")
+	}
 }
 
 // -----------------------------------------------------------------------
@@ -608,6 +610,7 @@ func TestDisplayRows_ColumnFilter(t *testing.T) {
 func TestDisplayRows_QuickFilter(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
 	m.SetQuickFilter("alice")
+	m.recomputeDisplayRows()
 	if len(m.displayRows) != 1 {
 		t.Errorf("expected 1 row after quick filter 'alice', got %d", len(m.displayRows))
 	}
@@ -1186,6 +1189,7 @@ func TestGrouping_RightExpands(t *testing.T) {
 	m.focusedCell = CellPosition{Row: groupIdx, Col: 0}
 	beforeCount := len(m.displayRows)
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	m.recomputeDisplayRows()
 	// Expanding should add child rows
 	if len(m.displayRows) <= beforeCount {
 		t.Error("expected more display rows after expanding group")
@@ -1211,6 +1215,7 @@ func TestGrouping_LeftCollapses(t *testing.T) {
 	m.focusedCell = CellPosition{Row: groupIdx, Col: 0}
 	beforeCount := len(m.displayRows)
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyLeft})
+	m.recomputeDisplayRows()
 	// Collapsing should remove child rows
 	if len(m.displayRows) >= beforeCount {
 		t.Error("expected fewer display rows after collapsing group")
@@ -1489,6 +1494,7 @@ func TestPublicAPI_SetSort_SortOrder(t *testing.T) {
 		{ColumnID: "Salary", Direction: data.SortDesc},
 	}
 	m.SetSort(criteria)
+	m.recomputeDisplayRows()
 	got := m.SortOrder()
 	if len(got) != 1 || got[0].ColumnID != "Salary" || got[0].Direction != data.SortDesc {
 		t.Errorf("unexpected sort order: %v", got)
@@ -1502,6 +1508,7 @@ func TestPublicAPI_SetSort_SortOrder(t *testing.T) {
 func TestPublicAPI_SetQuickFilter(t *testing.T) {
 	m := newTestGrid()
 	m.SetQuickFilter("bob")
+	m.recomputeDisplayRows()
 	if len(m.displayRows) != 1 {
 		t.Errorf("expected 1 row for 'bob', got %d", len(m.displayRows))
 	}
@@ -1515,6 +1522,7 @@ func TestPublicAPI_SetColumnFilter(t *testing.T) {
 	tf := filter.NewTextFilter()
 	tf.SetText("Carol")
 	m.SetColumnFilter("Name", tf)
+	m.recomputeDisplayRows()
 	if len(m.displayRows) != 1 {
 		t.Errorf("expected 1 row for Name='Carol', got %d", len(m.displayRows))
 	}
@@ -1530,6 +1538,7 @@ func TestPublicAPI_ClearFilters(t *testing.T) {
 	m.SetColumnFilter("Name", tf)
 	m.SetQuickFilter("xyz")
 	m.ClearFilters()
+	m.recomputeDisplayRows()
 	if len(m.displayRows) != 5 {
 		t.Errorf("expected 5 rows after ClearFilters, got %d", len(m.displayRows))
 	}
@@ -1554,12 +1563,14 @@ func TestPublicAPI_ExpandCollapseGroup(t *testing.T) {
 
 	beforeCount := len(m.displayRows)
 	m.ExpandGroup(groupKey)
+	m.recomputeDisplayRows()
 	if len(m.displayRows) <= beforeCount {
 		t.Error("expected more rows after ExpandGroup")
 	}
 
 	expandedCount := len(m.displayRows)
 	m.CollapseGroup(groupKey)
+	m.recomputeDisplayRows()
 	if len(m.displayRows) >= expandedCount {
 		t.Error("expected fewer rows after CollapseGroup")
 	}
@@ -1572,10 +1583,12 @@ func TestPublicAPI_ExpandAll_CollapseAll(t *testing.T) {
 	)
 	collapsedCount := len(m.displayRows)
 	m.ExpandAll()
+	m.recomputeDisplayRows()
 	if len(m.displayRows) <= collapsedCount {
 		t.Error("expected more rows after ExpandAll")
 	}
 	m.CollapseAll()
+	m.recomputeDisplayRows()
 	if len(m.displayRows) != collapsedCount {
 		t.Errorf("expected same count as initial collapsed after CollapseAll, got %d vs %d",
 			len(m.displayRows), collapsedCount)
@@ -1636,6 +1649,7 @@ func TestPublicAPI_PinUnpinRow(t *testing.T) {
 		WithHeight[TestRow](20),
 	)
 	m.PinRow("Alice", data.PinTop)
+	m.recomputeDisplayRows()
 	// Recomputation should move Alice to pinnedTop
 	found := false
 	for _, rn := range m.pinnedTop {
@@ -1648,6 +1662,7 @@ func TestPublicAPI_PinUnpinRow(t *testing.T) {
 	}
 
 	m.UnpinRow("Alice")
+	m.recomputeDisplayRows()
 	// Alice should be back in display rows
 	foundInPinned := false
 	for _, rn := range m.pinnedTop {
@@ -1882,14 +1897,6 @@ func TestFullHelp_ReturnsBindingGroups(t *testing.T) {
 	groups := m.FullHelp()
 	if len(groups) == 0 {
 		t.Error("expected non-empty full help binding groups")
-	}
-}
-
-func TestQuitKey(t *testing.T) {
-	m := newTestGrid()
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
-	if cmd == nil {
-		t.Error("expected quit command from 'q' key")
 	}
 }
 

@@ -44,9 +44,14 @@ type model struct {
 func (m model) Init() tea.Cmd { return m.grid.Init() }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if msg, ok := msg.(tea.WindowSizeMsg); ok {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
 		m.grid.SetWidth(msg.Width)
 		m.grid.SetHeight(msg.Height)
+	case tea.KeyMsg:
+		if msg.String() == "q" || msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
 	}
 	var cmd tea.Cmd
 	m.grid, cmd = m.grid.Update(msg)

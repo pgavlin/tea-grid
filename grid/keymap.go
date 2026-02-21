@@ -52,7 +52,6 @@ type KeyMap struct {
 	CollapseAll       key.Binding
 
 	// General
-	Quit key.Binding
 	Help key.Binding
 }
 
@@ -174,10 +173,6 @@ func DefaultKeyMap() KeyMap {
 		CollapseAll: key.NewBinding(
 			key.WithKeys("shift+left"),
 			key.WithHelp("shift+←", "collapse all"),
-		),
-		Quit: key.NewBinding(
-			key.WithKeys("q"),
-			key.WithHelp("q", "quit"),
 		),
 		Help: key.NewBinding(
 			key.WithKeys("?"),

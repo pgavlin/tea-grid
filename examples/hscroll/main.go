@@ -32,7 +32,8 @@ type model struct {
 func (m model) Init() tea.Cmd { return m.grid.Init() }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if msg, ok := msg.(tea.WindowSizeMsg); ok {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
 		// Cap width at 80 so the 12 columns always exceed the viewport.
 		w := msg.Width
 		if w > 80 {
@@ -40,6 +41,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.grid.SetWidth(w)
 		m.grid.SetHeight(msg.Height)
+	case tea.KeyMsg:
+		if msg.String() == "q" || msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
 	}
 	var cmd tea.Cmd
 	m.grid, cmd = m.grid.Update(msg)

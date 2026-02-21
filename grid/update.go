@@ -12,6 +12,8 @@ import (
 
 // Update handles messages and returns the updated model.
 func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
+	m.recomputeDisplayRows()
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if !m.focused {
@@ -45,10 +47,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	totalRows := len(m.displayRows)
 
 	switch {
-	// Quit
-	case key.Matches(msg, m.KeyMap.Quit):
-		return m, tea.Quit
-
 	// Help toggle
 	case key.Matches(msg, m.KeyMap.Help):
 		m.Help.ShowAll = !m.Help.ShowAll
@@ -143,7 +141,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 				if col.Sortable {
 					m.sortModel.ToggleSort(col.ColumnID)
 					m.dirty = true
-					m.recomputeDisplayRows()
 					return m, func() tea.Msg {
 						return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
 					}
@@ -167,7 +164,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 				if col.Sortable {
 					m.sortModel.AddSort(col.ColumnID)
 					m.dirty = true
-					m.recomputeDisplayRows()
 					return m, func() tea.Msg {
 						return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
 					}
@@ -183,7 +179,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			if col.Sortable {
 				m.sortModel.ToggleSort(col.ColumnID)
 				m.dirty = true
-				m.recomputeDisplayRows()
 				return m, func() tea.Msg {
 					return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
 				}
@@ -197,7 +192,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			if col.Sortable {
 				m.sortModel.AddSort(col.ColumnID)
 				m.dirty = true
-				m.recomputeDisplayRows()
 				return m, func() tea.Msg {
 					return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
 				}
@@ -211,7 +205,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			col := m.cols[m.focusedCell.Col]
 			m.groupModel.ToggleGroupColumn(col.ColumnID)
 			m.dirty = true
-			m.recomputeDisplayRows()
 			return m, func() tea.Msg {
 				return GroupColumnsChangedMsg{GroupColumns: m.groupModel.GroupColumns}
 			}
@@ -225,7 +218,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			if !m.quickFilterActive {
 				m.quickFilterText = ""
 				m.dirty = true
-				m.recomputeDisplayRows()
 			}
 			m.updateViewportSize()
 			return m, nil
@@ -326,7 +318,6 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		m.quickFilterActive = false
 		m.quickFilterText = ""
 		m.dirty = true
-		m.recomputeDisplayRows()
 		m.updateViewportSize()
 		return m, nil
 
@@ -334,14 +325,12 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		if len(m.quickFilterText) > 0 {
 			m.quickFilterText = m.quickFilterText[:len(m.quickFilterText)-1]
 			m.dirty = true
-			m.recomputeDisplayRows()
 		}
 		return m, nil
 
 	case tea.KeyRunes:
 		m.quickFilterText += string(msg.Runes)
 		m.dirty = true
-		m.recomputeDisplayRows()
 		return m, nil
 
 	case tea.KeyEnter:
@@ -370,7 +359,6 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		m.cols[colIdx] = col
 		m.filterEditColIdx = -1
 		m.dirty = true
-		m.recomputeDisplayRows()
 		m.updateViewportSize()
 		return m, func() tea.Msg {
 			return FilterChangedMsg{ColumnID: col.ColumnID, Active: col.Filter.Active()}
@@ -383,7 +371,6 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		m.cols[colIdx] = col
 		m.filterEditColIdx = -1
 		m.dirty = true
-		m.recomputeDisplayRows()
 		m.updateViewportSize()
 		return m, func() tea.Msg {
 			return FilterChangedMsg{ColumnID: col.ColumnID, Active: false}
@@ -590,7 +577,6 @@ func (m Model[T]) expandCurrentGroup() (Model[T], tea.Cmd) {
 
 	m.groupModel.SetExpanded(rn.GroupKey, true)
 	m.dirty = true
-	m.recomputeDisplayRows()
 
 	return m, func() tea.Msg {
 		return GroupExpandedMsg{GroupKey: rn.GroupKey, Level: rn.GroupLevel}
@@ -609,7 +595,6 @@ func (m Model[T]) collapseCurrentGroup() (Model[T], tea.Cmd) {
 
 	m.groupModel.SetExpanded(rn.GroupKey, false)
 	m.dirty = true
-	m.recomputeDisplayRows()
 
 	return m, func() tea.Msg {
 		return GroupCollapsedMsg{GroupKey: rn.GroupKey, Level: rn.GroupLevel}

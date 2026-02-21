@@ -12,6 +12,8 @@ import (
 
 // View renders the grid as a string.
 func (m Model[T]) View() string {
+	m.recomputeDisplayRows()
+
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
