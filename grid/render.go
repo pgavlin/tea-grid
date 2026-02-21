@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/pgavlin/tea-grid/data"
+	"github.com/pgavlin/tea-grid/grouping"
 )
 
 // View renders the grid as a string.
@@ -251,7 +252,7 @@ func (m Model[T]) renderHeaderBorder() string {
 // renderRow renders a single row.
 func (m Model[T]) renderRow(rn *data.RowNode[T], displayIndex int, isPinned bool) string {
 	if rn.IsGroup {
-		return m.renderGroupRow(rn)
+		return m.renderGroupRow(rn, displayIndex)
 	}
 
 	left, center, right := m.visibleColIndices()
@@ -401,8 +402,8 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 	return strings.Join(cells, m.colSeparator())
 }
 
-// renderGroupRow renders a synthetic group row.
-func (m Model[T]) renderGroupRow(rn *data.RowNode[T]) string {
+// renderGroupRow renders a synthetic group row with per-column aggregation values.
+func (m Model[T]) renderGroupRow(rn *data.RowNode[T], displayIndex int) string {
 	indent := strings.Repeat(" ", rn.GroupLevel*m.styles.GroupIndent)
 
 	indicator := m.styles.GroupCollapsed
@@ -413,15 +414,92 @@ func (m Model[T]) renderGroupRow(rn *data.RowNode[T]) string {
 	childCount := len(rn.Children)
 	label := fmt.Sprintf("%s%s %s (%d)", indent, indicator, rn.GroupKey, childCount)
 
-	isFocused := m.focused && m.focusedCell.Row >= 0 && m.focusedCell.Row < len(m.displayRows) &&
-		m.displayRows[m.focusedCell.Row].IsGroup && m.displayRows[m.focusedCell.Row].GroupKey == rn.GroupKey
+	isFocused := m.focused && m.focusedCell.Row == displayIndex
 
-	style := m.styles.GroupRow
-	if isFocused {
-		style = m.styles.CellFocused
+	left, center, right := m.visibleColIndices()
+
+	var parts []string
+
+	if len(left) > 0 {
+		parts = append(parts, m.renderGroupCells(rn, left, label, isFocused))
+		parts = append(parts, m.styles.PinSeparator)
 	}
 
-	return style.Width(m.width).Render(label)
+	visibleCenter := m.visibleCenterCols(center)
+	parts = append(parts, m.renderGroupCells(rn, visibleCenter, label, isFocused))
+
+	if len(right) > 0 {
+		parts = append(parts, m.styles.PinSeparator)
+		parts = append(parts, m.renderGroupCells(rn, right, label, isFocused))
+	}
+
+	return strings.Join(parts, "")
+}
+
+// renderGroupCells renders cells for a group row across specified column indices.
+// The label is placed in the first column cell; columns with AggFunc/AggFuncCustom
+// show the aggregated value; all other columns are blank.
+func (m Model[T]) renderGroupCells(rn *data.RowNode[T], colIndices []int, label string, isFocused bool) string {
+	var cells []string
+	labelPlaced := false
+
+	for _, idx := range colIndices {
+		col := m.cols[idx]
+		w := m.colWidths[idx]
+
+		style := m.styles.GroupRow
+		if isFocused {
+			style = m.styles.CellFocused
+		}
+
+		contentWidth := w - style.GetHorizontalFrameSize()
+		if contentWidth < 1 {
+			contentWidth = 1
+		}
+
+		var cellContent string
+		if !labelPlaced {
+			// First visible column gets the group label
+			cellContent = data.TruncateOrPad(label, contentWidth)
+			labelPlaced = true
+		} else if col.AggFuncCustom != nil || col.AggFunc != "" {
+			// Column has aggregation — compute and display
+			values := collectLeafValues(rn, &col)
+			var aggResult any
+			if col.AggFuncCustom != nil {
+				aggResult = col.AggFuncCustom(values)
+			} else {
+				aggResult = grouping.Aggregate(values, col.AggFunc)
+			}
+			formatted := fmt.Sprintf("%v", aggResult)
+			if col.ValueFormatter != nil {
+				var zero T
+				formatted = col.ValueFormatter(aggResult, zero)
+			}
+			cellContent = data.TruncateOrPad(formatted, contentWidth)
+		} else {
+			// Empty cell
+			cellContent = data.TruncateOrPad("", contentWidth)
+		}
+
+		cells = append(cells, style.Width(w).MaxWidth(w).Render(cellContent))
+	}
+
+	return strings.Join(cells, m.colSeparator())
+}
+
+// collectLeafValues recursively walks a group node's children to collect
+// all leaf-row values for a given column.
+func collectLeafValues[T any](node *data.RowNode[T], col *data.Column[T]) []any {
+	var values []any
+	for _, child := range node.Children {
+		if child.IsGroup {
+			values = append(values, collectLeafValues(child, col)...)
+		} else if col.ValueGetter != nil {
+			values = append(values, col.ValueGetter(child.Data))
+		}
+	}
+	return values
 }
 
 // renderSeparator renders a horizontal separator between pinned and unpinned regions.

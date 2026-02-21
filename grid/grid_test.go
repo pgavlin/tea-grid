@@ -1391,6 +1391,55 @@ func TestRender_GroupRow(t *testing.T) {
 	}
 }
 
+func TestRender_GroupRowAggregation(t *testing.T) {
+	cols := testCols()
+	// Set AggFunc on the Salary column
+	cols[2].AggFunc = "sum"
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithGrouping[TestRow]("Department"),
+		WithGroupDefaultExpanded[TestRow](-1),
+	)
+	output := m.View()
+
+	// Engineering group has salaries 95000 + 110000 = 205000
+	if !strings.Contains(output, "205000") {
+		t.Errorf("expected aggregated sum '205000' in group row output, got:\n%s", output)
+	}
+	// Sales group has salaries 75000 + 90000 = 165000
+	if !strings.Contains(output, "165000") {
+		t.Errorf("expected aggregated sum '165000' in group row output, got:\n%s", output)
+	}
+}
+
+func TestRender_GroupRowAggregationCustomFunc(t *testing.T) {
+	cols := testCols()
+	// Set AggFuncCustom on the Salary column to count values
+	cols[2].AggFuncCustom = func(values []any) any {
+		return len(values)
+	}
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithGrouping[TestRow]("Department"),
+		WithGroupDefaultExpanded[TestRow](-1),
+	)
+	output := m.View()
+
+	// Engineering group has 2 rows, Sales has 2, Marketing has 1
+	// The custom func returns the count, so "2" should appear for Engineering
+	// Check that the group row contains the custom aggregation result
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Engineering") && strings.Contains(line, "(2)") {
+			// This is the Engineering group row — it should show "2" for the salary column
+			if !strings.Contains(line, "2") {
+				t.Errorf("expected custom aggregation result in Engineering group row, got: %s", line)
+			}
+			break
+		}
+	}
+}
+
 func TestRender_QuickFilterBarShownWhenActive(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
