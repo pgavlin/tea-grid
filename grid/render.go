@@ -304,8 +304,8 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 
 		// Handle column spanning
 		span := 1
-		if col.ColSpan != nil {
-			span = col.ColSpan(rn.Data)
+		if col.ColumnSpan != nil {
+			span = col.ColumnSpan(rn.Data)
 		}
 		if span > 1 {
 			// Add widths of spanned columns

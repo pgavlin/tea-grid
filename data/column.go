@@ -71,7 +71,7 @@ type Column[T any] struct {
 	ValueSetter func(data *T, value any) // Write the edited value back.
 
 	// Column spanning
-	ColSpan func(data T) int // Number of columns this cell spans. Default: 1.
+	ColumnSpan func(data T) int // Number of columns this cell spans. Default: 1.
 
 	// Aggregation
 	AggFunc       string                 // Aggregation function name: "sum", "avg", "count", "min", "max".
