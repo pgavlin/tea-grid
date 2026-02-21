@@ -46,6 +46,7 @@ type KeyMap struct {
 
 	// Grouping
 	ToggleGroupColumn key.Binding
+	ToggleGroup       key.Binding
 	ExpandGroup       key.Binding
 	CollapseGroup     key.Binding
 	ExpandAll         key.Binding
@@ -158,13 +159,17 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("G"),
 			key.WithHelp("G", "toggle grouping"),
 		),
+		ToggleGroup: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "toggle expansion"),
+		),
 		ExpandGroup: key.NewBinding(
-			key.WithKeys("enter", "right"),
-			key.WithHelp("enter/→", "expand"),
+			key.WithKeys("right"),
+			key.WithHelp("→", "expand"),
 		),
 		CollapseGroup: key.NewBinding(
-			key.WithKeys("left", "backspace"),
-			key.WithHelp("←/bksp", "collapse"),
+			key.WithKeys("left"),
+			key.WithHelp("←", "collapse"),
 		),
 		ExpandAll: key.NewBinding(
 			key.WithKeys("shift+right"),

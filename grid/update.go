@@ -59,24 +59,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	case key.Matches(msg, m.KeyMap.Down):
 		return m.moveFocus(m.focusedCell.Row+1, m.focusedCell.Col)
 
-	case key.Matches(msg, m.KeyMap.Left):
-		if m.focusedCell.Row >= 0 && m.focusedCell.Row < totalRows {
-			rn := m.displayRows[m.focusedCell.Row]
-			if rn.IsGroup && rn.Expanded {
-				return m.collapseCurrentGroup()
-			}
-		}
-		return m.moveFocus(m.focusedCell.Row, m.focusedCell.Col-1)
-
-	case key.Matches(msg, m.KeyMap.Right):
-		if m.focusedCell.Row >= 0 && m.focusedCell.Row < totalRows {
-			rn := m.displayRows[m.focusedCell.Row]
-			if rn.IsGroup && !rn.Expanded {
-				return m.expandCurrentGroup()
-			}
-		}
-		return m.moveFocus(m.focusedCell.Row, m.focusedCell.Col+1)
-
 	case key.Matches(msg, m.KeyMap.PageUp):
 		newRow := m.focusedCell.Row - m.vp.visibleRows
 		if newRow < 0 {
@@ -116,60 +98,10 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	case key.Matches(msg, m.KeyMap.GoToHeader):
 		return m.moveFocus(-1, m.focusedCell.Col)
 
-	// Selection
-	case key.Matches(msg, m.KeyMap.Select):
-		if m.focusedCell.Row >= 0 && m.focusedCell.Row < totalRows {
-			rn := m.displayRows[m.focusedCell.Row]
-			m.sel.Toggle(rn.ID)
-			return m, func() tea.Msg {
-				return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
-			}
-		}
-
 	case key.Matches(msg, m.KeyMap.SelectAll):
 		m.SelectAll()
 		return m, func() tea.Msg {
 			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
-		}
-
-	// Sorting (header mode)
-	case key.Matches(msg, m.KeyMap.ToggleSort):
-		if m.focusedCell.Row == -1 {
-			// Header mode: toggle sort
-			if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
-				col := m.cols[m.focusedCell.Col]
-				if col.Sortable {
-					m.sortModel.ToggleSort(col.ColumnID)
-					m.dirty = true
-					return m, func() tea.Msg {
-						return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
-					}
-				}
-			}
-			return m, nil
-		}
-		// Data row: start editing or expand group
-		if m.focusedCell.Row >= 0 && m.focusedCell.Row < totalRows {
-			rn := m.displayRows[m.focusedCell.Row]
-			if rn.IsGroup {
-				return m.toggleCurrentGroup()
-			}
-			return m.startEditing()
-		}
-
-	case key.Matches(msg, m.KeyMap.ToggleMultiSort):
-		if m.focusedCell.Row == -1 && m.sortModel.MultiSort {
-			if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
-				col := m.cols[m.focusedCell.Col]
-				if col.Sortable {
-					m.sortModel.AddSort(col.ColumnID)
-					m.dirty = true
-					return m, func() tea.Msg {
-						return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
-					}
-				}
-			}
-			return m, nil
 		}
 
 	// Sort column from any row
@@ -249,6 +181,93 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			m.CollapseAll()
 			return m, nil
 		}
+	}
+
+	// Early out if the focus is beyond the total rows for any reason.
+	if m.focusedCell.Row >= totalRows {
+		return m, nil
+	}
+
+	// Header row keybindings
+	if isHeader := m.focusedCell.Row == -1; isHeader {
+		switch {
+		case key.Matches(msg, m.KeyMap.Left):
+			return m.moveFocus(m.focusedCell.Row, m.focusedCell.Col-1)
+
+		case key.Matches(msg, m.KeyMap.Right):
+			return m.moveFocus(m.focusedCell.Row, m.focusedCell.Col+1)
+
+		case key.Matches(msg, m.KeyMap.ToggleSort):
+			if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
+				col := m.cols[m.focusedCell.Col]
+				if col.Sortable {
+					m.sortModel.ToggleSort(col.ColumnID)
+					m.dirty = true
+					return m, func() tea.Msg {
+						return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
+					}
+				}
+			}
+			return m, nil
+
+		case key.Matches(msg, m.KeyMap.ToggleMultiSort):
+			if m.sortModel.MultiSort && m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
+				col := m.cols[m.focusedCell.Col]
+				if col.Sortable {
+					m.sortModel.AddSort(col.ColumnID)
+					m.dirty = true
+					return m, func() tea.Msg {
+						return SortChangedMsg{SortOrder: m.sortModel.SortOrder}
+					}
+				}
+			}
+			return m, nil
+		}
+
+		return m, nil
+	}
+
+	// Group row keybindings
+	rn := m.displayRows[m.focusedCell.Row]
+	if rn.IsGroup {
+		switch {
+		// Group toggle
+		case key.Matches(msg, m.KeyMap.ToggleGroup):
+			return m.toggleCurrentGroup()
+
+		// Group expansion
+		case key.Matches(msg, m.KeyMap.ExpandGroup):
+			if !rn.Expanded {
+				return m.expandCurrentGroup()
+			}
+
+		// Group collapse
+		case key.Matches(msg, m.KeyMap.CollapseGroup):
+			if rn.Expanded {
+				return m.collapseCurrentGroup()
+			}
+		}
+		return m, nil
+	}
+
+	// Data row keybindings
+	switch {
+	case key.Matches(msg, m.KeyMap.Left):
+		return m.moveFocus(m.focusedCell.Row, m.focusedCell.Col-1)
+
+	case key.Matches(msg, m.KeyMap.Right):
+		return m.moveFocus(m.focusedCell.Row, m.focusedCell.Col+1)
+
+	// Selection
+	case key.Matches(msg, m.KeyMap.Select):
+		m.sel.Toggle(rn.ID)
+		return m, func() tea.Msg {
+			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
+		}
+
+	// Editing
+	case key.Matches(msg, m.KeyMap.StartEdit):
+		return m.startEditing()
 	}
 
 	return m, nil
@@ -549,7 +568,7 @@ func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 		Data:           rn.Data,
 		RowNode:        &rn,
 		Column:         &col,
-		ColumnIndex:       pos.Col,
+		ColumnIndex:    pos.Col,
 		RowIndex:       pos.Row,
 		Width:          m.colWidths[pos.Col],
 	}
