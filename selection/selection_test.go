@@ -190,6 +190,43 @@ func TestSelectedIDsContent(t *testing.T) {
 	}
 }
 
+// --- Retain ---
+
+func TestRetain(t *testing.T) {
+	m := New(SelectMulti)
+	m.SelectAll([]string{"a", "b", "c", "d"})
+	if m.Count() != 4 {
+		t.Fatalf("expected 4 selected, got %d", m.Count())
+	}
+
+	// Retain only "b" and "d"
+	m.Retain(map[string]bool{"b": true, "d": true})
+	if m.Count() != 2 {
+		t.Errorf("expected 2 after Retain, got %d", m.Count())
+	}
+	if !m.IsSelected("b") {
+		t.Error("expected b to be retained")
+	}
+	if !m.IsSelected("d") {
+		t.Error("expected d to be retained")
+	}
+	if m.IsSelected("a") {
+		t.Error("expected a to be pruned")
+	}
+	if m.IsSelected("c") {
+		t.Error("expected c to be pruned")
+	}
+}
+
+func TestRetainEmptyValidSet(t *testing.T) {
+	m := New(SelectMulti)
+	m.SelectAll([]string{"a", "b"})
+	m.Retain(map[string]bool{})
+	if m.Count() != 0 {
+		t.Errorf("expected 0 after Retain with empty set, got %d", m.Count())
+	}
+}
+
 // --- Anchor ---
 
 func TestAnchorDefault(t *testing.T) {

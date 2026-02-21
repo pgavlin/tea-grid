@@ -149,6 +149,7 @@ func (m Model[T]) Init() tea.Cmd {
 // SetRows replaces the row data.
 func (m *Model[T]) SetRows(rows []T) {
 	m.setRowData(rows)
+	m.pruneSelection()
 	m.dirty = true
 }
 
@@ -201,6 +202,7 @@ func (m *Model[T]) RemoveRow(id string) {
 	for i := range m.rows {
 		if m.rows[i].ID == id {
 			m.rows = append(m.rows[:i], m.rows[i+1:]...)
+			m.sel.Deselect(id)
 			m.dirty = true
 			return
 		}
@@ -418,9 +420,33 @@ func (m Model[T]) FullHelp() [][]key.Binding {
 func (m *Model[T]) setRowData(rows []T) {
 	m.rows = make([]data.RowNode[T], len(rows))
 	for i, d := range rows {
-		m.rows[i] = m.makeRowNode(d)
+		rn := data.RowNode[T]{
+			Data:      d,
+			RowHeight: m.defaultRowHeight,
+		}
+		if m.dynamicRowHeight != nil {
+			rn.RowHeight = m.dynamicRowHeight(d)
+		}
+		if m.rowIDFunc != nil {
+			rn.ID = m.rowIDFunc(d)
+		} else {
+			rn.ID = fmt.Sprintf("row-%d", i)
+		}
+		m.rows[i] = rn
+	}
+	// Ensure nextRowID won't collide with position-based IDs
+	if len(rows) > m.nextRowID {
+		m.nextRowID = len(rows)
 	}
 	m.dirty = true
+}
+
+func (m *Model[T]) pruneSelection() {
+	validIDs := make(map[string]bool, len(m.rows))
+	for _, rn := range m.rows {
+		validIDs[rn.ID] = true
+	}
+	m.sel.Retain(validIDs)
 }
 
 func (m *Model[T]) makeRowNode(d T) data.RowNode[T] {
@@ -442,15 +468,37 @@ func (m *Model[T]) makeRowNode(d T) data.RowNode[T] {
 
 func (m *Model[T]) buildStaticPinnedNodes() {
 	m.staticPinnedTopNodes = nil
-	for _, d := range m.staticPinnedTop {
-		rn := m.makeRowNode(d)
-		rn.Pinned = data.PinTop
+	for i, d := range m.staticPinnedTop {
+		rn := data.RowNode[T]{
+			Data:      d,
+			RowHeight: m.defaultRowHeight,
+			Pinned:    data.PinTop,
+		}
+		if m.dynamicRowHeight != nil {
+			rn.RowHeight = m.dynamicRowHeight(d)
+		}
+		if m.rowIDFunc != nil {
+			rn.ID = m.rowIDFunc(d)
+		} else {
+			rn.ID = fmt.Sprintf("pinned-top-%d", i)
+		}
 		m.staticPinnedTopNodes = append(m.staticPinnedTopNodes, rn)
 	}
 	m.staticPinnedBotNodes = nil
-	for _, d := range m.staticPinnedBot {
-		rn := m.makeRowNode(d)
-		rn.Pinned = data.PinBottom
+	for i, d := range m.staticPinnedBot {
+		rn := data.RowNode[T]{
+			Data:      d,
+			RowHeight: m.defaultRowHeight,
+			Pinned:    data.PinBottom,
+		}
+		if m.dynamicRowHeight != nil {
+			rn.RowHeight = m.dynamicRowHeight(d)
+		}
+		if m.rowIDFunc != nil {
+			rn.ID = m.rowIDFunc(d)
+		} else {
+			rn.ID = fmt.Sprintf("pinned-bot-%d", i)
+		}
 		m.staticPinnedBotNodes = append(m.staticPinnedBotNodes, rn)
 	}
 }

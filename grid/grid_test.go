@@ -460,6 +460,74 @@ func TestDirtyFlag(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
+// 8b2. Row ID Stability & Selection Pruning
+// -----------------------------------------------------------------------
+
+func TestSetRows_AutoIDsArePositionStable(t *testing.T) {
+	m := newTestGrid()
+	// Collect IDs from initial SetRows
+	firstIDs := make([]string, len(m.rows))
+	for i, rn := range m.rows {
+		firstIDs[i] = rn.ID
+	}
+
+	// Call SetRows again with the same data
+	m.SetRows(testData())
+	secondIDs := make([]string, len(m.rows))
+	for i, rn := range m.rows {
+		secondIDs[i] = rn.ID
+	}
+
+	if len(firstIDs) != len(secondIDs) {
+		t.Fatalf("ID count mismatch: %d vs %d", len(firstIDs), len(secondIDs))
+	}
+	for i := range firstIDs {
+		if firstIDs[i] != secondIDs[i] {
+			t.Errorf("ID mismatch at index %d: %q vs %q", i, firstIDs[i], secondIDs[i])
+		}
+	}
+}
+
+func TestSetRows_PrunesStaleSelection(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	// Select the last row (index 4, ID "row-4")
+	lastID := m.rows[len(m.rows)-1].ID
+	m.SelectRow(lastID)
+	if m.sel.Count() != 1 {
+		t.Fatalf("expected 1 selected, got %d", m.sel.Count())
+	}
+
+	// Replace with fewer rows so the selected row's position no longer exists
+	m.SetRows([]TestRow{
+		{"Alice", "Engineering", 95000, true},
+		{"Bob", "Sales", 75000, false},
+	})
+	if m.sel.Count() != 0 {
+		t.Errorf("expected 0 selected after SetRows with fewer rows, got %d", m.sel.Count())
+	}
+}
+
+func TestRemoveRow_DeselectsRemovedRow(t *testing.T) {
+	m := New[TestRow](
+		WithColumns[TestRow](testCols()),
+		WithSelection[TestRow](selection.SelectMulti),
+		WithRowID[TestRow](func(r TestRow) string { return r.Name }),
+		WithRows[TestRow](testData()),
+		WithFocused[TestRow](true),
+		WithWidth[TestRow](80),
+		WithHeight[TestRow](20),
+	)
+	m.SelectRow("Bob")
+	if m.sel.Count() != 1 {
+		t.Fatalf("expected 1 selected, got %d", m.sel.Count())
+	}
+	m.RemoveRow("Bob")
+	if m.sel.Count() != 0 {
+		t.Errorf("expected 0 selected after RemoveRow, got %d", m.sel.Count())
+	}
+}
+
+// -----------------------------------------------------------------------
 // 8c. Column Sizing
 // -----------------------------------------------------------------------
 

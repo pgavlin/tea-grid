@@ -87,6 +87,15 @@ func (m *Model) SelectedIDs() []string {
 	return ids
 }
 
+// Retain removes any selected IDs that are not present in validIDs.
+func (m *Model) Retain(validIDs map[string]bool) {
+	for id := range m.selected {
+		if !validIDs[id] {
+			delete(m.selected, id)
+		}
+	}
+}
+
 // Count returns the number of selected rows.
 func (m *Model) Count() int {
 	return len(m.selected)
