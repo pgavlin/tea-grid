@@ -179,9 +179,5 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("shift+left"),
 			key.WithHelp("shift+←", "collapse all"),
 		),
-		Help: key.NewBinding(
-			key.WithKeys("?"),
-			key.WithHelp("?", "help"),
-		),
 	}
 }

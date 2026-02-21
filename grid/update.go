@@ -47,11 +47,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	totalRows := len(m.displayRows)
 
 	switch {
-	// Help toggle
-	case key.Matches(msg, m.KeyMap.Help):
-		m.Help.ShowAll = !m.Help.ShowAll
-		return m, nil
-
 	// Navigation
 	case key.Matches(msg, m.KeyMap.Up):
 		return m.moveFocus(m.focusedCell.Row-1, m.focusedCell.Col)

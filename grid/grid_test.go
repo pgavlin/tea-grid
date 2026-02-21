@@ -1994,15 +1994,6 @@ func TestFullHelp_ReturnsBindingGroups(t *testing.T) {
 	}
 }
 
-func TestHelpToggle(t *testing.T) {
-	m := newTestGrid()
-	before := m.Help.ShowAll
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
-	if m.Help.ShowAll == before {
-		t.Error("expected Help.ShowAll to toggle")
-	}
-}
-
 func TestSelectedRowNodes(t *testing.T) {
 	// WithRowID must come before WithRows so rows get custom IDs
 	m := New[TestRow](
