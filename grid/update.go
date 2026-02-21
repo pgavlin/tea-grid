@@ -216,8 +216,12 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		if m.quickFilterEnabled {
 			m.quickFilterActive = !m.quickFilterActive
 			if !m.quickFilterActive {
-				m.quickFilterText = ""
-				m.dirty = true
+				if m.quickFilterText != "" {
+					m.quickFilterText = ""
+					m.dirty = true
+					m.updateViewportSize()
+					return m, func() tea.Msg { return QuickFilterChangedMsg{Text: ""} }
+				}
 			}
 			m.updateViewportSize()
 			return m, nil
@@ -316,8 +320,12 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.quickFilterActive = false
-		m.quickFilterText = ""
-		m.dirty = true
+		if m.quickFilterText != "" {
+			m.quickFilterText = ""
+			m.dirty = true
+			m.updateViewportSize()
+			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: ""} }
+		}
 		m.updateViewportSize()
 		return m, nil
 
@@ -325,13 +333,14 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		if len(m.quickFilterText) > 0 {
 			m.quickFilterText = m.quickFilterText[:len(m.quickFilterText)-1]
 			m.dirty = true
+			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
 		}
 		return m, nil
 
 	case tea.KeyRunes:
 		m.quickFilterText += string(msg.Runes)
 		m.dirty = true
-		return m, nil
+		return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
 
 	case tea.KeyEnter:
 		// Confirm filter and return to normal mode
