@@ -17,7 +17,7 @@ func WithColumns[T any](cols []data.Column[T]) Option[T] {
 }
 
 // WithColumnGroups sets the column groups for grouped headers.
-func WithColumnGroups[T any](groups []data.ColGroup[T]) Option[T] {
+func WithColumnGroups[T any](groups []data.ColumnGroup[T]) Option[T] {
 	return func(m *Model[T]) {
 		m.colGroups = groups
 	}

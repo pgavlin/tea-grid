@@ -32,7 +32,7 @@ type Model[T any] struct {
 
 	// Column definitions
 	cols      []data.Column[T]
-	colGroups []data.ColGroup[T]
+	colGroups []data.ColumnGroup[T]
 
 	// Row data
 	rows      []data.RowNode[T] // All row nodes

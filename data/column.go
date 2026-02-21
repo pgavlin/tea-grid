@@ -81,8 +81,8 @@ type Column[T any] struct {
 	Hide bool // If true, column is not rendered.
 }
 
-// ColGroup produces a single level of grouped headers.
-type ColGroup[T any] struct {
+// ColumnGroup produces a single level of grouped headers.
+type ColumnGroup[T any] struct {
 	HeaderName string
 	Children   []Column[T] // Leaf columns in this group.
 }
