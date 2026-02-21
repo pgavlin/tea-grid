@@ -302,7 +302,7 @@ func (m Model[T]) handleEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 
 		return m, tea.Batch(
 			func() tea.Msg {
-				return CellEditingStoppedMsg{Position: pos}
+				return CellEditingConfirmedMsg{Position: pos}
 			},
 			func() tea.Msg {
 				return CellValueChangedMsg[T]{

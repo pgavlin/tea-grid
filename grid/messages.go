@@ -43,8 +43,8 @@ type CellEditingStartedMsg struct {
 	Position CellPosition
 }
 
-// CellEditingStoppedMsg is emitted when cell editing ends (confirm or cancel).
-type CellEditingStoppedMsg struct {
+// CellEditingConfirmedMsg is emitted when a cell edit is confirmed.
+type CellEditingConfirmedMsg struct {
 	Position CellPosition
 }
 
