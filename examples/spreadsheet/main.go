@@ -24,6 +24,21 @@ const (
 
 type clearStatusMsg struct{ seq int }
 
+// clipCell holds a single cell's content relative to the copy origin.
+type clipCell struct {
+	RowOffset int // offset from top-left of copied region
+	ColOffset int // offset from top-left of copied region
+	Raw       string
+	Format    *CellFormat
+}
+
+// clipboard stores copied cell data for paste operations.
+type clipboard struct {
+	cells     []clipCell
+	originRow int // 1-based spreadsheet row of top-left corner
+	originCol int // 0-based column letter index of top-left corner
+}
+
 var statusStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("252")).
 	Background(lipgloss.Color("235"))
@@ -46,6 +61,7 @@ type model struct {
 	width        int
 	height       int
 	filename     string
+	clip         clipboard
 }
 
 func newModel(filename string) model {
@@ -282,8 +298,11 @@ func (m *model) handleAppKey(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
 
 	switch key {
-	case "ctrl+c":
-		return tea.Quit
+	case "ctrl+c", "y":
+		return m.copySelection()
+
+	case "ctrl+v", "p":
+		return m.pasteClipboard()
 
 	case "q":
 		if !m.sidebarOn {
@@ -338,6 +357,126 @@ func (m *model) handleAppKey(msg tea.KeyMsg) tea.Cmd {
 	}
 
 	return nil
+}
+
+// copySelection copies the current rectangular selection (or single focused cell) to the clipboard.
+func (m *model) copySelection() tea.Cmd {
+	rowLo, rowHi, colLo, colHi := m.grid.SelectionRect()
+	if rowLo < 0 {
+		// No rectangular selection — copy single focused cell
+		pos := m.grid.FocusedCell()
+		if pos.Row < 0 || pos.Col < 1 { // col 0 is row-number column
+			return nil
+		}
+		rowLo, rowHi = pos.Row, pos.Row
+		colLo, colHi = pos.Col, pos.Col
+	}
+
+	m.clip = clipboard{
+		originRow: rowLo + 1, // 1-based spreadsheet row
+		originCol: colLo - 1, // 0-based column letter index (skip row-number column)
+	}
+	m.clip.cells = nil
+
+	for r := rowLo; r <= rowHi && r < len(m.rows); r++ {
+		if r < 0 {
+			continue
+		}
+		row := m.rows[r]
+		for c := colLo; c <= colHi; c++ {
+			if c < 1 { // skip row-number column
+				continue
+			}
+			colLetter := indexToColLetter(c - 1)
+			cc := clipCell{
+				RowOffset: r - rowLo,
+				ColOffset: c - colLo,
+			}
+			if cell, ok := row.Cells[colLetter]; ok {
+				cc.Raw = cell.Raw
+				if cell.Format != nil {
+					f := *cell.Format
+					cc.Format = &f
+				}
+			}
+			m.clip.cells = append(m.clip.cells, cc)
+		}
+	}
+
+	count := (rowHi - rowLo + 1) * (colHi - colLo + 1)
+	if count == 1 {
+		return m.setStatus("Copied cell")
+	}
+	return m.setStatus(fmt.Sprintf("Copied %d cells", count))
+}
+
+// pasteClipboard pastes the clipboard at the current focused cell, adjusting formula references.
+func (m *model) pasteClipboard() tea.Cmd {
+	if len(m.clip.cells) == 0 {
+		return nil
+	}
+
+	pos := m.grid.FocusedCell()
+	if pos.Row < 0 || pos.Col < 1 {
+		return nil
+	}
+
+	pasteRow := pos.Row + 1 // 1-based
+	pasteCol := pos.Col - 1 // column letter index
+
+	rowDelta := pasteRow - m.clip.originRow
+	colDelta := pasteCol - m.clip.originCol
+
+	// Find max row needed
+	maxRowIdx := pos.Row
+	for _, cc := range m.clip.cells {
+		destGridRow := pos.Row + cc.RowOffset
+		if destGridRow > maxRowIdx {
+			maxRowIdx = destGridRow
+		}
+	}
+
+	// Extend rows if needed
+	for len(m.rows) <= maxRowIdx {
+		cells := make(map[string]*Cell, m.numCols)
+		for j := 0; j < m.numCols; j++ {
+			cells[indexToColLetter(j)] = &Cell{}
+		}
+		m.rows = append(m.rows, &SpreadsheetRow{
+			RowIndex: len(m.rows),
+			Cells:    cells,
+		})
+	}
+
+	// Paste each cell
+	for _, cc := range m.clip.cells {
+		destGridRow := pos.Row + cc.RowOffset
+		destGridCol := pos.Col + cc.ColOffset
+		if destGridRow < 0 || destGridCol < 1 || destGridCol > m.numCols {
+			continue
+		}
+
+		colLetter := indexToColLetter(destGridCol - 1)
+		cell := m.rows[destGridRow].getCell(colLetter)
+		cell.Raw = adjustFormula(cc.Raw, rowDelta, colDelta)
+		if cc.Format != nil {
+			f := *cc.Format
+			cell.Format = &f
+		} else {
+			cell.Format = nil
+		}
+		cell.Value = nil
+	}
+
+	// Rebuild row indices and refresh
+	for i := range m.rows {
+		m.rows[i].RowIndex = i
+	}
+	m.grid.SetRows(m.rows)
+	recalcAll(m.rows, &m.deps)
+	m.grid.SetRows(m.rows)
+
+	return m.setStatus("Pasted")
 }
 
 func (m *model) insertRowBelow() tea.Cmd {
@@ -798,10 +937,12 @@ func (m model) renderHelp() string {
 			{"tab", "Switch focus (grid/sidebar)"},
 			{"esc", "Close sidebar"},
 		}},
-		{"Selection", [][2]string{
+		{"Selection & Clipboard", [][2]string{
 			{"R/C", "Select row/column"},
 			{"H/J/K/L, shift+arrows", "Expand selection"},
 			{"space", "Toggle row selection"},
+			{"ctrl+c/y", "Copy cell(s)"},
+			{"ctrl+v/p", "Paste (adjusts formulas)"},
 		}},
 		{"Sorting & Filtering", [][2]string{
 			{"s", "Sort by column"},
@@ -819,7 +960,7 @@ func (m model) renderHelp() string {
 		}},
 		{"Other", [][2]string{
 			{"?/f1", "This help screen"},
-			{"q, ctrl+c", "Quit"},
+			{"q", "Quit"},
 		}},
 	}
 

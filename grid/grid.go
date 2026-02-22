@@ -334,6 +334,12 @@ func (m Model[T]) colSelectionRange() (lo, hi int) {
 	return lo, hi
 }
 
+// SelectionRect returns the rectangular selection bounds, or (-1,-1,-1,-1) if inactive.
+// Row values are display row indices; column values are grid column indices.
+func (m Model[T]) SelectionRect() (rowLo, rowHi, colLo, colHi int) {
+	return m.selectionRect()
+}
+
 // selectionRect returns the rectangular selection bounds, or (-1,-1,-1,-1) if inactive.
 func (m Model[T]) selectionRect() (rowLo, rowHi, colLo, colHi int) {
 	if m.rectAnchor.Row < 0 {

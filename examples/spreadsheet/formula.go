@@ -683,6 +683,55 @@ func indexToColLetter(idx int) string {
 	return string(result)
 }
 
+// --- Formula Reference Adjustment ---
+
+// adjustFormula rewrites cell references in a formula by the given row/column deltas.
+// Non-formula strings (not starting with '=') are returned as-is.
+// References that would become invalid (negative row/col) become #REF!.
+func adjustFormula(raw string, rowDelta, colDelta int) string {
+	if !strings.HasPrefix(raw, "=") {
+		return raw
+	}
+	formula := raw[1:]
+	tokens, err := tokenize(formula)
+	if err != nil {
+		return raw // unparseable, return as-is
+	}
+
+	var b strings.Builder
+	b.WriteByte('=')
+	for _, tok := range tokens {
+		switch tok.kind {
+		case tokCellRef:
+			b.WriteString(adjustCellRef(tok.text, rowDelta, colDelta))
+		case tokRange:
+			parts := strings.SplitN(tok.text, ":", 2)
+			b.WriteString(adjustCellRef(parts[0], rowDelta, colDelta))
+			b.WriteByte(':')
+			b.WriteString(adjustCellRef(parts[1], rowDelta, colDelta))
+		case tokEOF:
+			// skip
+		default:
+			b.WriteString(tok.text)
+		}
+	}
+	return b.String()
+}
+
+// adjustCellRef shifts a single cell reference (e.g. "A1") by rowDelta and colDelta.
+func adjustCellRef(ref string, rowDelta, colDelta int) string {
+	col, row := parseCellRef(ref)
+	if col == "" || row == 0 {
+		return ref
+	}
+	newColIdx := colLetterToIndex(col) + colDelta
+	newRow := row + rowDelta
+	if newColIdx < 0 || newRow < 1 {
+		return "#REF!"
+	}
+	return indexToColLetter(newColIdx) + strconv.Itoa(newRow)
+}
+
 // --- Dependency Graph ---
 
 // DepGraph tracks cell dependencies for formula recalculation.
