@@ -89,8 +89,8 @@ func DefaultStyles() Styles {
 			Padding(0, 1).
 			Bold(true),
 
-		PinnedLeft:  lipgloss.NewStyle(),
-		PinnedRight: lipgloss.NewStyle(),
+		PinnedLeft:   lipgloss.NewStyle(),
+		PinnedRight:  lipgloss.NewStyle(),
 		PinSeparator: "│",
 		ScrollLeft:   "◀",
 		ScrollRight:  "▶",
