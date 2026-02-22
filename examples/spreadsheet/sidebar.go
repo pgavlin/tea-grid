@@ -85,21 +85,13 @@ func (s *SidebarModel) SetTarget(colID string, rowIndex int, cell *Cell, hasRow 
 	s.hasCol = colID != ""
 	s.editing = false
 
-	// Force target to an available option.
-	if !s.hasCell && s.target == TargetCell {
-		if s.hasRow {
-			s.target = TargetRow
-		} else {
-			s.target = TargetColumn
-		}
-	}
-	if !s.hasRow && s.target == TargetRow {
+	// Default to cell target when available, otherwise fall back.
+	if s.hasCell {
+		s.target = TargetCell
+	} else if s.hasRow {
+		s.target = TargetRow
+	} else {
 		s.target = TargetColumn
-	}
-	if !s.hasCol && s.target == TargetColumn {
-		if s.hasRow {
-			s.target = TargetRow
-		}
 	}
 
 	// Load format from the active target's source.

@@ -69,11 +69,11 @@ func newModel(filename string, csvImport string) model {
 		m.rows = rows
 		m.numCols = numCols
 		if m.filename == "" {
-			m.filename = "spreadsheet.json"
+			m.filename = "spreadsheet.txs"
 		}
 		m.status = fmt.Sprintf("Imported %s", csvImport)
 	} else if filename != "" {
-		if rows, colFmts, rowFmts, numCols, err := loadJSON(filename); err == nil {
+		if rows, colFmts, rowFmts, numCols, err := loadNative(filename); err == nil {
 			m.rows = rows
 			m.colFmts = colFmts
 			m.rowFmts = rowFmts
@@ -84,7 +84,7 @@ func newModel(filename string, csvImport string) model {
 			m.rows = makeEmptyRows(defaultRows, m.numCols)
 		}
 	} else {
-		m.filename = "spreadsheet.json"
+		m.filename = "spreadsheet.txs"
 		m.rows = makeEmptyRows(defaultRows, m.numCols)
 	}
 
@@ -527,7 +527,7 @@ func (m *model) showFileForm(mode string) tea.Cmd {
 	fileFormPath := m.filename
 	fileFormFmt := strings.TrimPrefix(filepath.Ext(m.filename), ".")
 	if fileFormFmt != "csv" {
-		fileFormFmt = "json"
+		fileFormFmt = "txs"
 	}
 
 	var title string
@@ -546,14 +546,14 @@ func (m *model) showFileForm(mode string) tea.Cmd {
 			FileAllowed(true).
 			DirAllowed(false).
 			ShowSize(true).
-			AllowedTypes([]string{".json", ".csv"}).
+			AllowedTypes([]string{".txs", ".csv"}).
 			Height(10).
 			Value(&fileFormPath).
 			Key("path")
 	} else {
 		pathField = huh.NewInput().
 			Title("File").
-			Placeholder("spreadsheet.json").
+			Placeholder("spreadsheet.txs").
 			Value(&fileFormPath).
 			Key("path")
 	}
@@ -561,7 +561,7 @@ func (m *model) showFileForm(mode string) tea.Cmd {
 	formatField := huh.NewSelect[string]().
 		Title("Format").
 		Options(
-			huh.NewOption("JSON", "json"),
+			huh.NewOption("Sheet", "txs"),
 			huh.NewOption("CSV", "csv"),
 		).
 		Value(&fileFormFmt).
@@ -587,7 +587,7 @@ func (m *model) completeFileForm() tea.Cmd {
 		if format == "csv" {
 			err = exportCSV(path, m.rows, m.numCols)
 		} else {
-			err = saveJSON(path, m.rows, m.colFmts, m.rowFmts, m.numCols)
+			err = saveNative(path, m.rows, m.colFmts, m.rowFmts, m.numCols)
 		}
 		if err != nil {
 			return m.setStatus(fmt.Sprintf("Save error: %v", err))
@@ -607,7 +607,7 @@ func (m *model) completeFileForm() tea.Cmd {
 		m.colFmts = make(map[string]*CellFormat)
 		m.rowFmts = make(map[int]*CellFormat)
 	} else {
-		rows, colFmts, rowFmts, numCols, err := loadJSON(path)
+		rows, colFmts, rowFmts, numCols, err := loadNative(path)
 		if err != nil {
 			return m.setStatus(fmt.Sprintf("Load error: %v", err))
 		}

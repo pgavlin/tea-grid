@@ -2,48 +2,53 @@ package main
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/fxamacker/cbor/v2"
+	"github.com/klauspost/compress/zstd"
 )
 
-// --- JSON Format ---
+// --- Native Binary Format (CBOR + zstd) ---
 
-type jsonFile struct {
-	Version    int                         `json:"version"`
-	NumCols    int                         `json:"numCols"`
-	NumRows    int                         `json:"numRows"`
-	ColFormats map[string]*jsonCellFormat  `json:"colFormats,omitempty"`
-	RowFormats map[int]*jsonCellFormat     `json:"rowFormats,omitempty"`
-	Cells      map[string]*jsonCell        `json:"cells"`
+// Magic number: "SHEETXS\x00" (8 bytes)
+var nativeMagic = [8]byte{'S', 'H', 'E', 'E', 'T', 'X', 'S', 0x00}
+
+type fileData struct {
+	Version    int                        `cbor:"version"`
+	NumCols    int                        `cbor:"numCols"`
+	NumRows    int                        `cbor:"numRows"`
+	ColFormats map[string]*fileCellFormat `cbor:"colFormats,omitempty"`
+	RowFormats map[int]*fileCellFormat    `cbor:"rowFormats,omitempty"`
+	Cells      map[string]*fileCell       `cbor:"cells"`
 }
 
-type jsonCellFormat struct {
-	DataType    DataType  `json:"dataType,omitempty"`
-	NumDecimals int       `json:"numDecimals,omitempty"`
-	DateFormat  string    `json:"dateFormat,omitempty"`
-	Prefix      string    `json:"prefix,omitempty"`
-	Suffix      string    `json:"suffix,omitempty"`
-	Align       Alignment `json:"align,omitempty"`
-	FgColor     string    `json:"fgColor,omitempty"`
-	BgColor     string    `json:"bgColor,omitempty"`
-	Bold        bool      `json:"bold,omitempty"`
-	Italic      bool      `json:"italic,omitempty"`
-	Underline   bool      `json:"underline,omitempty"`
+type fileCellFormat struct {
+	DataType    DataType  `cbor:"dataType,omitempty"`
+	NumDecimals int       `cbor:"numDecimals,omitempty"`
+	DateFormat  string    `cbor:"dateFormat,omitempty"`
+	Prefix      string    `cbor:"prefix,omitempty"`
+	Suffix      string    `cbor:"suffix,omitempty"`
+	Align       Alignment `cbor:"align,omitempty"`
+	FgColor     string    `cbor:"fgColor,omitempty"`
+	BgColor     string    `cbor:"bgColor,omitempty"`
+	Bold        bool      `cbor:"bold,omitempty"`
+	Italic      bool      `cbor:"italic,omitempty"`
+	Underline   bool      `cbor:"underline,omitempty"`
 }
 
-type jsonCell struct {
-	Raw    string          `json:"raw"`
-	Format *jsonCellFormat `json:"format,omitempty"`
+type fileCell struct {
+	Raw    string          `cbor:"raw"`
+	Format *fileCellFormat `cbor:"format,omitempty"`
 }
 
-func cellFormatToJSON(f *CellFormat) *jsonCellFormat {
+func cellFormatToFile(f *CellFormat) *fileCellFormat {
 	if f == nil {
 		return nil
 	}
-	return &jsonCellFormat{
+	return &fileCellFormat{
 		DataType:    f.DataType,
 		NumDecimals: f.NumDecimals,
 		DateFormat:  f.DateFormat,
@@ -58,7 +63,7 @@ func cellFormatToJSON(f *CellFormat) *jsonCellFormat {
 	}
 }
 
-func jsonToCellFormat(j *jsonCellFormat) *CellFormat {
+func fileToCellFormat(j *fileCellFormat) *CellFormat {
 	if j == nil {
 		return nil
 	}
@@ -77,27 +82,27 @@ func jsonToCellFormat(j *jsonCellFormat) *CellFormat {
 	}
 }
 
-// saveJSON writes the spreadsheet to a JSON file.
-func saveJSON(filename string, rows []*SpreadsheetRow, colFmts map[string]*CellFormat, rowFmts map[int]*CellFormat, numCols int) error {
-	file := jsonFile{
+// saveNative writes the spreadsheet to a binary file (CBOR + zstd).
+func saveNative(filename string, rows []*SpreadsheetRow, colFmts map[string]*CellFormat, rowFmts map[int]*CellFormat, numCols int) error {
+	file := fileData{
 		Version:    1,
 		NumCols:    numCols,
 		NumRows:    len(rows),
-		ColFormats: make(map[string]*jsonCellFormat),
-		Cells:      make(map[string]*jsonCell),
+		ColFormats: make(map[string]*fileCellFormat),
+		Cells:      make(map[string]*fileCell),
 	}
 
 	for col, fmt := range colFmts {
 		if fmt != nil {
-			file.ColFormats[col] = cellFormatToJSON(fmt)
+			file.ColFormats[col] = cellFormatToFile(fmt)
 		}
 	}
 
 	if len(rowFmts) > 0 {
-		file.RowFormats = make(map[int]*jsonCellFormat)
+		file.RowFormats = make(map[int]*fileCellFormat)
 		for idx, fmt := range rowFmts {
 			if fmt != nil {
-				file.RowFormats[idx] = cellFormatToJSON(fmt)
+				file.RowFormats[idx] = cellFormatToFile(fmt)
 			}
 		}
 	}
@@ -108,32 +113,58 @@ func saveJSON(filename string, rows []*SpreadsheetRow, colFmts map[string]*CellF
 				continue
 			}
 			ref := fmt.Sprintf("%s%d", col, row.RowIndex+1)
-			jc := &jsonCell{Raw: cell.Raw}
+			fc := &fileCell{Raw: cell.Raw}
 			if cell.Format != nil {
-				jc.Format = cellFormatToJSON(cell.Format)
+				fc.Format = cellFormatToFile(cell.Format)
 			}
-			file.Cells[ref] = jc
+			file.Cells[ref] = fc
 		}
 	}
 
-	data, err := json.MarshalIndent(file, "", "  ")
+	payload, err := cbor.Marshal(file)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filename, data, 0644)
+
+	enc, err := zstd.NewWriter(nil)
+	if err != nil {
+		return err
+	}
+	defer enc.Close()
+	compressed := enc.EncodeAll(payload, nil)
+
+	out := make([]byte, 0, len(nativeMagic)+len(compressed))
+	out = append(out, nativeMagic[:]...)
+	out = append(out, compressed...)
+	return os.WriteFile(filename, out, 0644)
 }
 
-// loadJSON reads a spreadsheet from a JSON file.
+// loadNative reads a spreadsheet from a binary file (CBOR + zstd).
 // Returns rows, column formats, row formats, number of columns.
-func loadJSON(filename string) ([]*SpreadsheetRow, map[string]*CellFormat, map[int]*CellFormat, int, error) {
-	data, err := os.ReadFile(filename)
+func loadNative(filename string) ([]*SpreadsheetRow, map[string]*CellFormat, map[int]*CellFormat, int, error) {
+	raw, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, nil, nil, 0, err
 	}
 
-	var file jsonFile
-	if err := json.Unmarshal(data, &file); err != nil {
+	if len(raw) < len(nativeMagic) || [8]byte(raw[:8]) != nativeMagic {
+		return nil, nil, nil, 0, fmt.Errorf("not a valid .txs file (bad magic number)")
+	}
+
+	dec, err := zstd.NewReader(nil)
+	if err != nil {
 		return nil, nil, nil, 0, err
+	}
+	defer dec.Close()
+
+	payload, err := dec.DecodeAll(raw[len(nativeMagic):], nil)
+	if err != nil {
+		return nil, nil, nil, 0, fmt.Errorf("decompression failed: %w", err)
+	}
+
+	var file fileData
+	if err := cbor.Unmarshal(payload, &file); err != nil {
+		return nil, nil, nil, 0, fmt.Errorf("decode failed: %w", err)
 	}
 
 	numCols := file.NumCols
@@ -155,14 +186,14 @@ func loadJSON(filename string) ([]*SpreadsheetRow, map[string]*CellFormat, map[i
 	}
 
 	// Populate cells
-	for ref, jc := range file.Cells {
+	for ref, fc := range file.Cells {
 		col, rowNum := parseCellRef(ref)
 		if col == "" || rowNum < 1 || rowNum > numRows {
 			continue
 		}
-		cell := &Cell{Raw: jc.Raw}
-		if jc.Format != nil {
-			cell.Format = jsonToCellFormat(jc.Format)
+		cell := &Cell{Raw: fc.Raw}
+		if fc.Format != nil {
+			cell.Format = fileToCellFormat(fc.Format)
 		}
 		rows[rowNum-1].Cells[col] = cell
 	}
@@ -179,14 +210,14 @@ func loadJSON(filename string) ([]*SpreadsheetRow, map[string]*CellFormat, map[i
 
 	// Convert column formats
 	colFmts := make(map[string]*CellFormat)
-	for col, jf := range file.ColFormats {
-		colFmts[col] = jsonToCellFormat(jf)
+	for col, ff := range file.ColFormats {
+		colFmts[col] = fileToCellFormat(ff)
 	}
 
 	// Convert row formats
 	rowFmts := make(map[int]*CellFormat)
-	for idx, jf := range file.RowFormats {
-		rowFmts[idx] = jsonToCellFormat(jf)
+	for idx, ff := range file.RowFormats {
+		rowFmts[idx] = fileToCellFormat(ff)
 	}
 
 	return rows, colFmts, rowFmts, numCols, nil
@@ -300,11 +331,11 @@ func isColHeader(headers []string) bool {
 }
 
 // csvFilename derives a CSV filename from the current filename.
-func csvFilename(jsonName string) string {
-	if strings.HasSuffix(jsonName, ".json") {
-		return strings.TrimSuffix(jsonName, ".json") + ".csv"
+func csvFilename(name string) string {
+	if strings.HasSuffix(name, ".txs") {
+		return strings.TrimSuffix(name, ".txs") + ".csv"
 	}
-	return jsonName + ".csv"
+	return name + ".csv"
 }
 
 // sortedColLetters returns column letters in sorted order.
