@@ -649,7 +649,7 @@ func (m *model) updateSidebarTarget() {
 }
 
 func (m *model) applySidebarFormat() {
-	fmt := m.sidebar.Format()
+	f := *m.sidebar.Format()
 	colID := m.sidebar.colID
 
 	switch m.sidebar.Target() {
@@ -659,17 +659,42 @@ func (m *model) applySidebarFormat() {
 			rowIdx := pos.Row
 			if rowIdx >= 0 && rowIdx < len(m.rows) {
 				cell := m.rows[rowIdx].getCell(colID)
-				cell.Format = fmt
+				// Clear cell format if it matches the next in precedence (row > column > default).
+				var parent CellFormat
+				if rf := m.rowFmts[rowIdx]; rf != nil {
+					parent = *rf
+				} else if cf := m.colFmts[colID]; cf != nil {
+					parent = *cf
+				}
+				if f == parent {
+					cell.Format = nil
+				} else {
+					cell.Format = &f
+				}
 			}
 		}
 	case TargetRow:
 		pos := m.grid.FocusedCell()
 		rowIdx := pos.Row
 		if rowIdx >= 0 && rowIdx < len(m.rows) {
-			m.rowFmts[rowIdx] = fmt
+			// Clear row format if it matches the next in precedence (column > default).
+			var parent CellFormat
+			if cf := m.colFmts[colID]; cf != nil {
+				parent = *cf
+			}
+			if f == parent {
+				delete(m.rowFmts, rowIdx)
+			} else {
+				m.rowFmts[rowIdx] = &f
+			}
 		}
 	case TargetColumn:
-		m.colFmts[colID] = fmt
+		// Clear column format if it matches default (zero value).
+		if f == (CellFormat{}) {
+			delete(m.colFmts, colID)
+		} else {
+			m.colFmts[colID] = &f
+		}
 	}
 
 	// Refresh display
