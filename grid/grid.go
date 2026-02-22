@@ -54,7 +54,8 @@ type Model[T any] struct {
 	vp viewport
 
 	// Selection
-	sel selection.Model
+	sel         selection.Model
+	selectedCol int // -1 = no column selected
 
 	// Sorting
 	sortModel gridsort.Model[T]
@@ -110,6 +111,7 @@ func New[T any](opts ...Option[T]) Model[T] {
 		styles:           DefaultStyles(),
 		vp:               newViewport(),
 		sel:              selection.New(selection.SelectNone),
+		selectedCol:      -1,
 		groupModel:       grouping.Model[T]{Expanded: make(map[string]bool), DefaultExpanded: -1},
 		defaultRowHeight: 1,
 		dirty:            true,
@@ -288,8 +290,22 @@ func (m *Model[T]) SelectAll() {
 	}
 	m.sel.SelectAll(ids)
 }
-func (m *Model[T]) DeselectAll()             { m.sel.DeselectAll() }
+func (m *Model[T]) DeselectAll()             { m.sel.DeselectAll(); m.selectedCol = -1 }
 func (m Model[T]) IsSelected(id string) bool { return m.sel.IsSelected(id) }
+
+// SelectColumn selects all cells in the given column, clearing row selection.
+func (m *Model[T]) SelectColumn(colIdx int) {
+	m.sel.DeselectAll()
+	m.selectedCol = colIdx
+}
+
+// DeselectColumns clears column selection.
+func (m *Model[T]) DeselectColumns() { m.selectedCol = -1 }
+
+// IsColumnSelected returns true if the given column index is selected.
+func (m Model[T]) IsColumnSelected(colIdx int) bool {
+	return m.selectedCol >= 0 && m.selectedCol == colIdx
+}
 
 // --- Sorting ---
 

@@ -14,6 +14,7 @@ import (
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/grid"
+	"github.com/pgavlin/tea-grid/selection"
 )
 
 const (
@@ -82,6 +83,7 @@ func newModel(filename string) model {
 			return fmt.Sprintf("row-%d", r.RowIndex)
 		}),
 		grid.WithEditable[*SpreadsheetRow](true),
+		grid.WithSelection[*SpreadsheetRow](selection.SelectMulti),
 		grid.WithQuickFilter[*SpreadsheetRow](true),
 		grid.WithFocused[*SpreadsheetRow](true),
 		grid.WithMultiSort[*SpreadsheetRow](true),
@@ -121,6 +123,7 @@ func (m *model) buildColumns() []data.Column[*SpreadsheetRow] {
 		Sortable:   false,
 		Filterable: false,
 		Editable:   false,
+		NoSelect:   true,
 		ValueGetter: func(r *SpreadsheetRow) any {
 			return r.RowIndex + 1
 		},

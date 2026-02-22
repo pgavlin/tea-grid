@@ -101,6 +101,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 
 	case key.Matches(msg, m.KeyMap.DeselectAll):
 		m.sel.DeselectAll()
+		m.selectedCol = -1
 		return m, nil
 
 	// Sort column from any row
@@ -252,8 +253,28 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		return m.moveFocus(m.focusedCell.Row, m.focusedCell.Col+1)
 
 	// Selection
+	case key.Matches(msg, m.KeyMap.SelectRow):
+		m.sel.DeselectAll()
+		m.sel.Select(rn.ID)
+		m.selectedCol = -1
+		return m, func() tea.Msg {
+			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
+		}
+
+	case key.Matches(msg, m.KeyMap.SelectColumn):
+		colIdx := m.focusedCell.Col
+		if colIdx >= 0 && colIdx < len(m.cols) && !m.cols[colIdx].NoSelect {
+			m.sel.DeselectAll()
+			m.selectedCol = colIdx
+			return m, func() tea.Msg {
+				return SelectionChangedMsg[T]{Selected: nil}
+			}
+		}
+		return m, nil
+
 	case key.Matches(msg, m.KeyMap.Select):
 		m.sel.Toggle(rn.ID)
+		m.selectedCol = -1
 		return m, func() tea.Msg {
 			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
 		}

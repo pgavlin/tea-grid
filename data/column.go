@@ -78,7 +78,8 @@ type Column[T any] struct {
 	AggFuncCustom func(values []any) any // Custom aggregation.
 
 	// Visibility
-	Hide bool // If true, column is not rendered.
+	Hide     bool // If true, column is not rendered.
+	NoSelect bool // If true, column is excluded from row and column selection highlighting.
 }
 
 // ColumnGroup produces a single level of grouped headers.
