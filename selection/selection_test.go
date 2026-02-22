@@ -243,3 +243,85 @@ func TestAnchorSetGet(t *testing.T) {
 		t.Errorf("anchor should be 5, got %d", m.Anchor())
 	}
 }
+
+// --- SelectRange ---
+
+func TestSelectRangeSelectNoneNoop(t *testing.T) {
+	m := New(SelectNone)
+	m.SelectRange([]string{"a", "b", "c"})
+	if m.Count() != 0 {
+		t.Errorf("SelectNone: SelectRange should be no-op, got count %d", m.Count())
+	}
+}
+
+func TestSelectRangeEmptyIDs(t *testing.T) {
+	m := New(SelectMulti)
+	m.Select("a")
+	m.SelectRange([]string{})
+	if !m.IsSelected("a") {
+		t.Error("empty ids should not alter existing selection")
+	}
+	if m.Count() != 1 {
+		t.Errorf("count should be 1, got %d", m.Count())
+	}
+}
+
+func TestSelectRangeSingleMode(t *testing.T) {
+	m := New(SelectSingle)
+	m.SelectRange([]string{"a", "b", "c"})
+	if m.IsSelected("a") {
+		t.Error("a should not be selected in single mode")
+	}
+	if m.IsSelected("b") {
+		t.Error("b should not be selected in single mode")
+	}
+	if !m.IsSelected("c") {
+		t.Error("c (last id) should be selected in single mode")
+	}
+	if m.Count() != 1 {
+		t.Errorf("count should be 1, got %d", m.Count())
+	}
+}
+
+func TestSelectRangeMultiMode(t *testing.T) {
+	m := New(SelectMulti)
+	m.SelectRange([]string{"a", "b", "c"})
+	if m.Count() != 3 {
+		t.Errorf("count should be 3, got %d", m.Count())
+	}
+	if !m.IsSelected("a") {
+		t.Error("a should be selected")
+	}
+	if !m.IsSelected("b") {
+		t.Error("b should be selected")
+	}
+	if !m.IsSelected("c") {
+		t.Error("c should be selected")
+	}
+}
+
+func TestSelectRangeReplacesExisting(t *testing.T) {
+	m := New(SelectMulti)
+	m.Select("x")
+	m.Select("y")
+	if m.Count() != 2 {
+		t.Fatalf("expected 2 selected before SelectRange, got %d", m.Count())
+	}
+
+	m.SelectRange([]string{"a", "b"})
+	if m.Count() != 2 {
+		t.Errorf("count should be 2, got %d", m.Count())
+	}
+	if m.IsSelected("x") {
+		t.Error("x should no longer be selected after SelectRange")
+	}
+	if m.IsSelected("y") {
+		t.Error("y should no longer be selected after SelectRange")
+	}
+	if !m.IsSelected("a") {
+		t.Error("a should be selected")
+	}
+	if !m.IsSelected("b") {
+		t.Error("b should be selected")
+	}
+}

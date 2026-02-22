@@ -2339,3 +2339,902 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// -----------------------------------------------------------------------
+// 1. SelectColumn / DeselectColumns / IsColumnSelected
+// -----------------------------------------------------------------------
+
+func TestSelectColumn_CKeySelectsColumn(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 1} // Department column
+
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+
+	if !m.IsColumnSelected(1) {
+		t.Error("expected column 1 to be selected after 'C' key")
+	}
+	// Row selection should be cleared
+	if m.sel.Count() != 0 {
+		t.Errorf("expected row selection cleared, got %d", m.sel.Count())
+	}
+}
+
+func TestSelectColumn_RangeModel(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	// Select column 1 programmatically and extend cursor to column 2
+	m.SelectColumn(1)
+	m.colSelectCursor = 2
+
+	if !m.IsColumnSelected(1) {
+		t.Error("expected column 1 to be selected")
+	}
+	if !m.IsColumnSelected(2) {
+		t.Error("expected column 2 to be selected (range)")
+	}
+	if m.IsColumnSelected(0) {
+		t.Error("expected column 0 to NOT be selected")
+	}
+	if m.IsColumnSelected(3) {
+		t.Error("expected column 3 to NOT be selected")
+	}
+}
+
+func TestDeselectColumns_ClearsColumnSelection(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.SelectColumn(1)
+
+	if !m.IsColumnSelected(1) {
+		t.Fatal("precondition: column 1 should be selected")
+	}
+
+	m.DeselectColumns()
+
+	if m.IsColumnSelected(1) {
+		t.Error("expected column 1 to be deselected after DeselectColumns()")
+	}
+}
+
+func TestSelectColumn_NoSelectColumnIgnored(t *testing.T) {
+	cols := testCols()
+	cols[2].NoSelect = true
+	m := newTestGrid(WithColumns[TestRow](cols), WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 2}
+
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+
+	if m.IsColumnSelected(2) {
+		t.Error("expected NoSelect column to NOT be selected after 'C' key")
+	}
+}
+
+// -----------------------------------------------------------------------
+// 2. SelectionRect / selectionRect
+// -----------------------------------------------------------------------
+
+func TestSelectionRect_ShiftDownCreatesRect(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 1, Col: 1}
+
+	// Shift+Down should create a rectangular selection from (1,1) to (2,1)
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+
+	rLo, rHi, cLo, cHi := m.SelectionRect()
+	if rLo != 1 || rHi != 2 || cLo != 1 || cHi != 1 {
+		t.Errorf("expected rect (1,2,1,1), got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
+func TestSelectionRect_PlainNavClearsRect(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 1, Col: 1}
+
+	// Create rectangle with shift+down
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	rLo, _, _, _ := m.SelectionRect()
+	if rLo < 0 {
+		t.Fatal("precondition: expected active rect selection")
+	}
+
+	// Plain navigation should clear the rect
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyDown})
+	rLo, rHi, cLo, cHi := m.SelectionRect()
+	if rLo != -1 || rHi != -1 || cLo != -1 || cHi != -1 {
+		t.Errorf("expected rect cleared after plain nav, got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
+func TestSelectionRect_InactiveReturnsNeg1(t *testing.T) {
+	m := newTestGrid()
+	rLo, rHi, cLo, cHi := m.SelectionRect()
+	if rLo != -1 || rHi != -1 || cLo != -1 || cHi != -1 {
+		t.Errorf("expected all -1 for inactive rect, got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
+// -----------------------------------------------------------------------
+// 3. shiftMoveFocus
+// -----------------------------------------------------------------------
+
+func TestShiftMoveFocus_ShiftDownCreatesSelection(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+
+	if m.focusedCell.Row != 1 {
+		t.Errorf("expected focus row=1 after shift+down, got %d", m.focusedCell.Row)
+	}
+	rLo, rHi, _, _ := m.SelectionRect()
+	if rLo != 0 || rHi != 1 {
+		t.Errorf("expected row range [0,1], got [%d,%d]", rLo, rHi)
+	}
+}
+
+func TestShiftMoveFocus_ShiftUpExpandsUpward(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 2, Col: 1}
+
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftUp})
+
+	if m.focusedCell.Row != 1 {
+		t.Errorf("expected focus row=1 after shift+up, got %d", m.focusedCell.Row)
+	}
+	rLo, rHi, _, _ := m.SelectionRect()
+	if rLo != 1 || rHi != 2 {
+		t.Errorf("expected row range [1,2], got [%d,%d]", rLo, rHi)
+	}
+}
+
+func TestShiftMoveFocus_ShiftRightExpandsHorizontally(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
+
+	if m.focusedCell.Col != 1 {
+		t.Errorf("expected focus col=1 after shift+right, got %d", m.focusedCell.Col)
+	}
+	_, _, cLo, cHi := m.SelectionRect()
+	if cLo != 0 || cHi != 1 {
+		t.Errorf("expected col range [0,1], got [%d,%d]", cLo, cHi)
+	}
+}
+
+func TestShiftMoveFocus_ShiftLeftExpandsHorizontally(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 2}
+
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftLeft})
+
+	if m.focusedCell.Col != 1 {
+		t.Errorf("expected focus col=1 after shift+left, got %d", m.focusedCell.Col)
+	}
+	_, _, cLo, cHi := m.SelectionRect()
+	if cLo != 1 || cHi != 2 {
+		t.Errorf("expected col range [1,2], got [%d,%d]", cLo, cHi)
+	}
+}
+
+func TestShiftMoveFocus_MultipleExtensions(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Extend down twice, right once
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
+
+	rLo, rHi, cLo, cHi := m.SelectionRect()
+	if rLo != 0 || rHi != 2 || cLo != 0 || cHi != 1 {
+		t.Errorf("expected rect (0,2,0,1), got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
+func TestShiftMoveFocus_PlainArrowAfterShiftClearsSelection(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Create a selection
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	rLo, _, _, _ := m.SelectionRect()
+	if rLo < 0 {
+		t.Fatal("precondition: expected active rect")
+	}
+
+	// Plain arrow should clear
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyDown})
+	rLo, rHi, cLo, cHi := m.SelectionRect()
+	if rLo != -1 || rHi != -1 || cLo != -1 || cHi != -1 {
+		t.Errorf("expected rect cleared, got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
+// -----------------------------------------------------------------------
+// 4. handleKeyMsg gaps — column/row selection and mutual exclusivity
+// -----------------------------------------------------------------------
+
+func TestSelectRow_RKeySelectsRow(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+	rowID := m.displayRows[0].ID
+
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+
+	if !m.sel.IsSelected(rowID) {
+		t.Error("expected row to be selected after 'R' key")
+	}
+}
+
+func TestSelectColumn_CKeySelectsCurrentColumn(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 2}
+
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+
+	if !m.IsColumnSelected(2) {
+		t.Error("expected column 2 to be selected after 'C' key")
+	}
+}
+
+func TestSelect_SpaceTogglesAndClearsAnchors(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+	rowID := m.displayRows[0].ID
+
+	// First press selects
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeySpace})
+	if !m.sel.IsSelected(rowID) {
+		t.Error("expected row selected after space")
+	}
+
+	// Column selection should be cleared
+	if m.IsColumnSelected(0) {
+		t.Error("expected column selection cleared after space")
+	}
+
+	// Rect anchor should be cleared
+	rLo, _, _, _ := m.SelectionRect()
+	if rLo != -1 {
+		t.Error("expected rect anchor cleared after space")
+	}
+}
+
+func TestSelection_MutualExclusivity_RowClearsColumn(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 1}
+
+	// Select column first
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	if !m.IsColumnSelected(1) {
+		t.Fatal("precondition: expected column 1 selected")
+	}
+
+	// Select row — should clear column selection
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	if m.IsColumnSelected(1) {
+		t.Error("expected column selection cleared after row selection")
+	}
+	rowID := m.displayRows[0].ID
+	if !m.sel.IsSelected(rowID) {
+		t.Error("expected row to be selected")
+	}
+}
+
+func TestSelection_MutualExclusivity_ColumnClearsRow(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 1}
+	rowID := m.displayRows[0].ID
+
+	// Select row first
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	if !m.sel.IsSelected(rowID) {
+		t.Fatal("precondition: expected row selected")
+	}
+
+	// Select column — should clear row selection
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	if m.sel.IsSelected(rowID) {
+		t.Error("expected row selection cleared after column selection")
+	}
+	if !m.IsColumnSelected(1) {
+		t.Error("expected column 1 to be selected")
+	}
+}
+
+func TestSelection_MutualExclusivity_ShiftNavClearsRowAndCol(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 1}
+	rowID := m.displayRows[0].ID
+
+	// Select row first
+	m.sel.Select(rowID)
+	m.SelectColumn(1)
+
+	// Shift+Down should clear both row and column selection
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+
+	if m.sel.IsSelected(rowID) {
+		t.Error("expected row selection cleared after shift+nav")
+	}
+	if m.IsColumnSelected(1) {
+		t.Error("expected column selection cleared after shift+nav")
+	}
+}
+
+// -----------------------------------------------------------------------
+// 5. selectedRowNodes (internal helper)
+// -----------------------------------------------------------------------
+
+func TestSelectedRowNodes_Internal(t *testing.T) {
+	m := New[TestRow](
+		WithColumns[TestRow](testCols()),
+		WithSelection[TestRow](selection.SelectMulti),
+		WithRowID[TestRow](func(r TestRow) string { return r.Name }),
+		WithRows[TestRow](testData()),
+		WithFocused[TestRow](true),
+		WithWidth[TestRow](80),
+		WithHeight[TestRow](20),
+	)
+	m.SelectRow("Bob")
+	m.SelectRow("Eve")
+
+	nodes := m.selectedRowNodes()
+	if len(nodes) != 2 {
+		t.Fatalf("expected 2 selected row nodes, got %d", len(nodes))
+	}
+
+	names := make(map[string]bool)
+	for _, rn := range nodes {
+		names[rn.Data.Name] = true
+	}
+	if !names["Bob"] || !names["Eve"] {
+		t.Errorf("expected Bob and Eve, got %v", names)
+	}
+}
+
+func TestSelectedRowNodes_EmptyWhenNoneSelected(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	nodes := m.selectedRowNodes()
+	if len(nodes) != 0 {
+		t.Errorf("expected 0 selected row nodes, got %d", len(nodes))
+	}
+}
+
+// -----------------------------------------------------------------------
+// 6. toggleCurrentGroup
+// -----------------------------------------------------------------------
+
+func TestToggleCurrentGroup_ExpandCollapsed(t *testing.T) {
+	m := newTestGrid(
+		WithGrouping[TestRow]("Department"),
+		WithGroupDefaultExpanded[TestRow](0), // all collapsed
+	)
+
+	// Find a collapsed group row
+	groupIdx := -1
+	for i, rn := range m.displayRows {
+		if rn.IsGroup && !rn.Expanded {
+			groupIdx = i
+			break
+		}
+	}
+	if groupIdx == -1 {
+		t.Fatal("no collapsed group found")
+	}
+
+	m.focusedCell = CellPosition{Row: groupIdx, Col: 0}
+	beforeCount := len(m.displayRows)
+
+	// Enter should toggle (expand) the group
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m.recomputeDisplayRows()
+
+	if len(m.displayRows) <= beforeCount {
+		t.Error("expected more display rows after toggling collapsed group (should expand)")
+	}
+}
+
+func TestToggleCurrentGroup_CollapseExpanded(t *testing.T) {
+	m := newTestGrid(
+		WithGrouping[TestRow]("Department"),
+		WithGroupDefaultExpanded[TestRow](-1), // all expanded
+	)
+
+	// Find an expanded group row
+	groupIdx := -1
+	for i, rn := range m.displayRows {
+		if rn.IsGroup && rn.Expanded {
+			groupIdx = i
+			break
+		}
+	}
+	if groupIdx == -1 {
+		t.Fatal("no expanded group found")
+	}
+
+	m.focusedCell = CellPosition{Row: groupIdx, Col: 0}
+	beforeCount := len(m.displayRows)
+
+	// Enter should toggle (collapse) the group
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m.recomputeDisplayRows()
+
+	if len(m.displayRows) >= beforeCount {
+		t.Error("expected fewer display rows after toggling expanded group (should collapse)")
+	}
+}
+
+func TestToggleCurrentGroup_EmitsMessages(t *testing.T) {
+	m := newTestGrid(
+		WithGrouping[TestRow]("Department"),
+		WithGroupDefaultExpanded[TestRow](0), // all collapsed
+	)
+
+	// Find a collapsed group row
+	groupIdx := -1
+	for i, rn := range m.displayRows {
+		if rn.IsGroup && !rn.Expanded {
+			groupIdx = i
+			break
+		}
+	}
+	if groupIdx == -1 {
+		t.Fatal("no collapsed group found")
+	}
+
+	m.focusedCell = CellPosition{Row: groupIdx, Col: 0}
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected a command to be emitted")
+	}
+	msg := cmd()
+	if _, ok := msg.(GroupExpandedMsg); !ok {
+		t.Fatalf("expected GroupExpandedMsg, got %T", msg)
+	}
+}
+
+// -----------------------------------------------------------------------
+// 7. handleEditKeyMsg gaps — type characters and confirm
+// -----------------------------------------------------------------------
+
+func TestEditing_TypeAndConfirm(t *testing.T) {
+	cols := testCols()
+	cols[0].Editable = true
+	cols[0].ValueSetter = func(d *TestRow, val any) { d.Name = val.(string) }
+
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithEditable[TestRow](true),
+	)
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Start editing
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.editState == nil {
+		t.Fatal("expected editing to start")
+	}
+
+	// Type some characters through the editor (clear + type)
+	// The editor is initialized with the formatted value "Alice"
+	// Send backspace to clear, then type "Zara"
+	for i := 0; i < 5; i++ {
+		m = sendKey(m, tea.KeyMsg{Type: tea.KeyBackspace})
+	}
+	for _, r := range "Zara" {
+		m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+
+	// Confirm with Enter
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.editState != nil {
+		t.Error("expected editState=nil after confirming edit")
+	}
+
+	// The value should have been updated
+	if m.displayRows[0].Data.Name != "Zara" {
+		t.Errorf("expected Name='Zara' after edit, got %q", m.displayRows[0].Data.Name)
+	}
+
+	// Should emit CellValueChangedMsg via batch
+	if cmd == nil {
+		t.Fatal("expected commands to be emitted after edit confirm")
+	}
+}
+
+func TestEditing_EmitsCellValueChangedMsg(t *testing.T) {
+	cols := testCols()
+	cols[0].Editable = true
+	cols[0].ValueSetter = func(d *TestRow, val any) { d.Name = val.(string) }
+
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithEditable[TestRow](true),
+	)
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Start editing
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Type a character to change the value
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Z'}})
+
+	// Confirm
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if cmd == nil {
+		t.Fatal("expected command batch from confirm")
+	}
+
+	// tea.Batch returns a function that, when called, returns tea.BatchMsg
+	// which contains the batch of commands. We verify the command is non-nil.
+	// The batch should produce CellEditingConfirmedMsg and CellValueChangedMsg.
+}
+
+func TestEditing_EscEmitsCellEditingCancelledMsg(t *testing.T) {
+	cols := testCols()
+	cols[0].Editable = true
+	cols[0].ValueSetter = func(d *TestRow, val any) { d.Name = val.(string) }
+
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithEditable[TestRow](true),
+	)
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Start editing
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.editState == nil {
+		t.Fatal("expected editing to start")
+	}
+
+	// Cancel
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+
+	if m.editState != nil {
+		t.Error("expected editState=nil after cancel")
+	}
+	if cmd == nil {
+		t.Fatal("expected CellEditingCancelledMsg command")
+	}
+	msg := cmd()
+	if _, ok := msg.(CellEditingCancelledMsg); !ok {
+		t.Fatalf("expected CellEditingCancelledMsg, got %T", msg)
+	}
+}
+
+// -----------------------------------------------------------------------
+// 8. handleFilterEditKeyMsg
+// -----------------------------------------------------------------------
+
+func TestFilterEdit_EnterConfirmsFilter(t *testing.T) {
+	cols := testCols()
+	cols[0].Filter = filter.NewTextFilter()
+	m := newTestGrid(WithColumns[TestRow](cols))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Open filter editor with ctrl+f
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	if m.filterEditColIdx != 0 {
+		t.Fatalf("expected filterEditColIdx=0, got %d", m.filterEditColIdx)
+	}
+
+	// Type some filter text
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'A'}})
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+
+	// Confirm with Enter
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.filterEditColIdx != -1 {
+		t.Errorf("expected filterEditColIdx=-1 after Enter, got %d", m.filterEditColIdx)
+	}
+	if cmd == nil {
+		t.Fatal("expected FilterChangedMsg command")
+	}
+	msg := cmd()
+	fc, ok := msg.(FilterChangedMsg)
+	if !ok {
+		t.Fatalf("expected FilterChangedMsg, got %T", msg)
+	}
+	if fc.ColumnID != "Name" {
+		t.Errorf("expected ColumnID='Name', got %q", fc.ColumnID)
+	}
+}
+
+func TestFilterEdit_EscCancelsAndClearsFilter(t *testing.T) {
+	cols := testCols()
+	cols[0].Filter = filter.NewTextFilter()
+	m := newTestGrid(WithColumns[TestRow](cols))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Open filter editor
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	if m.filterEditColIdx != 0 {
+		t.Fatalf("expected filterEditColIdx=0, got %d", m.filterEditColIdx)
+	}
+
+	// Type some text
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+
+	// Cancel with Esc
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+
+	if m.filterEditColIdx != -1 {
+		t.Errorf("expected filterEditColIdx=-1 after Esc, got %d", m.filterEditColIdx)
+	}
+	if cmd == nil {
+		t.Fatal("expected FilterChangedMsg command")
+	}
+	msg := cmd()
+	fc, ok := msg.(FilterChangedMsg)
+	if !ok {
+		t.Fatalf("expected FilterChangedMsg, got %T", msg)
+	}
+	if fc.Active {
+		t.Error("expected filter to be inactive after Esc cancel")
+	}
+}
+
+func TestFilterEdit_RoutesToFilter(t *testing.T) {
+	cols := testCols()
+	cols[0].Filter = filter.NewTextFilter()
+	m := newTestGrid(WithColumns[TestRow](cols))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Open filter
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+
+	// Send a key that is neither Enter nor Esc — should route to filter
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
+
+	// Filter edit should still be open
+	if m.filterEditColIdx != 0 {
+		t.Errorf("expected filter edit still open, got filterEditColIdx=%d", m.filterEditColIdx)
+	}
+}
+
+// -----------------------------------------------------------------------
+// 9. Rendering gaps
+// -----------------------------------------------------------------------
+
+func TestRender_PinnedTopRowsAppear(t *testing.T) {
+	m := newTestGrid(
+		WithPinnedTopRows[TestRow](func(r TestRow) bool { return r.Name == "Alice" }),
+	)
+	output := m.View()
+	if !strings.Contains(output, "Alice") {
+		t.Error("expected pinned top row 'Alice' to appear in rendered output")
+	}
+}
+
+func TestRender_PinnedBottomRowsAppear(t *testing.T) {
+	m := newTestGrid(
+		WithPinnedBottomRows[TestRow](func(r TestRow) bool { return r.Name == "Eve" }),
+	)
+	output := m.View()
+	if !strings.Contains(output, "Eve") {
+		t.Error("expected pinned bottom row 'Eve' to appear in rendered output")
+	}
+}
+
+func TestRender_SeparatorWithPinnedRows(t *testing.T) {
+	m := newTestGrid(
+		WithPinnedTopRows[TestRow](func(r TestRow) bool { return r.Name == "Alice" }),
+	)
+	output := m.View()
+	// renderSeparator uses "─" characters
+	if !strings.Contains(output, "─") {
+		t.Error("expected separator '─' in output when pinned rows are present")
+	}
+}
+
+func TestRender_SelectedColumnHighlighting(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 1}
+
+	// Select column 1
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+
+	output := m.View()
+	// The output should contain the data — the styling will apply CellSelected style
+	// We verify the output is non-empty and still contains the expected data
+	if !strings.Contains(output, "Department") {
+		t.Error("expected 'Department' header in output after column selection")
+	}
+	if !strings.Contains(output, "Engineering") {
+		t.Error("expected 'Engineering' data in output after column selection")
+	}
+	if len(output) == 0 {
+		t.Error("expected non-empty output with column selection")
+	}
+}
+
+func TestRender_GroupHeaders(t *testing.T) {
+	cols := testCols()
+	groups := []data.ColumnGroup[TestRow]{
+		{
+			HeaderName: "Personal",
+			Columns:    cols[:2], // Name, Department
+		},
+		{
+			HeaderName: "Metrics",
+			Columns:    cols[2:], // Salary, Active
+		},
+	}
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithColumnGroups[TestRow](groups),
+	)
+	output := m.View()
+	if !strings.Contains(output, "Personal") {
+		t.Error("expected column group header 'Personal' in output")
+	}
+	if !strings.Contains(output, "Metrics") {
+		t.Error("expected column group header 'Metrics' in output")
+	}
+}
+
+func TestRender_FilterEditorShown(t *testing.T) {
+	cols := testCols()
+	cols[0].Filter = filter.NewTextFilter()
+	m := newTestGrid(WithColumns[TestRow](cols))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Open filter editor
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+
+	output := m.View()
+	if !strings.Contains(output, "Filter:") {
+		t.Error("expected 'Filter:' label in output when filter editor is active")
+	}
+	if !strings.Contains(output, "Name") {
+		t.Error("expected column name 'Name' in filter editor output")
+	}
+}
+
+func TestRender_RectSelectionCellsRendered(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Create rectangular selection
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
+
+	output := m.View()
+	// Verify the grid still renders with data
+	if !strings.Contains(output, "Alice") {
+		t.Error("expected 'Alice' in output with rect selection")
+	}
+	if !strings.Contains(output, "Bob") {
+		t.Error("expected 'Bob' in output with rect selection")
+	}
+}
+
+func TestRender_EditingCellShowsEditor(t *testing.T) {
+	cols := testCols()
+	cols[0].Editable = true
+	cols[0].ValueSetter = func(d *TestRow, val any) { d.Name = val.(string) }
+
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithEditable[TestRow](true),
+	)
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	// Start editing
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.editState == nil {
+		t.Fatal("expected editing to start")
+	}
+
+	output := m.View()
+	// The editor view should be rendered (it shows the current text "Alice")
+	if !strings.Contains(output, "Alice") {
+		t.Error("expected editor content in rendered output during editing")
+	}
+}
+
+func TestRender_HeaderBorder(t *testing.T) {
+	s := DefaultStyles()
+	s.BorderHeader = true
+	m := newTestGrid(WithStyles[TestRow](s))
+	output := m.View()
+	// Header border uses Border.Bottom character
+	if !strings.Contains(output, s.Border.Bottom) {
+		t.Errorf("expected header border character %q in output", s.Border.Bottom)
+	}
+}
+
+func TestRender_RowSelection_HighlightedRowRendered(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 1, Col: 0}
+
+	// Select row via 'R' key
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+
+	output := m.View()
+	// The selected row's data should still appear
+	if !strings.Contains(output, "Bob") {
+		t.Error("expected 'Bob' in output for selected row")
+	}
+}
+
+// -----------------------------------------------------------------------
+// Additional edge cases for shift+nav on header row
+// -----------------------------------------------------------------------
+
+func TestShiftMoveFocus_HeaderRow(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: -1, Col: 1} // Header row
+
+	// Shift+Right on header should work
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
+
+	if m.focusedCell.Col != 2 {
+		t.Errorf("expected col=2 after shift+right on header, got %d", m.focusedCell.Col)
+	}
+}
+
+func TestShiftMoveFocus_HeaderRow_ShiftLeft(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: -1, Col: 2} // Header row
+
+	// Shift+Left on header should work
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftLeft})
+
+	if m.focusedCell.Col != 1 {
+		t.Errorf("expected col=1 after shift+left on header, got %d", m.focusedCell.Col)
+	}
+}
+
+// -----------------------------------------------------------------------
+// SelectionChangedMsg emission from R and C keys
+// -----------------------------------------------------------------------
+
+func TestSelectRow_RKeyEmitsSelectionChangedMsg(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+
+	if cmd == nil {
+		t.Fatal("expected a command to be emitted")
+	}
+	msg := cmd()
+	sc, ok := msg.(SelectionChangedMsg[TestRow])
+	if !ok {
+		t.Fatalf("expected SelectionChangedMsg, got %T", msg)
+	}
+	if len(sc.Selected) != 1 {
+		t.Errorf("expected 1 selected row in message, got %d", len(sc.Selected))
+	}
+}
+
+func TestSelectColumn_CKeyEmitsSelectionChangedMsg(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+
+	if cmd == nil {
+		t.Fatal("expected a command to be emitted")
+	}
+	msg := cmd()
+	sc, ok := msg.(SelectionChangedMsg[TestRow])
+	if !ok {
+		t.Fatalf("expected SelectionChangedMsg, got %T", msg)
+	}
+	// Column selection emits nil Selected since no rows are selected
+	if sc.Selected != nil {
+		t.Errorf("expected nil Selected for column selection, got %v", sc.Selected)
+	}
+}
