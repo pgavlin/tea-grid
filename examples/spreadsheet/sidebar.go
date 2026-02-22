@@ -67,10 +67,6 @@ type SidebarModel struct {
 func NewSidebar() SidebarModel {
 	return SidebarModel{
 		target: TargetCell,
-		format: CellFormat{
-			NumDecimals: 2,
-			DateFormat:  "2006-01-02",
-		},
 	}
 }
 
@@ -104,7 +100,7 @@ func (s *SidebarModel) SetTarget(colID string, rowIndex int, cell *Cell, hasRow 
 		} else if colFmt != nil {
 			s.format = *colFmt
 		} else {
-			s.format = CellFormat{NumDecimals: 2, DateFormat: "2006-01-02"}
+			s.format = CellFormat{}
 		}
 	case TargetRow:
 		if rowFmt != nil {
@@ -112,13 +108,13 @@ func (s *SidebarModel) SetTarget(colID string, rowIndex int, cell *Cell, hasRow 
 		} else if colFmt != nil {
 			s.format = *colFmt
 		} else {
-			s.format = CellFormat{NumDecimals: 2, DateFormat: "2006-01-02"}
+			s.format = CellFormat{}
 		}
 	case TargetColumn:
 		if colFmt != nil {
 			s.format = *colFmt
 		} else {
-			s.format = CellFormat{NumDecimals: 2, DateFormat: "2006-01-02"}
+			s.format = CellFormat{}
 		}
 	}
 
