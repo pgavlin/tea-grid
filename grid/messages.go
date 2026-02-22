@@ -10,10 +10,10 @@ import (
 type SelectionKind = selection.Kind
 
 const (
-	SelectionNone    = selection.KindNone
-	SelectionRect    = selection.KindRect
-	SelectionFullRow = selection.KindFullRow
-	SelectionFullCol = selection.KindFullCol
+	SelectionNone    = selection.KindNone    // No selection.
+	SelectionRect    = selection.KindRect    // Rectangular cell selection.
+	SelectionFullRow = selection.KindFullRow // Full-row selection.
+	SelectionFullCol = selection.KindFullCol // Full-column selection.
 )
 
 // SelectionRegion describes one contiguous selected region.

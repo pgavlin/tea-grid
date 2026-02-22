@@ -211,26 +211,40 @@ func (m *Model[T]) RemoveRow(id string) {
 
 // --- Dimensions ---
 
+// SetWidth sets the grid width in terminal columns and recomputes column widths.
 func (m *Model[T]) SetWidth(w int) {
 	m.width = w
 	m.computeColWidths()
 }
 
+// SetHeight sets the grid height in terminal lines and recomputes the viewport.
 func (m *Model[T]) SetHeight(h int) {
 	m.height = h
 	m.updateViewportSize()
 }
 
-func (m Model[T]) Width() int  { return m.width }
+// Width returns the current grid width.
+func (m Model[T]) Width() int { return m.width }
+
+// Height returns the current grid height.
 func (m Model[T]) Height() int { return m.height }
 
 // --- Focus ---
 
-func (m *Model[T]) Focus()                          { m.focused = true }
-func (m *Model[T]) Blur()                           { m.focused = false }
-func (m Model[T]) Focused() bool                    { return m.focused }
+// Focus sets the grid as focused, enabling keyboard input.
+func (m *Model[T]) Focus() { m.focused = true }
+
+// Blur removes focus from the grid, disabling keyboard input.
+func (m *Model[T]) Blur() { m.focused = false }
+
+// Focused returns whether the grid is currently focused.
+func (m Model[T]) Focused() bool { return m.focused }
+
+// SetFocusedCell moves the focus to the given cell position.
 func (m *Model[T]) SetFocusedCell(pos CellPosition) { m.focusedCell = pos }
-func (m Model[T]) FocusedCell() CellPosition        { return m.focusedCell }
+
+// FocusedCell returns the currently focused cell position.
+func (m Model[T]) FocusedCell() CellPosition { return m.focusedCell }
 
 // --- Selection ---
 
@@ -424,22 +438,26 @@ func (m Model[T]) SelectionBounds() (rowLo, rowHi, colLo, colHi int) {
 
 // --- Sorting ---
 
+// SetSort replaces the sort criteria and marks display rows as dirty.
 func (m *Model[T]) SetSort(criteria []gridsort.SortCriterion) {
 	m.sortModel.SortOrder = criteria
 	m.dirty = true
 }
 
+// SortOrder returns the current sort criteria.
 func (m Model[T]) SortOrder() []gridsort.SortCriterion {
 	return m.sortModel.SortOrder
 }
 
 // --- Filtering ---
 
+// SetQuickFilter sets the quick filter text and marks display rows as dirty.
 func (m *Model[T]) SetQuickFilter(text string) {
 	m.quickFilterText = text
 	m.dirty = true
 }
 
+// SetColumnFilter sets the filter for the column with the given ID.
 func (m *Model[T]) SetColumnFilter(colID string, f filter.Filter) {
 	for i := range m.cols {
 		if m.cols[i].ColumnID == colID {
@@ -450,6 +468,7 @@ func (m *Model[T]) SetColumnFilter(colID string, f filter.Filter) {
 	}
 }
 
+// ClearFilters removes all quick and column filters.
 func (m *Model[T]) ClearFilters() {
 	m.quickFilterText = ""
 	for i := range m.cols {
@@ -460,16 +479,19 @@ func (m *Model[T]) ClearFilters() {
 
 // --- Grouping ---
 
+// ExpandGroup expands the group with the given key.
 func (m *Model[T]) ExpandGroup(groupKey string) {
 	m.groupModel.SetExpanded(groupKey, true)
 	m.dirty = true
 }
 
+// CollapseGroup collapses the group with the given key.
 func (m *Model[T]) CollapseGroup(groupKey string) {
 	m.groupModel.SetExpanded(groupKey, false)
 	m.dirty = true
 }
 
+// ExpandAll expands all groups at all levels.
 func (m *Model[T]) ExpandAll() {
 	groups := grouping.BuildGroups(m.rows, m.cols, m.groupModel.GroupColumns,
 		m.groupModel.Expanded, m.groupModel.DefaultExpanded)
@@ -477,6 +499,7 @@ func (m *Model[T]) ExpandAll() {
 	m.dirty = true
 }
 
+// CollapseAll collapses all groups at all levels.
 func (m *Model[T]) CollapseAll() {
 	groups := grouping.BuildGroups(m.rows, m.cols, m.groupModel.GroupColumns,
 		m.groupModel.Expanded, m.groupModel.DefaultExpanded)
@@ -486,14 +509,20 @@ func (m *Model[T]) CollapseAll() {
 
 // --- Scrolling ---
 
+// ScrollToRow scrolls the viewport to ensure the given display row index is visible.
 func (m *Model[T]) ScrollToRow(index int) {
 	m.vp.ensureRowVisible(index, len(m.displayRows), m.rowHeightFunc())
 }
-func (m *Model[T]) ScrollToTop()    { m.vp.scrollToTop() }
+
+// ScrollToTop scrolls to the first row.
+func (m *Model[T]) ScrollToTop() { m.vp.scrollToTop() }
+
+// ScrollToBottom scrolls to the last page.
 func (m *Model[T]) ScrollToBottom() { m.vp.scrollToBottom(len(m.displayRows), m.rowHeightFunc()) }
 
 // --- Pinning ---
 
+// PinColumn pins the column with the given ID to the specified direction.
 func (m *Model[T]) PinColumn(colID string, dir data.Pin) {
 	for i := range m.cols {
 		if m.cols[i].ColumnID == colID {
@@ -504,10 +533,12 @@ func (m *Model[T]) PinColumn(colID string, dir data.Pin) {
 	}
 }
 
+// UnpinColumn removes the pin from the column with the given ID.
 func (m *Model[T]) UnpinColumn(colID string) {
 	m.PinColumn(colID, data.PinNone)
 }
 
+// PinRow pins the row with the given ID to the specified position.
 func (m *Model[T]) PinRow(id string, pos data.Pin) {
 	for i := range m.rows {
 		if m.rows[i].ID == id {
@@ -518,6 +549,7 @@ func (m *Model[T]) PinRow(id string, pos data.Pin) {
 	}
 }
 
+// UnpinRow removes the pin from the row with the given ID.
 func (m *Model[T]) UnpinRow(id string) {
 	m.PinRow(id, data.PinNone)
 }

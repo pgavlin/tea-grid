@@ -31,6 +31,7 @@ func NewTextFilter() *TextFilter {
 	return &TextFilter{}
 }
 
+// SetText sets the filter text and recompiles the regex if enabled.
 func (f *TextFilter) SetText(text string) {
 	f.editor.SetText(text)
 	f.compiled = nil
@@ -39,6 +40,7 @@ func (f *TextFilter) SetText(text string) {
 	}
 }
 
+// SetRegex enables or disables regex matching mode.
 func (f *TextFilter) SetRegex(regex bool) {
 	f.regex = regex
 	if regex && f.editor.Text() != "" {
@@ -123,6 +125,7 @@ func NewNumberFilter() *NumberFilter {
 	return &NumberFilter{}
 }
 
+// SetText sets the filter expression (e.g. ">10", "5..20", "=42").
 func (f *NumberFilter) SetText(text string) {
 	f.editor.SetText(text)
 	f.parseText()
@@ -270,6 +273,7 @@ func NewSetFilter(allValues ...string) *SetFilter {
 	}
 }
 
+// SetValues replaces the set of known values, all initially included.
 func (f *SetFilter) SetValues(values []string) {
 	f.allValues = values
 	f.values = make(map[string]bool, len(values))
@@ -278,10 +282,12 @@ func (f *SetFilter) SetValues(values []string) {
 	}
 }
 
+// Include marks a value as included in the filter.
 func (f *SetFilter) Include(value string) {
 	f.values[value] = true
 }
 
+// Exclude marks a value as excluded from the filter.
 func (f *SetFilter) Exclude(value string) {
 	f.values[value] = false
 }
@@ -478,6 +484,7 @@ func NewBoolFilter() *BoolFilter {
 	return &BoolFilter{state: 0}
 }
 
+// Toggle cycles the filter state: any → true only → false only → any.
 func (f *BoolFilter) Toggle() {
 	f.state = (f.state + 1) % 3
 }
@@ -570,6 +577,7 @@ func NewTimeFilter() *TimeFilter {
 	return &TimeFilter{}
 }
 
+// SetText sets the filter expression (e.g. "2024-01-01", "2024-01-01..2024-12-31").
 func (f *TimeFilter) SetText(text string) {
 	f.editor.SetText(text)
 	f.start = nil

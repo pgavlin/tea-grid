@@ -207,6 +207,7 @@ type TextEditorModel[T any] struct {
 	width  int
 }
 
+// NewTextEditor creates a new single-line text editor.
 func NewTextEditor[T any]() *TextEditorModel[T] {
 	return &TextEditorModel[T]{}
 }
@@ -245,20 +246,24 @@ type NumberEditorModel[T any] struct {
 	step float64
 }
 
+// NewNumberEditor creates a new numeric input editor.
 func NewNumberEditor[T any]() *NumberEditorModel[T] {
 	return &NumberEditorModel[T]{step: 1}
 }
 
+// WithMin sets the minimum allowed value.
 func (e *NumberEditorModel[T]) WithMin(min float64) *NumberEditorModel[T] {
 	e.min = &min
 	return e
 }
 
+// WithMax sets the maximum allowed value.
 func (e *NumberEditorModel[T]) WithMax(max float64) *NumberEditorModel[T] {
 	e.max = &max
 	return e
 }
 
+// WithStep sets the increment/decrement step for up/down arrow keys.
 func (e *NumberEditorModel[T]) WithStep(step float64) *NumberEditorModel[T] {
 	e.step = step
 	return e
@@ -324,6 +329,7 @@ type SelectEditorModel[T any] struct {
 	index   int
 }
 
+// NewSelectEditor creates a new select editor that cycles through the given options.
 func NewSelectEditor[T any](options []string) *SelectEditorModel[T] {
 	return &SelectEditorModel[T]{options: options}
 }
@@ -378,6 +384,7 @@ type BoolEditorModel[T any] struct {
 	value bool
 }
 
+// NewBoolEditor creates a new boolean toggle editor.
 func NewBoolEditor[T any]() *BoolEditorModel[T] {
 	return &BoolEditorModel[T]{}
 }
@@ -421,6 +428,7 @@ type TimeEditorModel[T any] struct {
 	parseErr string
 }
 
+// NewTimeEditor creates a new time.Time editor with text input.
 func NewTimeEditor[T any]() *TimeEditorModel[T] {
 	return &TimeEditorModel[T]{}
 }
