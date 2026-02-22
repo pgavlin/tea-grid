@@ -32,8 +32,8 @@ type Rect struct {
 	Cursor Position // Moving corner
 }
 
-// rowRange returns the ordered row range of the rectangle.
-func (r Rect) rowRange() (lo, hi int) {
+// RowRange returns the ordered row range of the rectangle.
+func (r Rect) RowRange() (lo, hi int) {
 	lo, hi = r.Anchor.Row, r.Cursor.Row
 	if lo > hi {
 		lo, hi = hi, lo
@@ -41,8 +41,8 @@ func (r Rect) rowRange() (lo, hi int) {
 	return
 }
 
-// colRange returns the ordered column range of the rectangle.
-func (r Rect) colRange() (lo, hi int) {
+// ColRange returns the ordered column range of the rectangle.
+func (r Rect) ColRange() (lo, hi int) {
 	lo, hi = r.Anchor.Col, r.Cursor.Col
 	if lo > hi {
 		lo, hi = hi, lo
@@ -84,7 +84,7 @@ func (m *Model) Replace(r Rect) {
 // Non-KindFullRow rects are cleared first. If an existing KindFullRow rect
 // matches exactly (row, row), it is removed; otherwise a new one is added.
 // In SelectSingle mode, the list is cleared before adding.
-func (m *Model) ToggleFullRow(row, colLo, colHi int) {
+func (m *Model) ToggleFullRow(row int) {
 	if m.Mode == SelectNone {
 		return
 	}
@@ -100,7 +100,7 @@ func (m *Model) ToggleFullRow(row, colLo, colHi int) {
 
 	// Search for an existing single-row KindFullRow matching exactly this row
 	for i, r := range m.Rects {
-		rLo, rHi := r.rowRange()
+		rLo, rHi := r.RowRange()
 		if rLo == row && rHi == row {
 			// Remove it (toggle off)
 			m.Rects = append(m.Rects[:i], m.Rects[i+1:]...)
@@ -111,8 +111,8 @@ func (m *Model) ToggleFullRow(row, colLo, colHi int) {
 	// Add new rect
 	newRect := Rect{
 		Kind:   KindFullRow,
-		Anchor: Position{Row: row, Col: colLo},
-		Cursor: Position{Row: row, Col: colHi},
+		Anchor: Position{Row: row, Col: 0},
+		Cursor: Position{Row: row, Col: 0},
 	}
 
 	if m.Mode == SelectSingle {
@@ -131,18 +131,18 @@ func (m *Model) ContainsCell(row, col int, noSelect bool) bool {
 	for _, r := range m.Rects {
 		switch r.Kind {
 		case KindFullRow:
-			rLo, rHi := r.rowRange()
+			rLo, rHi := r.RowRange()
 			if row >= rLo && row <= rHi {
 				return true
 			}
 		case KindFullCol:
-			cLo, cHi := r.colRange()
+			cLo, cHi := r.ColRange()
 			if col >= cLo && col <= cHi {
 				return true
 			}
 		case KindRect:
-			rLo, rHi := r.rowRange()
-			cLo, cHi := r.colRange()
+			rLo, rHi := r.RowRange()
+			cLo, cHi := r.ColRange()
 			if row >= rLo && row <= rHi && col >= cLo && col <= cHi {
 				return true
 			}
@@ -156,7 +156,7 @@ func (m *Model) FullRowRanges() [][2]int {
 	var ranges [][2]int
 	for _, r := range m.Rects {
 		if r.Kind == KindFullRow {
-			lo, hi := r.rowRange()
+			lo, hi := r.RowRange()
 			ranges = append(ranges, [2]int{lo, hi})
 		}
 	}
@@ -170,12 +170,12 @@ func (m *Model) BoundingRect() (rowLo, rowHi, colLo, colHi int) {
 		return -1, -1, -1, -1
 	}
 
-	rowLo, rowHi = m.Rects[0].rowRange()
-	colLo, colHi = m.Rects[0].colRange()
+	rowLo, rowHi = m.Rects[0].RowRange()
+	colLo, colHi = m.Rects[0].ColRange()
 
 	for _, r := range m.Rects[1:] {
-		rLo, rHi := r.rowRange()
-		cLo, cHi := r.colRange()
+		rLo, rHi := r.RowRange()
+		cLo, cHi := r.ColRange()
 		if rLo < rowLo {
 			rowLo = rLo
 		}

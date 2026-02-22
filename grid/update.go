@@ -164,13 +164,13 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 
 	// Select/deselect all
 	case key.Matches(msg, m.KeyMap.SelectAll):
-		m.SelectAll()
+		m.SelectAllRows()
 		return m, func() tea.Msg {
-			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
+			return SelectionChangedMsg[T]{Regions: m.Selection(), Selected: m.selectedRowNodes()}
 		}
 
 	case key.Matches(msg, m.KeyMap.DeselectAll):
-		m.DeselectAll()
+		m.ClearSelection()
 		return m, nil
 
 	// Shift+nav selection expansion
@@ -268,10 +268,10 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		m.sel.Replace(selection.Rect{
 			Kind:   selection.KindFullRow,
 			Anchor: selection.Position{Row: m.focusedCell.Row, Col: 0},
-			Cursor: selection.Position{Row: m.focusedCell.Row, Col: len(m.cols) - 1},
+			Cursor: selection.Position{Row: m.focusedCell.Row, Col: 0},
 		})
 		return m, func() tea.Msg {
-			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes(), Kind: selection.KindFullRow}
+			return SelectionChangedMsg[T]{Regions: m.Selection(), Selected: m.selectedRowNodes()}
 		}
 
 	case key.Matches(msg, m.KeyMap.SelectColumn):
@@ -283,15 +283,15 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 				Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: colIdx},
 			})
 			return m, func() tea.Msg {
-				return SelectionChangedMsg[T]{Selected: nil, Kind: selection.KindFullCol}
+				return SelectionChangedMsg[T]{Regions: m.Selection(), Selected: nil}
 			}
 		}
 		return m, nil
 
 	case key.Matches(msg, m.KeyMap.Select):
-		m.sel.ToggleFullRow(m.focusedCell.Row, 0, len(m.cols)-1)
+		m.sel.ToggleFullRow(m.focusedCell.Row)
 		return m, func() tea.Msg {
-			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes(), Kind: selection.KindFullRow}
+			return SelectionChangedMsg[T]{Regions: m.Selection(), Selected: m.selectedRowNodes()}
 		}
 
 	// Editing
@@ -698,6 +698,6 @@ func (m Model[T]) shiftMoveFocus(newRow, newCol int) (Model[T], tea.Cmd) {
 	})
 
 	return m, tea.Batch(cmd, func() tea.Msg {
-		return SelectionChangedMsg[T]{Selected: m.selectedRowNodes(), Kind: selection.KindRect}
+		return SelectionChangedMsg[T]{Regions: m.Selection(), Selected: m.selectedRowNodes()}
 	})
 }

@@ -71,7 +71,7 @@ func TestReplace_OverwritesPrevious(t *testing.T) {
 
 func TestToggleFullRow_SelectNoneIsNoop(t *testing.T) {
 	m := New(SelectNone)
-	m.ToggleFullRow(0, 0, 3)
+	m.ToggleFullRow(0)
 	if m.Active() {
 		t.Error("ToggleFullRow should be no-op in SelectNone mode")
 	}
@@ -79,7 +79,7 @@ func TestToggleFullRow_SelectNoneIsNoop(t *testing.T) {
 
 func TestToggleFullRow_AddsRow(t *testing.T) {
 	m := New(SelectMulti)
-	m.ToggleFullRow(2, 0, 3)
+	m.ToggleFullRow(2)
 	if len(m.Rects) != 1 {
 		t.Fatalf("expected 1 rect, got %d", len(m.Rects))
 	}
@@ -93,8 +93,8 @@ func TestToggleFullRow_AddsRow(t *testing.T) {
 
 func TestToggleFullRow_RemovesExistingRow(t *testing.T) {
 	m := New(SelectMulti)
-	m.ToggleFullRow(2, 0, 3)
-	m.ToggleFullRow(2, 0, 3) // toggle off
+	m.ToggleFullRow(2)
+	m.ToggleFullRow(2) // toggle off
 	if m.Active() {
 		t.Error("expected no rects after toggling same row twice")
 	}
@@ -102,9 +102,9 @@ func TestToggleFullRow_RemovesExistingRow(t *testing.T) {
 
 func TestToggleFullRow_AccumulatesMultipleRows(t *testing.T) {
 	m := New(SelectMulti)
-	m.ToggleFullRow(1, 0, 3)
-	m.ToggleFullRow(5, 0, 3)
-	m.ToggleFullRow(9, 0, 3)
+	m.ToggleFullRow(1)
+	m.ToggleFullRow(5)
+	m.ToggleFullRow(9)
 	if len(m.Rects) != 3 {
 		t.Fatalf("expected 3 rects, got %d", len(m.Rects))
 	}
@@ -112,10 +112,10 @@ func TestToggleFullRow_AccumulatesMultipleRows(t *testing.T) {
 
 func TestToggleFullRow_RemovesMiddleRow(t *testing.T) {
 	m := New(SelectMulti)
-	m.ToggleFullRow(1, 0, 3)
-	m.ToggleFullRow(5, 0, 3)
-	m.ToggleFullRow(9, 0, 3)
-	m.ToggleFullRow(5, 0, 3) // remove row 5
+	m.ToggleFullRow(1)
+	m.ToggleFullRow(5)
+	m.ToggleFullRow(9)
+	m.ToggleFullRow(5) // remove row 5
 	if len(m.Rects) != 2 {
 		t.Fatalf("expected 2 rects after removing middle, got %d", len(m.Rects))
 	}
@@ -124,7 +124,7 @@ func TestToggleFullRow_RemovesMiddleRow(t *testing.T) {
 func TestToggleFullRow_ClearsNonFullRowRects(t *testing.T) {
 	m := New(SelectMulti)
 	m.Replace(Rect{Kind: KindRect, Anchor: Position{0, 0}, Cursor: Position{3, 3}})
-	m.ToggleFullRow(2, 0, 3)
+	m.ToggleFullRow(2)
 	if len(m.Rects) != 1 {
 		t.Fatalf("expected 1 rect, got %d", len(m.Rects))
 	}
@@ -135,8 +135,8 @@ func TestToggleFullRow_ClearsNonFullRowRects(t *testing.T) {
 
 func TestToggleFullRow_SingleModeReplacesExisting(t *testing.T) {
 	m := New(SelectSingle)
-	m.ToggleFullRow(1, 0, 3)
-	m.ToggleFullRow(5, 0, 3)
+	m.ToggleFullRow(1)
+	m.ToggleFullRow(5)
 	if len(m.Rects) != 1 {
 		t.Fatalf("expected 1 rect in single mode, got %d", len(m.Rects))
 	}
@@ -253,9 +253,9 @@ func TestFullRowRanges_NonRowRectsExcluded(t *testing.T) {
 
 func TestFullRowRanges_MultipleRows(t *testing.T) {
 	m := New(SelectMulti)
-	m.ToggleFullRow(1, 0, 3)
-	m.ToggleFullRow(5, 0, 3)
-	m.ToggleFullRow(9, 0, 3)
+	m.ToggleFullRow(1)
+	m.ToggleFullRow(5)
+	m.ToggleFullRow(9)
 	ranges := m.FullRowRanges()
 	if len(ranges) != 3 {
 		t.Fatalf("expected 3 ranges, got %d", len(ranges))

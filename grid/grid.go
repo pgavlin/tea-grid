@@ -233,112 +233,94 @@ func (m Model[T]) FocusedCell() CellPosition        { return m.focusedCell }
 
 // --- Selection ---
 
-func (m Model[T]) SelectedRows() []T {
-	ranges := m.sel.FullRowRanges()
-	if len(ranges) == 0 {
-		return nil
-	}
-	var result []T
-	for _, rn := range m.displayRows {
-		if rn.IsGroup {
-			continue
-		}
-		for _, r := range ranges {
-			if rn.RowIndex >= r[0] && rn.RowIndex <= r[1] {
-				result = append(result, rn.Data)
-				break
-			}
-		}
-	}
-	return result
-}
-
-func (m Model[T]) SelectedRowNodes() []*data.RowNode[T] {
-	ranges := m.sel.FullRowRanges()
-	if len(ranges) == 0 {
-		return nil
-	}
-	var result []*data.RowNode[T]
-	for i := range m.displayRows {
-		rn := &m.displayRows[i]
-		if rn.IsGroup {
-			continue
-		}
-		for _, r := range ranges {
-			if rn.RowIndex >= r[0] && rn.RowIndex <= r[1] {
-				result = append(result, rn)
-				break
-			}
-		}
-	}
-	return result
-}
-
-// selectedRowNodes returns row nodes for all full-row-selected rows (used for emitting SelectionChangedMsg).
-func (m Model[T]) selectedRowNodes() []data.RowNode[T] {
-	ranges := m.sel.FullRowRanges()
-	if len(ranges) == 0 {
-		return nil
-	}
-	var result []data.RowNode[T]
-	for _, rn := range m.displayRows {
-		if rn.IsGroup {
-			continue
-		}
-		for _, r := range ranges {
-			if rn.RowIndex >= r[0] && rn.RowIndex <= r[1] {
-				result = append(result, rn)
-				break
-			}
-		}
-	}
-	return result
-}
-
-func (m *Model[T]) SelectRow(id string) {
+// SetRowSelection replaces the selection with a single full-row rect for the given row ID.
+func (m *Model[T]) SetRowSelection(id string) {
 	for i, rn := range m.displayRows {
 		if rn.ID == id {
 			m.sel.Replace(selection.Rect{
 				Kind:   selection.KindFullRow,
 				Anchor: selection.Position{Row: i, Col: 0},
-				Cursor: selection.Position{Row: i, Col: len(m.cols) - 1},
+				Cursor: selection.Position{Row: i, Col: 0},
 			})
 			return
 		}
 	}
 }
 
-func (m *Model[T]) DeselectRow(id string) {
-	if len(m.sel.Rects) == 1 && m.sel.Rects[0].Kind == selection.KindFullRow {
-		rLo, rHi := m.sel.Rects[0].Anchor.Row, m.sel.Rects[0].Cursor.Row
-		if rLo > rHi {
-			rLo, rHi = rHi, rLo
-		}
-		for i := rLo; i <= rHi; i++ {
-			if i < len(m.displayRows) && m.displayRows[i].ID == id && rLo == rHi {
-				m.sel.Clear()
-				return
-			}
+// ToggleRowSelection toggles a KindFullRow rect for the given row ID.
+// Non-KindFullRow rects are cleared first (same semantics as the Space key).
+func (m *Model[T]) ToggleRowSelection(id string) {
+	for i, rn := range m.displayRows {
+		if rn.ID == id {
+			m.sel.ToggleFullRow(i)
+			return
 		}
 	}
 }
 
-func (m *Model[T]) SelectAll() {
+// SetColumnSelection replaces the selection with a single full-column rect.
+func (m *Model[T]) SetColumnSelection(colIdx int) {
+	m.sel.Replace(selection.Rect{
+		Kind:   selection.KindFullCol,
+		Anchor: selection.Position{Row: 0, Col: colIdx},
+		Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: colIdx},
+	})
+}
+
+// SetRectSelection replaces the selection with a single rectangular region.
+func (m *Model[T]) SetRectSelection(anchor, cursor CellPosition) {
+	m.sel.Replace(selection.Rect{
+		Kind:   selection.KindRect,
+		Anchor: selection.Position{Row: anchor.Row, Col: anchor.Col},
+		Cursor: selection.Position{Row: cursor.Row, Col: cursor.Col},
+	})
+}
+
+// SelectAllRows replaces the selection with a KindFullRow rect spanning all display rows.
+func (m *Model[T]) SelectAllRows() {
 	if len(m.displayRows) == 0 {
 		return
 	}
 	m.sel.Replace(selection.Rect{
 		Kind:   selection.KindFullRow,
 		Anchor: selection.Position{Row: 0, Col: 0},
-		Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: len(m.cols) - 1},
+		Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: 0},
 	})
 }
 
-func (m *Model[T]) DeselectAll() {
+// ClearSelection removes all selection.
+func (m *Model[T]) ClearSelection() {
 	m.sel.Clear()
 }
 
-func (m Model[T]) IsSelected(id string) bool {
+// Selection returns all current selection regions.
+func (m Model[T]) Selection() []SelectionRegion {
+	if len(m.sel.Rects) == 0 {
+		return nil
+	}
+	regions := make([]SelectionRegion, len(m.sel.Rects))
+	for i, r := range m.sel.Rects {
+		regions[i] = SelectionRegion{
+			Kind:   r.Kind,
+			Anchor: CellPosition{Row: r.Anchor.Row, Col: r.Anchor.Col},
+			Cursor: CellPosition{Row: r.Cursor.Row, Col: r.Cursor.Col},
+		}
+	}
+	return regions
+}
+
+// HasSelection returns true if there is at least one selection region.
+func (m Model[T]) HasSelection() bool {
+	return m.sel.Active()
+}
+
+// IsCellSelected returns true if the cell at (row, col) is within any selection region.
+func (m Model[T]) IsCellSelected(row, col int) bool {
+	return m.sel.ContainsCell(row, col, false)
+}
+
+// IsRowSelected returns true if the given row ID is covered by any KindFullRow rect.
+func (m Model[T]) IsRowSelected(id string) bool {
 	ranges := m.sel.FullRowRanges()
 	for _, r := range ranges {
 		for i := r[0]; i <= r[1]; i++ {
@@ -350,30 +332,11 @@ func (m Model[T]) IsSelected(id string) bool {
 	return false
 }
 
-// SelectColumn selects all cells in the given column, clearing other selection.
-func (m *Model[T]) SelectColumn(colIdx int) {
-	m.sel.Replace(selection.Rect{
-		Kind:   selection.KindFullCol,
-		Anchor: selection.Position{Row: 0, Col: colIdx},
-		Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: colIdx},
-	})
-}
-
-// DeselectColumns clears column selection.
-func (m *Model[T]) DeselectColumns() {
-	if len(m.sel.Rects) > 0 && m.sel.Rects[0].Kind == selection.KindFullCol {
-		m.sel.Clear()
-	}
-}
-
 // IsColumnSelected returns true if the given column index is within a KindFullCol rect.
 func (m Model[T]) IsColumnSelected(colIdx int) bool {
 	for _, r := range m.sel.Rects {
 		if r.Kind == selection.KindFullCol {
-			cLo, cHi := r.Anchor.Col, r.Cursor.Col
-			if cLo > cHi {
-				cLo, cHi = cHi, cLo
-			}
+			cLo, cHi := r.ColRange()
 			if colIdx >= cLo && colIdx <= cHi {
 				return true
 			}
@@ -382,9 +345,79 @@ func (m Model[T]) IsColumnSelected(colIdx int) bool {
 	return false
 }
 
-// SelectionRect returns the bounding rectangle of the selection, or (-1,-1,-1,-1) if inactive.
+// isRowInSelection returns true if the display row index is covered by any selection rect.
+func (m Model[T]) isRowInSelection(rowIdx int) bool {
+	for _, r := range m.sel.Rects {
+		switch r.Kind {
+		case selection.KindFullRow, selection.KindRect:
+			lo, hi := r.RowRange()
+			if rowIdx >= lo && rowIdx <= hi {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// SelectedRows returns the data for all rows covered by the current selection.
+// For KindFullRow and KindRect, rows in the row range are included.
+// For KindFullCol, no rows are returned (column selection is about columns).
+func (m Model[T]) SelectedRows() []T {
+	if !m.sel.Active() {
+		return nil
+	}
+	var result []T
+	for _, rn := range m.displayRows {
+		if rn.IsGroup {
+			continue
+		}
+		if m.isRowInSelection(rn.RowIndex) {
+			result = append(result, rn.Data)
+		}
+	}
+	return result
+}
+
+// SelectedRowNodes returns the row nodes for all rows covered by the current selection.
+// For KindFullRow and KindRect, rows in the row range are included.
+// For KindFullCol, no rows are returned.
+func (m Model[T]) SelectedRowNodes() []*data.RowNode[T] {
+	if !m.sel.Active() {
+		return nil
+	}
+	var result []*data.RowNode[T]
+	for i := range m.displayRows {
+		rn := &m.displayRows[i]
+		if rn.IsGroup {
+			continue
+		}
+		if m.isRowInSelection(rn.RowIndex) {
+			result = append(result, rn)
+		}
+	}
+	return result
+}
+
+// selectedRowNodes returns row nodes for all selected rows (used for emitting SelectionChangedMsg).
+func (m Model[T]) selectedRowNodes() []data.RowNode[T] {
+	if !m.sel.Active() {
+		return nil
+	}
+	var result []data.RowNode[T]
+	for _, rn := range m.displayRows {
+		if rn.IsGroup {
+			continue
+		}
+		if m.isRowInSelection(rn.RowIndex) {
+			result = append(result, rn)
+		}
+	}
+	return result
+}
+
+// SelectionBounds returns the bounding rectangle of the selection, or (-1,-1,-1,-1) if inactive.
 // Row values are display row indices; column values are grid column indices.
-func (m Model[T]) SelectionRect() (rowLo, rowHi, colLo, colHi int) {
+func (m Model[T]) SelectionBounds() (rowLo, rowHi, colLo, colHi int) {
 	return m.sel.BoundingRect()
 }
 

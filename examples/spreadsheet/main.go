@@ -361,7 +361,7 @@ func (m *model) handleAppKey(msg tea.KeyMsg) tea.Cmd {
 
 // copySelection copies the current rectangular selection (or single focused cell) to the clipboard.
 func (m *model) copySelection() tea.Cmd {
-	rowLo, rowHi, colLo, colHi := m.grid.SelectionRect()
+	rowLo, rowHi, colLo, colHi := m.grid.SelectionBounds()
 	if rowLo < 0 {
 		// No rectangular selection — copy single focused cell
 		pos := m.grid.FocusedCell()

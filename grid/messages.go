@@ -6,6 +6,41 @@ import (
 	"github.com/pgavlin/tea-grid/sort"
 )
 
+// SelectionKind is a type alias for selection.Kind so users don't need to import the selection package.
+type SelectionKind = selection.Kind
+
+const (
+	SelectionNone    = selection.KindNone
+	SelectionRect    = selection.KindRect
+	SelectionFullRow = selection.KindFullRow
+	SelectionFullCol = selection.KindFullCol
+)
+
+// SelectionRegion describes one contiguous selected region.
+type SelectionRegion struct {
+	Kind   SelectionKind
+	Anchor CellPosition
+	Cursor CellPosition
+}
+
+// RowRange returns the ordered row range of the region.
+func (r SelectionRegion) RowRange() (lo, hi int) {
+	lo, hi = r.Anchor.Row, r.Cursor.Row
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	return
+}
+
+// ColRange returns the ordered column range of the region.
+func (r SelectionRegion) ColRange() (lo, hi int) {
+	lo, hi = r.Anchor.Col, r.Cursor.Col
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	return
+}
+
 // CellPosition identifies a cell by row and column index.
 type CellPosition struct {
 	Row int
@@ -20,8 +55,8 @@ type FocusChangedMsg struct {
 
 // SelectionChangedMsg is emitted when the selection set changes.
 type SelectionChangedMsg[T any] struct {
-	Selected []data.RowNode[T] // Rows in full-row selections (backward compat).
-	Kind     selection.Kind    // What kind of selection changed.
+	Regions  []SelectionRegion // All current selection regions.
+	Selected []data.RowNode[T] // Rows covered by any selection (convenience).
 }
 
 // SortChangedMsg is emitted when the sort order changes.
