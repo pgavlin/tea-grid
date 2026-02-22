@@ -55,8 +55,9 @@ type Model[T any] struct {
 
 	// Selection
 	sel             selection.Model
-	colSelectAnchor int // -1 = no anchor
-	colSelectCursor int // -1 = no selection
+	colSelectAnchor int          // -1 = no column selection (C key)
+	colSelectCursor int          // -1 = no column selection (C key)
+	rectAnchor      CellPosition // Row=-1 means no rectangular selection (shift+nav)
 
 	// Sorting
 	sortModel gridsort.Model[T]
@@ -114,6 +115,7 @@ func New[T any](opts ...Option[T]) Model[T] {
 		sel:              selection.New(selection.SelectNone),
 		colSelectAnchor:  -1,
 		colSelectCursor:  -1,
+		rectAnchor:       CellPosition{Row: -1, Col: -1},
 		groupModel:       grouping.Model[T]{Expanded: make(map[string]bool), DefaultExpanded: -1},
 		defaultRowHeight: 1,
 		dirty:            true,
@@ -297,6 +299,7 @@ func (m *Model[T]) DeselectAll() {
 	m.sel.SetAnchor(-1)
 	m.colSelectAnchor = -1
 	m.colSelectCursor = -1
+	m.rectAnchor = CellPosition{Row: -1, Col: -1}
 }
 func (m Model[T]) IsSelected(id string) bool { return m.sel.IsSelected(id) }
 
@@ -329,6 +332,22 @@ func (m Model[T]) colSelectionRange() (lo, hi int) {
 		lo, hi = hi, lo
 	}
 	return lo, hi
+}
+
+// selectionRect returns the rectangular selection bounds, or (-1,-1,-1,-1) if inactive.
+func (m Model[T]) selectionRect() (rowLo, rowHi, colLo, colHi int) {
+	if m.rectAnchor.Row < 0 {
+		return -1, -1, -1, -1
+	}
+	rowLo, rowHi = m.rectAnchor.Row, m.focusedCell.Row
+	if rowLo > rowHi {
+		rowLo, rowHi = rowHi, rowLo
+	}
+	colLo, colHi = m.rectAnchor.Col, m.focusedCell.Col
+	if colLo > colHi {
+		colLo, colHi = colHi, colLo
+	}
+	return rowLo, rowHi, colLo, colHi
 }
 
 // --- Sorting ---

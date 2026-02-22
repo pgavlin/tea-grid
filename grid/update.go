@@ -162,32 +162,28 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	case key.Matches(msg, m.KeyMap.ColumnFilter):
 		return m.startFilterEdit()
 
-	// Shift+nav selection expansion (row)
+	// Shift+nav selection expansion
 	case key.Matches(msg, m.KeyMap.ShiftUp):
-		return m.shiftMoveRow(m.focusedCell.Row - 1)
+		return m.shiftMoveFocus(m.focusedCell.Row-1, m.focusedCell.Col)
 
 	case key.Matches(msg, m.KeyMap.ShiftDown):
-		return m.shiftMoveRow(m.focusedCell.Row + 1)
+		return m.shiftMoveFocus(m.focusedCell.Row+1, m.focusedCell.Col)
 
-	// Expand/collapse all (only when groups exist; otherwise fall through to shift+left/right)
-	case key.Matches(msg, m.KeyMap.ExpandAll):
-		if len(m.groupModel.GroupColumns) > 0 {
-			m.ExpandAll()
-			return m, nil
-		}
-
-	case key.Matches(msg, m.KeyMap.CollapseAll):
-		if len(m.groupModel.GroupColumns) > 0 {
+	// Expand/collapse all overlap with shift+left/right.
+	// When groups exist, grouping takes priority; otherwise shift+nav handles it.
+	case key.Matches(msg, m.KeyMap.CollapseAll, m.KeyMap.ShiftLeft):
+		if key.Matches(msg, m.KeyMap.CollapseAll) && len(m.groupModel.GroupColumns) > 0 {
 			m.CollapseAll()
 			return m, nil
 		}
+		return m.shiftMoveFocus(m.focusedCell.Row, m.focusedCell.Col-1)
 
-	// Shift+nav selection expansion (column) — reached when no groups consume shift+left/right
-	case key.Matches(msg, m.KeyMap.ShiftLeft):
-		return m.shiftMoveCol(m.focusedCell.Col - 1)
-
-	case key.Matches(msg, m.KeyMap.ShiftRight):
-		return m.shiftMoveCol(m.focusedCell.Col + 1)
+	case key.Matches(msg, m.KeyMap.ExpandAll, m.KeyMap.ShiftRight):
+		if key.Matches(msg, m.KeyMap.ExpandAll) && len(m.groupModel.GroupColumns) > 0 {
+			m.ExpandAll()
+			return m, nil
+		}
+		return m.shiftMoveFocus(m.focusedCell.Row, m.focusedCell.Col+1)
 	}
 
 	// Early out if the focus is beyond the total rows for any reason.
@@ -231,10 +227,10 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, m.KeyMap.ShiftLeft):
-			return m.shiftMoveCol(m.focusedCell.Col - 1)
+			return m.shiftMoveFocus(m.focusedCell.Row, m.focusedCell.Col-1)
 
 		case key.Matches(msg, m.KeyMap.ShiftRight):
-			return m.shiftMoveCol(m.focusedCell.Col + 1)
+			return m.shiftMoveFocus(m.focusedCell.Row, m.focusedCell.Col+1)
 		}
 
 		return m, nil
@@ -278,6 +274,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		m.sel.SetAnchor(m.focusedCell.Row)
 		m.colSelectAnchor = -1
 		m.colSelectCursor = -1
+		m.rectAnchor = CellPosition{Row: -1, Col: -1}
 		return m, func() tea.Msg {
 			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
 		}
@@ -289,6 +286,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			m.sel.SetAnchor(-1)
 			m.colSelectAnchor = colIdx
 			m.colSelectCursor = colIdx
+			m.rectAnchor = CellPosition{Row: -1, Col: -1}
 			return m, func() tea.Msg {
 				return SelectionChangedMsg[T]{Selected: nil}
 			}
@@ -300,6 +298,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		m.sel.SetAnchor(-1)
 		m.colSelectAnchor = -1
 		m.colSelectCursor = -1
+		m.rectAnchor = CellPosition{Row: -1, Col: -1}
 		return m, func() tea.Msg {
 			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
 		}
@@ -500,6 +499,7 @@ func (m Model[T]) moveFocus(newRow, newCol int) (Model[T], tea.Cmd) {
 	m.sel.SetAnchor(-1)
 	m.colSelectAnchor = -1
 	m.colSelectCursor = -1
+	m.rectAnchor = CellPosition{Row: -1, Col: -1}
 
 	// Clamp row: -1 = header, 0..len-1 = data rows
 	totalRows := len(m.displayRows)
@@ -690,67 +690,26 @@ func (m Model[T]) toggleCurrentGroup() (Model[T], tea.Cmd) {
 	return m.expandCurrentGroup()
 }
 
-// shiftMoveRow expands row selection toward newRow using an anchor/cursor model.
-func (m Model[T]) shiftMoveRow(newRow int) (Model[T], tea.Cmd) {
-	// Save/initialize row anchor
-	anchor := m.sel.Anchor()
-	if anchor < 0 {
-		anchor = m.focusedCell.Row
+// shiftMoveFocus expands the rectangular selection toward (newRow, newCol).
+// The anchor stays fixed at the starting cell; the cursor (focusedCell) moves.
+func (m Model[T]) shiftMoveFocus(newRow, newCol int) (Model[T], tea.Cmd) {
+	// Initialize rectangle anchor from current focus if not set
+	anchor := m.rectAnchor
+	if anchor.Row < 0 {
+		anchor = m.focusedCell
 	}
 
-	// Clear column selection
+	// Clear row and column selection (shift+nav is mutually exclusive)
+	m.sel.DeselectAll()
+	m.sel.SetAnchor(-1)
 	m.colSelectAnchor = -1
 	m.colSelectCursor = -1
 
-	// Move focus (this clears anchors)
-	m, cmd := m.moveFocus(newRow, m.focusedCell.Col)
+	// Move focus (this clears all anchors including rectAnchor)
+	m, cmd := m.moveFocus(newRow, newCol)
 
-	// Restore row anchor
-	m.sel.SetAnchor(anchor)
-
-	// Compute range
-	cursor := m.focusedCell.Row
-	lo, hi := anchor, cursor
-	if lo > hi {
-		lo, hi = hi, lo
-	}
-
-	// Collect display row IDs in range (skip group rows)
-	var ids []string
-	for i := lo; i <= hi && i < len(m.displayRows); i++ {
-		if i < 0 {
-			continue
-		}
-		rn := m.displayRows[i]
-		if !rn.IsGroup {
-			ids = append(ids, rn.ID)
-		}
-	}
-	m.sel.SelectRange(ids)
-
-	return m, tea.Batch(cmd, func() tea.Msg {
-		return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
-	})
-}
-
-// shiftMoveCol expands column selection toward newCol using an anchor/cursor model.
-func (m Model[T]) shiftMoveCol(newCol int) (Model[T], tea.Cmd) {
-	// Save/initialize column anchor
-	anchor := m.colSelectAnchor
-	if anchor < 0 {
-		anchor = m.focusedCell.Col
-	}
-
-	// Clear row selection
-	m.sel.DeselectAll()
-	m.sel.SetAnchor(-1)
-
-	// Move focus (this clears anchors)
-	m, cmd := m.moveFocus(m.focusedCell.Row, newCol)
-
-	// Restore column anchor and set cursor to new focused col
-	m.colSelectAnchor = anchor
-	m.colSelectCursor = m.focusedCell.Col
+	// Restore rectangle anchor
+	m.rectAnchor = anchor
 
 	return m, tea.Batch(cmd, func() tea.Msg {
 		return SelectionChangedMsg[T]{Selected: nil}
