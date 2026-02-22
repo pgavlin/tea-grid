@@ -54,8 +54,9 @@ type Model[T any] struct {
 	vp viewport
 
 	// Selection
-	sel         selection.Model
-	selectedCol int // -1 = no column selected
+	sel             selection.Model
+	colSelectAnchor int // -1 = no anchor
+	colSelectCursor int // -1 = no selection
 
 	// Sorting
 	sortModel gridsort.Model[T]
@@ -111,7 +112,8 @@ func New[T any](opts ...Option[T]) Model[T] {
 		styles:           DefaultStyles(),
 		vp:               newViewport(),
 		sel:              selection.New(selection.SelectNone),
-		selectedCol:      -1,
+		colSelectAnchor:  -1,
+		colSelectCursor:  -1,
 		groupModel:       grouping.Model[T]{Expanded: make(map[string]bool), DefaultExpanded: -1},
 		defaultRowHeight: 1,
 		dirty:            true,
@@ -290,21 +292,43 @@ func (m *Model[T]) SelectAll() {
 	}
 	m.sel.SelectAll(ids)
 }
-func (m *Model[T]) DeselectAll()             { m.sel.DeselectAll(); m.selectedCol = -1 }
+func (m *Model[T]) DeselectAll() {
+	m.sel.DeselectAll()
+	m.sel.SetAnchor(-1)
+	m.colSelectAnchor = -1
+	m.colSelectCursor = -1
+}
 func (m Model[T]) IsSelected(id string) bool { return m.sel.IsSelected(id) }
 
 // SelectColumn selects all cells in the given column, clearing row selection.
 func (m *Model[T]) SelectColumn(colIdx int) {
 	m.sel.DeselectAll()
-	m.selectedCol = colIdx
+	m.colSelectAnchor = colIdx
+	m.colSelectCursor = colIdx
 }
 
 // DeselectColumns clears column selection.
-func (m *Model[T]) DeselectColumns() { m.selectedCol = -1 }
+func (m *Model[T]) DeselectColumns() {
+	m.colSelectAnchor = -1
+	m.colSelectCursor = -1
+}
 
 // IsColumnSelected returns true if the given column index is selected.
 func (m Model[T]) IsColumnSelected(colIdx int) bool {
-	return m.selectedCol >= 0 && m.selectedCol == colIdx
+	lo, hi := m.colSelectionRange()
+	return lo >= 0 && colIdx >= lo && colIdx <= hi
+}
+
+// colSelectionRange returns the ordered range of selected columns, or (-1, -1) if none.
+func (m Model[T]) colSelectionRange() (lo, hi int) {
+	if m.colSelectAnchor < 0 || m.colSelectCursor < 0 {
+		return -1, -1
+	}
+	lo, hi = m.colSelectAnchor, m.colSelectCursor
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	return lo, hi
 }
 
 // --- Sorting ---

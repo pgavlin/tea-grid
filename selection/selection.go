@@ -87,6 +87,24 @@ func (m *Model) SelectedIDs() []string {
 	return ids
 }
 
+// SelectRange replaces the current selection with exactly the given IDs.
+// In SelectNone mode: no-op. In SelectSingle mode: select only the last ID.
+// In SelectMulti mode: replace selection with exactly the given IDs.
+func (m *Model) SelectRange(ids []string) {
+	if m.Mode == SelectNone || len(ids) == 0 {
+		return
+	}
+	if m.Mode == SelectSingle {
+		m.selected = make(map[string]bool)
+		m.selected[ids[len(ids)-1]] = true
+		return
+	}
+	m.selected = make(map[string]bool, len(ids))
+	for _, id := range ids {
+		m.selected[id] = true
+	}
+}
+
 // Retain removes any selected IDs that are not present in validIDs.
 func (m *Model) Retain(validIDs map[string]bool) {
 	for id := range m.selected {

@@ -798,6 +798,11 @@ func (m model) renderHelp() string {
 			{"tab", "Switch focus (grid/sidebar)"},
 			{"esc", "Close sidebar"},
 		}},
+		{"Selection", [][2]string{
+			{"R/C", "Select row/column"},
+			{"H/J/K/L, shift+arrows", "Expand selection"},
+			{"space", "Toggle row selection"},
+		}},
 		{"Sorting & Filtering", [][2]string{
 			{"s", "Sort by column"},
 			{"/", "Quick filter"},

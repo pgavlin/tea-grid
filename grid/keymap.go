@@ -30,6 +30,12 @@ type KeyMap struct {
 	SelectRow    key.Binding
 	SelectColumn key.Binding
 
+	// Shift+nav selection expansion
+	ShiftUp    key.Binding
+	ShiftDown  key.Binding
+	ShiftLeft  key.Binding
+	ShiftRight key.Binding
+
 	// Sorting (when header is focused)
 	ToggleSort      key.Binding
 	ToggleMultiSort key.Binding
@@ -133,6 +139,22 @@ func DefaultKeyMap() KeyMap {
 		SelectColumn: key.NewBinding(
 			key.WithKeys("C"),
 			key.WithHelp("C", "select column"),
+		),
+		ShiftUp: key.NewBinding(
+			key.WithKeys("shift+up", "K"),
+			key.WithHelp("shift+↑/K", "expand selection up"),
+		),
+		ShiftDown: key.NewBinding(
+			key.WithKeys("shift+down", "J"),
+			key.WithHelp("shift+↓/J", "expand selection down"),
+		),
+		ShiftLeft: key.NewBinding(
+			key.WithKeys("shift+left", "H"),
+			key.WithHelp("shift+←/H", "expand selection left"),
+		),
+		ShiftRight: key.NewBinding(
+			key.WithKeys("shift+right", "L"),
+			key.WithHelp("shift+←/L", "expand selection right"),
 		),
 		ToggleSort: key.NewBinding(
 			key.WithKeys("enter"),
