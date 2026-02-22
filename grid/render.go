@@ -327,11 +327,7 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 		}
 
 		// Determine style
-		colLo, colHi := m.colSelectionRange()
-		isColSelected := colLo >= 0 && idx >= colLo && idx <= colHi
-		rLo, rHi, cLo, cHi := m.selectionRect()
-		isRectSelected := rLo >= 0 && displayIndex >= rLo && displayIndex <= rHi && idx >= cLo && idx <= cHi
-		isSelected := !col.NoSelect && (m.sel.IsSelected(rn.ID) || isColSelected || isRectSelected)
+		isSelected := m.sel.ContainsCell(displayIndex, idx, col.NoSelect)
 		isFocused := m.focused && m.focusedCell.Row == displayIndex && m.focusedCell.Col == idx
 
 		// Select base style based on row context

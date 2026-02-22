@@ -495,8 +495,8 @@ func TestSetRows_PrunesStaleSelection(t *testing.T) {
 	// Select the last row (index 4, ID "row-4")
 	lastID := m.rows[len(m.rows)-1].ID
 	m.SelectRow(lastID)
-	if m.sel.Count() != 1 {
-		t.Fatalf("expected 1 selected, got %d", m.sel.Count())
+	if !m.sel.Active() {
+		t.Fatal("expected selection to be active")
 	}
 
 	// Replace with fewer rows so the selected row's position no longer exists
@@ -504,8 +504,8 @@ func TestSetRows_PrunesStaleSelection(t *testing.T) {
 		{"Alice", "Engineering", 95000, true},
 		{"Bob", "Sales", 75000, false},
 	})
-	if m.sel.Count() != 0 {
-		t.Errorf("expected 0 selected after SetRows with fewer rows, got %d", m.sel.Count())
+	if m.sel.Active() {
+		t.Error("expected selection cleared after SetRows with fewer rows")
 	}
 }
 
@@ -656,7 +656,7 @@ func TestAutoID_InsertRow_DoesNotCollideWithSetRows(t *testing.T) {
 	}
 }
 
-func TestAutoID_SelectionSurvivesSetRows(t *testing.T) {
+func TestAutoID_SelectionClearedOnSetRows(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 
 	// Select the second row
@@ -666,7 +666,7 @@ func TestAutoID_SelectionSurvivesSetRows(t *testing.T) {
 		t.Fatal("expected row to be selected")
 	}
 
-	// Replace with same-length data — ID is preserved so selection should survive
+	// Replace with same-length data — index-based selection is cleared on data change
 	m.SetRows([]TestRow{
 		{"Xander", "HR", 60000, true},
 		{"Yara", "Legal", 70000, false},
@@ -675,8 +675,8 @@ func TestAutoID_SelectionSurvivesSetRows(t *testing.T) {
 		{"Victor", "IT", 100000, true},
 	})
 
-	if !m.IsSelected(id1) {
-		t.Error("expected selection to survive SetRows when auto-ID is preserved")
+	if m.sel.Active() {
+		t.Error("expected selection cleared after SetRows")
 	}
 }
 
@@ -691,12 +691,12 @@ func TestRemoveRow_DeselectsRemovedRow(t *testing.T) {
 		WithHeight[TestRow](20),
 	)
 	m.SelectRow("Bob")
-	if m.sel.Count() != 1 {
-		t.Fatalf("expected 1 selected, got %d", m.sel.Count())
+	if !m.sel.Active() {
+		t.Fatal("expected selection to be active")
 	}
 	m.RemoveRow("Bob")
-	if m.sel.Count() != 0 {
-		t.Errorf("expected 0 selected after RemoveRow, got %d", m.sel.Count())
+	if m.sel.Active() {
+		t.Error("expected selection cleared after RemoveRow")
 	}
 }
 
@@ -1149,13 +1149,13 @@ func TestSelection_SpaceToggles(t *testing.T) {
 
 	// Press space to select
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeySpace})
-	if !m.sel.IsSelected(rowID) {
+	if !m.IsSelected(rowID) {
 		t.Error("expected row to be selected after space")
 	}
 
 	// Press space again to deselect
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeySpace})
-	if m.sel.IsSelected(rowID) {
+	if m.IsSelected(rowID) {
 		t.Error("expected row to be deselected after second space")
 	}
 }
@@ -1175,8 +1175,8 @@ func TestSelection_EscDeselectsAll(t *testing.T) {
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlA})
 	// Esc should deselect
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEsc})
-	if m.sel.Count() != 0 {
-		t.Errorf("expected 0 selected after Esc, got %d", m.sel.Count())
+	if m.sel.Active() {
+		t.Error("expected selection cleared after Esc")
 	}
 }
 
@@ -1728,8 +1728,19 @@ func TestPublicAPI_SelectedRows(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	m.SelectRow("Alice")
-	m.SelectRow("Carol")
+	// Use ToggleFullRow to select two disjoint rows (Space key behavior)
+	aliceIdx := -1
+	carolIdx := -1
+	for i, rn := range m.displayRows {
+		if rn.ID == "Alice" {
+			aliceIdx = i
+		}
+		if rn.ID == "Carol" {
+			carolIdx = i
+		}
+	}
+	m.sel.ToggleFullRow(aliceIdx, 0, len(m.Columns())-1)
+	m.sel.ToggleFullRow(carolIdx, 0, len(m.Columns())-1)
 	selected := m.SelectedRows()
 	if len(selected) != 2 {
 		t.Fatalf("expected 2 selected, got %d", len(selected))
@@ -2355,17 +2366,20 @@ func TestSelectColumn_CKeySelectsColumn(t *testing.T) {
 	if !m.IsColumnSelected(1) {
 		t.Error("expected column 1 to be selected after 'C' key")
 	}
-	// Row selection should be cleared
-	if m.sel.Count() != 0 {
-		t.Errorf("expected row selection cleared, got %d", m.sel.Count())
+	// Should be a column selection, not a row selection
+	if len(m.sel.Rects) != 1 || m.sel.Rects[0].Kind != selection.KindFullCol {
+		t.Error("expected exactly one KindFullCol rect")
 	}
 }
 
 func TestSelectColumn_RangeModel(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
-	// Select column 1 programmatically and extend cursor to column 2
-	m.SelectColumn(1)
-	m.colSelectCursor = 2
+	// Select column range 1..2 using a KindFullCol rect with anchor=1, cursor=2
+	m.sel.Replace(selection.Rect{
+		Kind:   selection.KindFullCol,
+		Anchor: selection.Position{Row: 0, Col: 1},
+		Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: 2},
+	})
 
 	if !m.IsColumnSelected(1) {
 		t.Error("expected column 1 to be selected")
@@ -2562,7 +2576,7 @@ func TestSelectRow_RKeySelectsRow(t *testing.T) {
 
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
 
-	if !m.sel.IsSelected(rowID) {
+	if !m.IsSelected(rowID) {
 		t.Error("expected row to be selected after 'R' key")
 	}
 }
@@ -2585,19 +2599,18 @@ func TestSelect_SpaceTogglesAndClearsAnchors(t *testing.T) {
 
 	// First press selects
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeySpace})
-	if !m.sel.IsSelected(rowID) {
+	if !m.IsSelected(rowID) {
 		t.Error("expected row selected after space")
 	}
 
-	// Column selection should be cleared
+	// Column selection should be cleared (Space clears non-KindFullRow rects)
 	if m.IsColumnSelected(0) {
 		t.Error("expected column selection cleared after space")
 	}
 
-	// Rect anchor should be cleared
-	rLo, _, _, _ := m.SelectionRect()
-	if rLo != -1 {
-		t.Error("expected rect anchor cleared after space")
+	// Should be a KindFullRow rect, not a KindRect
+	if len(m.sel.Rects) != 1 || m.sel.Rects[0].Kind != selection.KindFullRow {
+		t.Error("expected exactly one KindFullRow rect after space")
 	}
 }
 
@@ -2617,7 +2630,7 @@ func TestSelection_MutualExclusivity_RowClearsColumn(t *testing.T) {
 		t.Error("expected column selection cleared after row selection")
 	}
 	rowID := m.displayRows[0].ID
-	if !m.sel.IsSelected(rowID) {
+	if !m.IsSelected(rowID) {
 		t.Error("expected row to be selected")
 	}
 }
@@ -2629,13 +2642,13 @@ func TestSelection_MutualExclusivity_ColumnClearsRow(t *testing.T) {
 
 	// Select row first
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
-	if !m.sel.IsSelected(rowID) {
+	if !m.IsSelected(rowID) {
 		t.Fatal("precondition: expected row selected")
 	}
 
 	// Select column — should clear row selection
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
-	if m.sel.IsSelected(rowID) {
+	if m.IsSelected(rowID) {
 		t.Error("expected row selection cleared after column selection")
 	}
 	if !m.IsColumnSelected(1) {
@@ -2649,13 +2662,13 @@ func TestSelection_MutualExclusivity_ShiftNavClearsRowAndCol(t *testing.T) {
 	rowID := m.displayRows[0].ID
 
 	// Select row first
-	m.sel.Select(rowID)
+	m.SelectRow(rowID)
 	m.SelectColumn(1)
 
 	// Shift+Down should clear both row and column selection
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
 
-	if m.sel.IsSelected(rowID) {
+	if m.IsSelected(rowID) {
 		t.Error("expected row selection cleared after shift+nav")
 	}
 	if m.IsColumnSelected(1) {
@@ -2677,8 +2690,19 @@ func TestSelectedRowNodes_Internal(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	m.SelectRow("Bob")
-	m.SelectRow("Eve")
+	// Use ToggleFullRow to select two disjoint rows (Space key behavior)
+	bobIdx := -1
+	eveIdx := -1
+	for i, rn := range m.displayRows {
+		if rn.ID == "Bob" {
+			bobIdx = i
+		}
+		if rn.ID == "Eve" {
+			eveIdx = i
+		}
+	}
+	m.sel.ToggleFullRow(bobIdx, 0, len(m.Columns())-1)
+	m.sel.ToggleFullRow(eveIdx, 0, len(m.Columns())-1)
 
 	nodes := m.selectedRowNodes()
 	if len(nodes) != 2 {
@@ -3246,26 +3270,33 @@ func TestSelectColumn_CKeyEmitsSelectionChangedMsg(t *testing.T) {
 // =======================================================================
 
 // -----------------------------------------------------------------------
-// grid.go:326 - colSelectionRange: lo > hi swap path (anchor > cursor)
+// IsColumnSelected: reversed anchor/cursor and no selection
 // -----------------------------------------------------------------------
 
-func TestColSelectionRange_AnchorGreaterThanCursor(t *testing.T) {
-	m := newTestGrid()
-	// Set anchor > cursor to trigger the swap path
-	m.colSelectAnchor = 3
-	m.colSelectCursor = 1
+func TestIsColumnSelected_ReversedAnchors(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	// Set a KindFullCol rect with anchor col > cursor col to test ordering
+	m.sel.Replace(selection.Rect{
+		Kind:   selection.KindFullCol,
+		Anchor: selection.Position{Row: 0, Col: 3},
+		Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: 1},
+	})
 
-	lo, hi := m.colSelectionRange()
-	if lo != 1 || hi != 3 {
-		t.Errorf("expected lo=1, hi=3, got lo=%d, hi=%d", lo, hi)
+	if !m.IsColumnSelected(1) {
+		t.Error("expected column 1 to be selected")
+	}
+	if !m.IsColumnSelected(3) {
+		t.Error("expected column 3 to be selected")
+	}
+	if m.IsColumnSelected(0) {
+		t.Error("expected column 0 to NOT be selected")
 	}
 }
 
-func TestColSelectionRange_NoSelection(t *testing.T) {
+func TestIsColumnSelected_NoSelection(t *testing.T) {
 	m := newTestGrid()
-	lo, hi := m.colSelectionRange()
-	if lo != -1 || hi != -1 {
-		t.Errorf("expected lo=-1, hi=-1, got lo=%d, hi=%d", lo, hi)
+	if m.IsColumnSelected(0) {
+		t.Error("expected no column selected with empty selection")
 	}
 }
 
@@ -4742,23 +4773,31 @@ func TestToggleCurrentGroup_RowOutOfRange(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// update.go:695 - shiftMoveFocus: when rectAnchor already set
+// update.go - shiftMoveFocus: when rect anchor already set via KindRect
 // -----------------------------------------------------------------------
 
 func TestShiftMoveFocus_RectAnchorAlreadySet(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 1, Col: 1}
 
-	// First shift+down sets anchor at (1,1)
+	// First shift+down sets anchor at (1,1), cursor at (2,1)
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
-	if m.rectAnchor.Row != 1 || m.rectAnchor.Col != 1 {
-		t.Fatalf("expected rectAnchor=(1,1), got (%d,%d)", m.rectAnchor.Row, m.rectAnchor.Col)
+	if len(m.sel.Rects) != 1 || m.sel.Rects[0].Kind != selection.KindRect {
+		t.Fatal("expected exactly one KindRect after shift+down")
+	}
+	anchor := m.sel.Rects[0].Anchor
+	if anchor.Row != 1 || anchor.Col != 1 {
+		t.Fatalf("expected anchor=(1,1), got (%d,%d)", anchor.Row, anchor.Col)
 	}
 
 	// Second shift+down should keep the same anchor
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
-	if m.rectAnchor.Row != 1 || m.rectAnchor.Col != 1 {
-		t.Errorf("expected rectAnchor to stay at (1,1), got (%d,%d)", m.rectAnchor.Row, m.rectAnchor.Col)
+	if len(m.sel.Rects) != 1 || m.sel.Rects[0].Kind != selection.KindRect {
+		t.Fatal("expected exactly one KindRect after second shift+down")
+	}
+	anchor = m.sel.Rects[0].Anchor
+	if anchor.Row != 1 || anchor.Col != 1 {
+		t.Errorf("expected anchor to stay at (1,1), got (%d,%d)", anchor.Row, anchor.Col)
 	}
 	if m.focusedCell.Row != 3 {
 		t.Errorf("expected focus row=3 after two shift+down, got %d", m.focusedCell.Row)

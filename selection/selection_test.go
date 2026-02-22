@@ -1,327 +1,332 @@
 package selection
 
 import (
-	"sort"
 	"testing"
 )
 
-// --- SelectNone ---
+// --- New ---
 
-func TestSelectNoneToggle(t *testing.T) {
+func TestNew(t *testing.T) {
+	m := New(SelectMulti)
+	if m.Mode != SelectMulti {
+		t.Errorf("expected SelectMulti, got %d", m.Mode)
+	}
+	if m.Active() {
+		t.Error("new model should not be active")
+	}
+}
+
+// --- Active / Clear ---
+
+func TestActive_EmptyIsInactive(t *testing.T) {
+	m := New(SelectMulti)
+	if m.Active() {
+		t.Error("expected inactive when no rects")
+	}
+}
+
+func TestClear(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{0, 0}, Cursor: Position{0, 3}})
+	m.Clear()
+	if m.Active() {
+		t.Error("expected inactive after Clear")
+	}
+}
+
+// --- Replace ---
+
+func TestReplace_SelectNoneIsNoop(t *testing.T) {
 	m := New(SelectNone)
-	m.Toggle("a")
-	if m.Count() != 0 {
-		t.Error("SelectNone: Toggle should be no-op")
+	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{0, 0}, Cursor: Position{0, 3}})
+	if m.Active() {
+		t.Error("Replace should be no-op in SelectNone mode")
 	}
 }
 
-func TestSelectNoneSelect(t *testing.T) {
+func TestReplace_SetsExactlyOneRect(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{0, 0}, Cursor: Position{0, 3}})
+	if len(m.Rects) != 1 {
+		t.Fatalf("expected 1 rect, got %d", len(m.Rects))
+	}
+	if m.Rects[0].Kind != KindFullRow {
+		t.Errorf("expected KindFullRow, got %d", m.Rects[0].Kind)
+	}
+}
+
+func TestReplace_OverwritesPrevious(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{0, 0}, Cursor: Position{0, 3}})
+	m.Replace(Rect{Kind: KindFullCol, Anchor: Position{0, 1}, Cursor: Position{9, 1}})
+	if len(m.Rects) != 1 {
+		t.Fatalf("expected 1 rect after second Replace, got %d", len(m.Rects))
+	}
+	if m.Rects[0].Kind != KindFullCol {
+		t.Error("expected KindFullCol after Replace")
+	}
+}
+
+// --- ToggleFullRow ---
+
+func TestToggleFullRow_SelectNoneIsNoop(t *testing.T) {
 	m := New(SelectNone)
-	m.Select("a")
-	if m.Count() != 0 {
-		t.Error("SelectNone: Select should be no-op")
+	m.ToggleFullRow(0, 0, 3)
+	if m.Active() {
+		t.Error("ToggleFullRow should be no-op in SelectNone mode")
 	}
 }
 
-func TestSelectNoneSelectAll(t *testing.T) {
-	m := New(SelectNone)
-	m.SelectAll([]string{"a", "b"})
-	if m.Count() != 0 {
-		t.Error("SelectNone: SelectAll should be no-op")
+func TestToggleFullRow_AddsRow(t *testing.T) {
+	m := New(SelectMulti)
+	m.ToggleFullRow(2, 0, 3)
+	if len(m.Rects) != 1 {
+		t.Fatalf("expected 1 rect, got %d", len(m.Rects))
+	}
+	if m.Rects[0].Kind != KindFullRow {
+		t.Error("expected KindFullRow")
+	}
+	if m.Rects[0].Anchor.Row != 2 || m.Rects[0].Cursor.Row != 2 {
+		t.Errorf("expected row 2, got anchor=%d cursor=%d", m.Rects[0].Anchor.Row, m.Rects[0].Cursor.Row)
 	}
 }
 
-func TestSelectNoneSelectedIDs(t *testing.T) {
-	m := New(SelectNone)
-	if len(m.SelectedIDs()) != 0 {
-		t.Error("SelectNone: SelectedIDs should be empty")
+func TestToggleFullRow_RemovesExistingRow(t *testing.T) {
+	m := New(SelectMulti)
+	m.ToggleFullRow(2, 0, 3)
+	m.ToggleFullRow(2, 0, 3) // toggle off
+	if m.Active() {
+		t.Error("expected no rects after toggling same row twice")
 	}
 }
 
-// --- SelectSingle ---
+func TestToggleFullRow_AccumulatesMultipleRows(t *testing.T) {
+	m := New(SelectMulti)
+	m.ToggleFullRow(1, 0, 3)
+	m.ToggleFullRow(5, 0, 3)
+	m.ToggleFullRow(9, 0, 3)
+	if len(m.Rects) != 3 {
+		t.Fatalf("expected 3 rects, got %d", len(m.Rects))
+	}
+}
 
-func TestSelectSingleToggle(t *testing.T) {
+func TestToggleFullRow_RemovesMiddleRow(t *testing.T) {
+	m := New(SelectMulti)
+	m.ToggleFullRow(1, 0, 3)
+	m.ToggleFullRow(5, 0, 3)
+	m.ToggleFullRow(9, 0, 3)
+	m.ToggleFullRow(5, 0, 3) // remove row 5
+	if len(m.Rects) != 2 {
+		t.Fatalf("expected 2 rects after removing middle, got %d", len(m.Rects))
+	}
+}
+
+func TestToggleFullRow_ClearsNonFullRowRects(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindRect, Anchor: Position{0, 0}, Cursor: Position{3, 3}})
+	m.ToggleFullRow(2, 0, 3)
+	if len(m.Rects) != 1 {
+		t.Fatalf("expected 1 rect, got %d", len(m.Rects))
+	}
+	if m.Rects[0].Kind != KindFullRow {
+		t.Error("expected KindFullRow")
+	}
+}
+
+func TestToggleFullRow_SingleModeReplacesExisting(t *testing.T) {
 	m := New(SelectSingle)
-	m.Toggle("a")
-	if !m.IsSelected("a") {
-		t.Error("should select a")
+	m.ToggleFullRow(1, 0, 3)
+	m.ToggleFullRow(5, 0, 3)
+	if len(m.Rects) != 1 {
+		t.Fatalf("expected 1 rect in single mode, got %d", len(m.Rects))
 	}
-	if m.Count() != 1 {
-		t.Errorf("count should be 1, got %d", m.Count())
+	if m.Rects[0].Anchor.Row != 5 {
+		t.Errorf("expected row 5, got %d", m.Rects[0].Anchor.Row)
 	}
 }
 
-func TestSelectSingleToggleDeselect(t *testing.T) {
+// --- ContainsCell ---
+
+func TestContainsCell_NoSelect(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{0, 0}, Cursor: Position{0, 3}})
+	if m.ContainsCell(0, 1, true) {
+		t.Error("ContainsCell should return false when noSelect is true")
+	}
+}
+
+func TestContainsCell_Empty(t *testing.T) {
+	m := New(SelectMulti)
+	if m.ContainsCell(0, 0, false) {
+		t.Error("ContainsCell should return false with no rects")
+	}
+}
+
+func TestContainsCell_FullRow(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{2, 0}, Cursor: Position{4, 3}})
+
+	if !m.ContainsCell(2, 0, false) {
+		t.Error("expected (2,0) in full-row selection")
+	}
+	if !m.ContainsCell(3, 99, false) {
+		t.Error("expected (3,99) in full-row selection (any column)")
+	}
+	if m.ContainsCell(1, 0, false) {
+		t.Error("expected (1,0) NOT in full-row selection")
+	}
+	if m.ContainsCell(5, 0, false) {
+		t.Error("expected (5,0) NOT in full-row selection")
+	}
+}
+
+func TestContainsCell_FullCol(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindFullCol, Anchor: Position{0, 2}, Cursor: Position{9, 4}})
+
+	if !m.ContainsCell(0, 2, false) {
+		t.Error("expected (0,2) in full-col selection")
+	}
+	if !m.ContainsCell(99, 3, false) {
+		t.Error("expected (99,3) in full-col selection (any row)")
+	}
+	if m.ContainsCell(0, 1, false) {
+		t.Error("expected (0,1) NOT in full-col selection")
+	}
+	if m.ContainsCell(0, 5, false) {
+		t.Error("expected (0,5) NOT in full-col selection")
+	}
+}
+
+func TestContainsCell_Rect(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindRect, Anchor: Position{1, 1}, Cursor: Position{3, 3}})
+
+	if !m.ContainsCell(2, 2, false) {
+		t.Error("expected (2,2) in rect selection")
+	}
+	if !m.ContainsCell(1, 1, false) {
+		t.Error("expected (1,1) in rect selection (anchor corner)")
+	}
+	if !m.ContainsCell(3, 3, false) {
+		t.Error("expected (3,3) in rect selection (cursor corner)")
+	}
+	if m.ContainsCell(0, 2, false) {
+		t.Error("expected (0,2) NOT in rect selection")
+	}
+	if m.ContainsCell(2, 0, false) {
+		t.Error("expected (2,0) NOT in rect selection")
+	}
+}
+
+func TestContainsCell_RectReversedAnchors(t *testing.T) {
+	// Anchor > Cursor (selection made upward/leftward)
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindRect, Anchor: Position{5, 5}, Cursor: Position{2, 2}})
+
+	if !m.ContainsCell(3, 3, false) {
+		t.Error("expected (3,3) in reversed-anchor rect")
+	}
+	if m.ContainsCell(1, 3, false) {
+		t.Error("expected (1,3) NOT in reversed-anchor rect")
+	}
+}
+
+// --- FullRowRanges ---
+
+func TestFullRowRanges_Empty(t *testing.T) {
+	m := New(SelectMulti)
+	ranges := m.FullRowRanges()
+	if len(ranges) != 0 {
+		t.Errorf("expected 0 ranges, got %d", len(ranges))
+	}
+}
+
+func TestFullRowRanges_NonRowRectsExcluded(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindRect, Anchor: Position{0, 0}, Cursor: Position{5, 5}})
+	ranges := m.FullRowRanges()
+	if len(ranges) != 0 {
+		t.Errorf("expected 0 ranges for KindRect, got %d", len(ranges))
+	}
+}
+
+func TestFullRowRanges_MultipleRows(t *testing.T) {
+	m := New(SelectMulti)
+	m.ToggleFullRow(1, 0, 3)
+	m.ToggleFullRow(5, 0, 3)
+	m.ToggleFullRow(9, 0, 3)
+	ranges := m.FullRowRanges()
+	if len(ranges) != 3 {
+		t.Fatalf("expected 3 ranges, got %d", len(ranges))
+	}
+}
+
+func TestFullRowRanges_ReversedAnchor(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{5, 0}, Cursor: Position{2, 3}})
+	ranges := m.FullRowRanges()
+	if len(ranges) != 1 {
+		t.Fatalf("expected 1 range, got %d", len(ranges))
+	}
+	if ranges[0][0] != 2 || ranges[0][1] != 5 {
+		t.Errorf("expected (2,5), got (%d,%d)", ranges[0][0], ranges[0][1])
+	}
+}
+
+// --- BoundingRect ---
+
+func TestBoundingRect_Empty(t *testing.T) {
+	m := New(SelectMulti)
+	rLo, rHi, cLo, cHi := m.BoundingRect()
+	if rLo != -1 || rHi != -1 || cLo != -1 || cHi != -1 {
+		t.Errorf("expected (-1,-1,-1,-1), got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
+func TestBoundingRect_SingleRect(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindRect, Anchor: Position{1, 2}, Cursor: Position{4, 5}})
+	rLo, rHi, cLo, cHi := m.BoundingRect()
+	if rLo != 1 || rHi != 4 || cLo != 2 || cHi != 5 {
+		t.Errorf("expected (1,4,2,5), got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
+func TestBoundingRect_MultipleRects(t *testing.T) {
+	m := New(SelectMulti)
+	m.Rects = []Rect{
+		{Kind: KindFullRow, Anchor: Position{2, 0}, Cursor: Position{2, 3}},
+		{Kind: KindFullRow, Anchor: Position{8, 0}, Cursor: Position{8, 3}},
+	}
+	rLo, rHi, cLo, cHi := m.BoundingRect()
+	if rLo != 2 || rHi != 8 || cLo != 0 || cHi != 3 {
+		t.Errorf("expected (2,8,0,3), got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
+func TestBoundingRect_ReversedAnchors(t *testing.T) {
+	m := New(SelectMulti)
+	m.Replace(Rect{Kind: KindRect, Anchor: Position{5, 5}, Cursor: Position{1, 1}})
+	rLo, rHi, cLo, cHi := m.BoundingRect()
+	if rLo != 1 || rHi != 5 || cLo != 1 || cHi != 5 {
+		t.Errorf("expected (1,5,1,5), got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
+// --- Mode enforcement ---
+
+func TestSelectSingle_ReplaceEnforcesOneRect(t *testing.T) {
 	m := New(SelectSingle)
-	m.Toggle("a")
-	m.Toggle("a")
-	if m.IsSelected("a") {
-		t.Error("second toggle should deselect a")
+	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{0, 0}, Cursor: Position{0, 3}})
+	if len(m.Rects) != 1 {
+		t.Fatalf("expected 1 rect, got %d", len(m.Rects))
 	}
-	if m.Count() != 0 {
-		t.Errorf("count should be 0, got %d", m.Count())
+	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{5, 0}, Cursor: Position{5, 3}})
+	if len(m.Rects) != 1 {
+		t.Fatalf("expected 1 rect after second Replace, got %d", len(m.Rects))
 	}
-}
-
-func TestSelectSingleOnlyOne(t *testing.T) {
-	m := New(SelectSingle)
-	m.Toggle("a")
-	m.Toggle("b")
-	if m.IsSelected("a") {
-		t.Error("a should be deselected when b is toggled")
-	}
-	if !m.IsSelected("b") {
-		t.Error("b should be selected")
-	}
-	if m.Count() != 1 {
-		t.Errorf("count should be 1, got %d", m.Count())
-	}
-}
-
-func TestSelectSingleSelectReplaces(t *testing.T) {
-	m := New(SelectSingle)
-	m.Select("a")
-	m.Select("b")
-	if m.IsSelected("a") {
-		t.Error("a should be replaced by b")
-	}
-	if !m.IsSelected("b") {
-		t.Error("b should be selected")
-	}
-}
-
-func TestSelectSingleSelectAllNoop(t *testing.T) {
-	m := New(SelectSingle)
-	m.SelectAll([]string{"a", "b", "c"})
-	if m.Count() != 0 {
-		t.Error("SelectAll should be no-op in single mode")
-	}
-}
-
-func TestSelectSingleDeselectAll(t *testing.T) {
-	m := New(SelectSingle)
-	m.Select("a")
-	m.DeselectAll()
-	if m.Count() != 0 {
-		t.Error("DeselectAll should clear selection")
-	}
-}
-
-// --- SelectMulti ---
-
-func TestSelectMultiToggleAccumulates(t *testing.T) {
-	m := New(SelectMulti)
-	m.Toggle("a")
-	m.Toggle("b")
-	if !m.IsSelected("a") || !m.IsSelected("b") {
-		t.Error("both a and b should be selected")
-	}
-	if m.Count() != 2 {
-		t.Errorf("count should be 2, got %d", m.Count())
-	}
-}
-
-func TestSelectMultiToggleDeselects(t *testing.T) {
-	m := New(SelectMulti)
-	m.Toggle("a")
-	m.Toggle("b")
-	m.Toggle("a")
-	if m.IsSelected("a") {
-		t.Error("a should be deselected")
-	}
-	if !m.IsSelected("b") {
-		t.Error("b should still be selected")
-	}
-	if m.Count() != 1 {
-		t.Errorf("count should be 1, got %d", m.Count())
-	}
-}
-
-func TestSelectMultiSelectAdds(t *testing.T) {
-	m := New(SelectMulti)
-	m.Select("a")
-	m.Select("b")
-	if !m.IsSelected("a") || !m.IsSelected("b") {
-		t.Error("both should be selected")
-	}
-}
-
-func TestSelectMultiSelectAll(t *testing.T) {
-	m := New(SelectMulti)
-	m.SelectAll([]string{"a", "b", "c"})
-	if m.Count() != 3 {
-		t.Errorf("count should be 3, got %d", m.Count())
-	}
-}
-
-func TestSelectMultiDeselectAll(t *testing.T) {
-	m := New(SelectMulti)
-	m.SelectAll([]string{"a", "b", "c"})
-	m.DeselectAll()
-	if m.Count() != 0 {
-		t.Error("DeselectAll should clear all")
-	}
-}
-
-func TestSelectMultiDeselect(t *testing.T) {
-	m := New(SelectMulti)
-	m.SelectAll([]string{"a", "b", "c"})
-	m.Deselect("b")
-	if m.IsSelected("b") {
-		t.Error("b should be deselected")
-	}
-	if m.Count() != 2 {
-		t.Errorf("count should be 2, got %d", m.Count())
-	}
-}
-
-// --- Count and SelectedIDs ---
-
-func TestSelectedIDsContent(t *testing.T) {
-	m := New(SelectMulti)
-	m.Select("x")
-	m.Select("y")
-	m.Select("z")
-
-	ids := m.SelectedIDs()
-	sort.Strings(ids)
-	if len(ids) != 3 || ids[0] != "x" || ids[1] != "y" || ids[2] != "z" {
-		t.Errorf("unexpected IDs: %v", ids)
-	}
-}
-
-// --- Retain ---
-
-func TestRetain(t *testing.T) {
-	m := New(SelectMulti)
-	m.SelectAll([]string{"a", "b", "c", "d"})
-	if m.Count() != 4 {
-		t.Fatalf("expected 4 selected, got %d", m.Count())
-	}
-
-	// Retain only "b" and "d"
-	m.Retain(map[string]bool{"b": true, "d": true})
-	if m.Count() != 2 {
-		t.Errorf("expected 2 after Retain, got %d", m.Count())
-	}
-	if !m.IsSelected("b") {
-		t.Error("expected b to be retained")
-	}
-	if !m.IsSelected("d") {
-		t.Error("expected d to be retained")
-	}
-	if m.IsSelected("a") {
-		t.Error("expected a to be pruned")
-	}
-	if m.IsSelected("c") {
-		t.Error("expected c to be pruned")
-	}
-}
-
-func TestRetainEmptyValidSet(t *testing.T) {
-	m := New(SelectMulti)
-	m.SelectAll([]string{"a", "b"})
-	m.Retain(map[string]bool{})
-	if m.Count() != 0 {
-		t.Errorf("expected 0 after Retain with empty set, got %d", m.Count())
-	}
-}
-
-// --- Anchor ---
-
-func TestAnchorDefault(t *testing.T) {
-	m := New(SelectMulti)
-	if m.Anchor() != -1 {
-		t.Errorf("default anchor should be -1, got %d", m.Anchor())
-	}
-}
-
-func TestAnchorSetGet(t *testing.T) {
-	m := New(SelectMulti)
-	m.SetAnchor(5)
-	if m.Anchor() != 5 {
-		t.Errorf("anchor should be 5, got %d", m.Anchor())
-	}
-}
-
-// --- SelectRange ---
-
-func TestSelectRangeSelectNoneNoop(t *testing.T) {
-	m := New(SelectNone)
-	m.SelectRange([]string{"a", "b", "c"})
-	if m.Count() != 0 {
-		t.Errorf("SelectNone: SelectRange should be no-op, got count %d", m.Count())
-	}
-}
-
-func TestSelectRangeEmptyIDs(t *testing.T) {
-	m := New(SelectMulti)
-	m.Select("a")
-	m.SelectRange([]string{})
-	if !m.IsSelected("a") {
-		t.Error("empty ids should not alter existing selection")
-	}
-	if m.Count() != 1 {
-		t.Errorf("count should be 1, got %d", m.Count())
-	}
-}
-
-func TestSelectRangeSingleMode(t *testing.T) {
-	m := New(SelectSingle)
-	m.SelectRange([]string{"a", "b", "c"})
-	if m.IsSelected("a") {
-		t.Error("a should not be selected in single mode")
-	}
-	if m.IsSelected("b") {
-		t.Error("b should not be selected in single mode")
-	}
-	if !m.IsSelected("c") {
-		t.Error("c (last id) should be selected in single mode")
-	}
-	if m.Count() != 1 {
-		t.Errorf("count should be 1, got %d", m.Count())
-	}
-}
-
-func TestSelectRangeMultiMode(t *testing.T) {
-	m := New(SelectMulti)
-	m.SelectRange([]string{"a", "b", "c"})
-	if m.Count() != 3 {
-		t.Errorf("count should be 3, got %d", m.Count())
-	}
-	if !m.IsSelected("a") {
-		t.Error("a should be selected")
-	}
-	if !m.IsSelected("b") {
-		t.Error("b should be selected")
-	}
-	if !m.IsSelected("c") {
-		t.Error("c should be selected")
-	}
-}
-
-func TestSelectRangeReplacesExisting(t *testing.T) {
-	m := New(SelectMulti)
-	m.Select("x")
-	m.Select("y")
-	if m.Count() != 2 {
-		t.Fatalf("expected 2 selected before SelectRange, got %d", m.Count())
-	}
-
-	m.SelectRange([]string{"a", "b"})
-	if m.Count() != 2 {
-		t.Errorf("count should be 2, got %d", m.Count())
-	}
-	if m.IsSelected("x") {
-		t.Error("x should no longer be selected after SelectRange")
-	}
-	if m.IsSelected("y") {
-		t.Error("y should no longer be selected after SelectRange")
-	}
-	if !m.IsSelected("a") {
-		t.Error("a should be selected")
-	}
-	if !m.IsSelected("b") {
-		t.Error("b should be selected")
+	if m.Rects[0].Anchor.Row != 5 {
+		t.Errorf("expected row 5, got %d", m.Rects[0].Anchor.Row)
 	}
 }

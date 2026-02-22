@@ -54,10 +54,7 @@ type Model[T any] struct {
 	vp viewport
 
 	// Selection
-	sel             selection.Model
-	colSelectAnchor int          // -1 = no column selection (C key)
-	colSelectCursor int          // -1 = no column selection (C key)
-	rectAnchor      CellPosition // Row=-1 means no rectangular selection (shift+nav)
+	sel selection.Model
 
 	// Sorting
 	sortModel gridsort.Model[T]
@@ -112,10 +109,7 @@ func New[T any](opts ...Option[T]) Model[T] {
 		Help:             help.New(),
 		styles:           DefaultStyles(),
 		vp:               newViewport(),
-		sel:              selection.New(selection.SelectNone),
-		colSelectAnchor:  -1,
-		colSelectCursor:  -1,
-		rectAnchor:       CellPosition{Row: -1, Col: -1},
+		sel: selection.New(selection.SelectNone),
 		groupModel:       grouping.Model[T]{Expanded: make(map[string]bool), DefaultExpanded: -1},
 		defaultRowHeight: 1,
 		dirty:            true,
@@ -207,7 +201,7 @@ func (m *Model[T]) RemoveRow(id string) {
 	for i := range m.rows {
 		if m.rows[i].ID == id {
 			m.rows = append(m.rows[:i], m.rows[i+1:]...)
-			m.sel.Deselect(id)
+			m.sel.Clear()
 			m.dirty = true
 			return
 		}
@@ -240,120 +234,158 @@ func (m Model[T]) FocusedCell() CellPosition        { return m.focusedCell }
 // --- Selection ---
 
 func (m Model[T]) SelectedRows() []T {
-	ids := m.sel.SelectedIDs()
-	idSet := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		idSet[id] = true
+	ranges := m.sel.FullRowRanges()
+	if len(ranges) == 0 {
+		return nil
 	}
 	var result []T
-	for _, rn := range m.rows {
-		if idSet[rn.ID] {
-			result = append(result, rn.Data)
+	for _, rn := range m.displayRows {
+		if rn.IsGroup {
+			continue
+		}
+		for _, r := range ranges {
+			if rn.RowIndex >= r[0] && rn.RowIndex <= r[1] {
+				result = append(result, rn.Data)
+				break
+			}
 		}
 	}
 	return result
 }
 
 func (m Model[T]) SelectedRowNodes() []*data.RowNode[T] {
-	ids := m.sel.SelectedIDs()
-	idSet := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		idSet[id] = true
+	ranges := m.sel.FullRowRanges()
+	if len(ranges) == 0 {
+		return nil
 	}
 	var result []*data.RowNode[T]
-	for i := range m.rows {
-		if idSet[m.rows[i].ID] {
-			result = append(result, &m.rows[i])
+	for i := range m.displayRows {
+		rn := &m.displayRows[i]
+		if rn.IsGroup {
+			continue
+		}
+		for _, r := range ranges {
+			if rn.RowIndex >= r[0] && rn.RowIndex <= r[1] {
+				result = append(result, rn)
+				break
+			}
 		}
 	}
 	return result
 }
 
-// selectedRowNodes returns row nodes for all selected IDs (used for emitting SelectionChangedMsg).
+// selectedRowNodes returns row nodes for all full-row-selected rows (used for emitting SelectionChangedMsg).
 func (m Model[T]) selectedRowNodes() []data.RowNode[T] {
-	ids := m.sel.SelectedIDs()
-	idSet := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		idSet[id] = true
+	ranges := m.sel.FullRowRanges()
+	if len(ranges) == 0 {
+		return nil
 	}
 	var result []data.RowNode[T]
-	for _, rn := range m.rows {
-		if idSet[rn.ID] {
-			result = append(result, rn)
+	for _, rn := range m.displayRows {
+		if rn.IsGroup {
+			continue
+		}
+		for _, r := range ranges {
+			if rn.RowIndex >= r[0] && rn.RowIndex <= r[1] {
+				result = append(result, rn)
+				break
+			}
 		}
 	}
 	return result
 }
 
-func (m *Model[T]) SelectRow(id string)   { m.sel.Select(id) }
-func (m *Model[T]) DeselectRow(id string) { m.sel.Deselect(id) }
-func (m *Model[T]) SelectAll() {
-	ids := make([]string, len(m.displayRows))
+func (m *Model[T]) SelectRow(id string) {
 	for i, rn := range m.displayRows {
-		ids[i] = rn.ID
+		if rn.ID == id {
+			m.sel.Replace(selection.Rect{
+				Kind:   selection.KindFullRow,
+				Anchor: selection.Position{Row: i, Col: 0},
+				Cursor: selection.Position{Row: i, Col: len(m.cols) - 1},
+			})
+			return
+		}
 	}
-	m.sel.SelectAll(ids)
 }
-func (m *Model[T]) DeselectAll() {
-	m.sel.DeselectAll()
-	m.sel.SetAnchor(-1)
-	m.colSelectAnchor = -1
-	m.colSelectCursor = -1
-	m.rectAnchor = CellPosition{Row: -1, Col: -1}
-}
-func (m Model[T]) IsSelected(id string) bool { return m.sel.IsSelected(id) }
 
-// SelectColumn selects all cells in the given column, clearing row selection.
+func (m *Model[T]) DeselectRow(id string) {
+	if len(m.sel.Rects) == 1 && m.sel.Rects[0].Kind == selection.KindFullRow {
+		rLo, rHi := m.sel.Rects[0].Anchor.Row, m.sel.Rects[0].Cursor.Row
+		if rLo > rHi {
+			rLo, rHi = rHi, rLo
+		}
+		for i := rLo; i <= rHi; i++ {
+			if i < len(m.displayRows) && m.displayRows[i].ID == id && rLo == rHi {
+				m.sel.Clear()
+				return
+			}
+		}
+	}
+}
+
+func (m *Model[T]) SelectAll() {
+	if len(m.displayRows) == 0 {
+		return
+	}
+	m.sel.Replace(selection.Rect{
+		Kind:   selection.KindFullRow,
+		Anchor: selection.Position{Row: 0, Col: 0},
+		Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: len(m.cols) - 1},
+	})
+}
+
+func (m *Model[T]) DeselectAll() {
+	m.sel.Clear()
+}
+
+func (m Model[T]) IsSelected(id string) bool {
+	ranges := m.sel.FullRowRanges()
+	for _, r := range ranges {
+		for i := r[0]; i <= r[1]; i++ {
+			if i >= 0 && i < len(m.displayRows) && m.displayRows[i].ID == id {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// SelectColumn selects all cells in the given column, clearing other selection.
 func (m *Model[T]) SelectColumn(colIdx int) {
-	m.sel.DeselectAll()
-	m.colSelectAnchor = colIdx
-	m.colSelectCursor = colIdx
+	m.sel.Replace(selection.Rect{
+		Kind:   selection.KindFullCol,
+		Anchor: selection.Position{Row: 0, Col: colIdx},
+		Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: colIdx},
+	})
 }
 
 // DeselectColumns clears column selection.
 func (m *Model[T]) DeselectColumns() {
-	m.colSelectAnchor = -1
-	m.colSelectCursor = -1
+	if len(m.sel.Rects) > 0 && m.sel.Rects[0].Kind == selection.KindFullCol {
+		m.sel.Clear()
+	}
 }
 
-// IsColumnSelected returns true if the given column index is selected.
+// IsColumnSelected returns true if the given column index is within a KindFullCol rect.
 func (m Model[T]) IsColumnSelected(colIdx int) bool {
-	lo, hi := m.colSelectionRange()
-	return lo >= 0 && colIdx >= lo && colIdx <= hi
+	for _, r := range m.sel.Rects {
+		if r.Kind == selection.KindFullCol {
+			cLo, cHi := r.Anchor.Col, r.Cursor.Col
+			if cLo > cHi {
+				cLo, cHi = cHi, cLo
+			}
+			if colIdx >= cLo && colIdx <= cHi {
+				return true
+			}
+		}
+	}
+	return false
 }
 
-// colSelectionRange returns the ordered range of selected columns, or (-1, -1) if none.
-func (m Model[T]) colSelectionRange() (lo, hi int) {
-	if m.colSelectAnchor < 0 || m.colSelectCursor < 0 {
-		return -1, -1
-	}
-	lo, hi = m.colSelectAnchor, m.colSelectCursor
-	if lo > hi {
-		lo, hi = hi, lo
-	}
-	return lo, hi
-}
-
-// SelectionRect returns the rectangular selection bounds, or (-1,-1,-1,-1) if inactive.
+// SelectionRect returns the bounding rectangle of the selection, or (-1,-1,-1,-1) if inactive.
 // Row values are display row indices; column values are grid column indices.
 func (m Model[T]) SelectionRect() (rowLo, rowHi, colLo, colHi int) {
-	return m.selectionRect()
-}
-
-// selectionRect returns the rectangular selection bounds, or (-1,-1,-1,-1) if inactive.
-func (m Model[T]) selectionRect() (rowLo, rowHi, colLo, colHi int) {
-	if m.rectAnchor.Row < 0 {
-		return -1, -1, -1, -1
-	}
-	rowLo, rowHi = m.rectAnchor.Row, m.focusedCell.Row
-	if rowLo > rowHi {
-		rowLo, rowHi = rowHi, rowLo
-	}
-	colLo, colHi = m.rectAnchor.Col, m.focusedCell.Col
-	if colLo > colHi {
-		colLo, colHi = colHi, colLo
-	}
-	return rowLo, rowHi, colLo, colHi
+	return m.sel.BoundingRect()
 }
 
 // --- Sorting ---
@@ -507,11 +539,8 @@ func (m *Model[T]) setRowData(rows []T) {
 }
 
 func (m *Model[T]) pruneSelection() {
-	validIDs := make(map[string]bool, len(m.rows))
-	for _, rn := range m.rows {
-		validIDs[rn.ID] = true
-	}
-	m.sel.Retain(validIDs)
+	// Index-based selection is invalidated by data changes (sort/filter/SetRows).
+	m.sel.Clear()
 }
 
 func (m *Model[T]) makeRowNode(d T) data.RowNode[T] {

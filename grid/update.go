@@ -8,6 +8,7 @@ import (
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
+	"github.com/pgavlin/tea-grid/selection"
 )
 
 // Update handles messages and returns the updated model.
@@ -264,38 +265,33 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 
 	// Selection
 	case key.Matches(msg, m.KeyMap.SelectRow):
-		m.sel.DeselectAll()
-		m.sel.Select(rn.ID)
-		m.sel.SetAnchor(m.focusedCell.Row)
-		m.colSelectAnchor = -1
-		m.colSelectCursor = -1
-		m.rectAnchor = CellPosition{Row: -1, Col: -1}
+		m.sel.Replace(selection.Rect{
+			Kind:   selection.KindFullRow,
+			Anchor: selection.Position{Row: m.focusedCell.Row, Col: 0},
+			Cursor: selection.Position{Row: m.focusedCell.Row, Col: len(m.cols) - 1},
+		})
 		return m, func() tea.Msg {
-			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
+			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes(), Kind: selection.KindFullRow}
 		}
 
 	case key.Matches(msg, m.KeyMap.SelectColumn):
 		colIdx := m.focusedCell.Col
 		if colIdx >= 0 && colIdx < len(m.cols) && !m.cols[colIdx].NoSelect {
-			m.sel.DeselectAll()
-			m.sel.SetAnchor(-1)
-			m.colSelectAnchor = colIdx
-			m.colSelectCursor = colIdx
-			m.rectAnchor = CellPosition{Row: -1, Col: -1}
+			m.sel.Replace(selection.Rect{
+				Kind:   selection.KindFullCol,
+				Anchor: selection.Position{Row: 0, Col: colIdx},
+				Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: colIdx},
+			})
 			return m, func() tea.Msg {
-				return SelectionChangedMsg[T]{Selected: nil}
+				return SelectionChangedMsg[T]{Selected: nil, Kind: selection.KindFullCol}
 			}
 		}
 		return m, nil
 
 	case key.Matches(msg, m.KeyMap.Select):
-		m.sel.Toggle(rn.ID)
-		m.sel.SetAnchor(-1)
-		m.colSelectAnchor = -1
-		m.colSelectCursor = -1
-		m.rectAnchor = CellPosition{Row: -1, Col: -1}
+		m.sel.ToggleFullRow(m.focusedCell.Row, 0, len(m.cols)-1)
 		return m, func() tea.Msg {
-			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
+			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes(), Kind: selection.KindFullRow}
 		}
 
 	// Editing
@@ -490,11 +486,8 @@ func (m Model[T]) startFilterEdit() (Model[T], tea.Cmd) {
 func (m Model[T]) moveFocus(newRow, newCol int) (Model[T], tea.Cmd) {
 	prev := m.focusedCell
 
-	// Clear selection anchors on plain navigation
-	m.sel.SetAnchor(-1)
-	m.colSelectAnchor = -1
-	m.colSelectCursor = -1
-	m.rectAnchor = CellPosition{Row: -1, Col: -1}
+	// Clear selection on plain navigation
+	m.sel.Clear()
 
 	// Clamp row: -1 = header, 0..len-1 = data rows
 	totalRows := len(m.displayRows)
@@ -688,25 +681,23 @@ func (m Model[T]) toggleCurrentGroup() (Model[T], tea.Cmd) {
 // shiftMoveFocus expands the rectangular selection toward (newRow, newCol).
 // The anchor stays fixed at the starting cell; the cursor (focusedCell) moves.
 func (m Model[T]) shiftMoveFocus(newRow, newCol int) (Model[T], tea.Cmd) {
-	// Initialize rectangle anchor from current focus if not set
-	anchor := m.rectAnchor
-	if anchor.Row < 0 {
-		anchor = m.focusedCell
+	// Capture anchor: if active KindRect, keep its anchor; otherwise use current focus
+	anchor := selection.Position{Row: m.focusedCell.Row, Col: m.focusedCell.Col}
+	if m.sel.Active() && len(m.sel.Rects) == 1 && m.sel.Rects[0].Kind == selection.KindRect {
+		anchor = m.sel.Rects[0].Anchor
 	}
 
-	// Clear row and column selection (shift+nav is mutually exclusive)
-	m.sel.DeselectAll()
-	m.sel.SetAnchor(-1)
-	m.colSelectAnchor = -1
-	m.colSelectCursor = -1
-
-	// Move focus (this clears all anchors including rectAnchor)
+	// Move focus (this clears selection)
 	m, cmd := m.moveFocus(newRow, newCol)
 
-	// Restore rectangle anchor
-	m.rectAnchor = anchor
+	// Set rectangular selection from anchor to new focus
+	m.sel.Replace(selection.Rect{
+		Kind:   selection.KindRect,
+		Anchor: anchor,
+		Cursor: selection.Position{Row: m.focusedCell.Row, Col: m.focusedCell.Col},
+	})
 
 	return m, tea.Batch(cmd, func() tea.Msg {
-		return SelectionChangedMsg[T]{Selected: nil}
+		return SelectionChangedMsg[T]{Selected: m.selectedRowNodes(), Kind: selection.KindRect}
 	})
 }
