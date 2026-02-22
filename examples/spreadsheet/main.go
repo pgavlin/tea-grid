@@ -615,10 +615,11 @@ func (m *model) updateSidebarTarget() {
 	if pos.Col > 0 && pos.Col <= m.numCols {
 		colLetter := indexToColLetter(pos.Col - 1)
 		rowIdx := pos.Row
+		var cell *Cell
 		if rowIdx >= 0 && rowIdx < len(m.rows) {
-			cell := m.rows[rowIdx].Cells[colLetter]
-			m.sidebar.SetTarget(colLetter, rowIdx, cell, m.colFmts[colLetter])
+			cell = m.rows[rowIdx].Cells[colLetter]
 		}
+		m.sidebar.SetTarget(colLetter, rowIdx, cell, m.colFmts[colLetter])
 	}
 }
 
