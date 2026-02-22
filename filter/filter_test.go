@@ -1166,3 +1166,288 @@ func TestTimeFilterUpdateTypingRange(t *testing.T) {
 		t.Error("should not match a time before the range")
 	}
 }
+
+// ==========================================================================
+// Additional coverage gap tests
+// ==========================================================================
+
+// 1. SetFilter.Include - call Include() and verify the value is included
+func TestSetFilterIncludeReIncludesExcludedValue(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Exclude("b")
+	if f.Matches("b") {
+		t.Error("b should be excluded after Exclude")
+	}
+	f.Include("b")
+	if !f.Matches("b") {
+		t.Error("b should be included after Include")
+	}
+	if f.Active() {
+		t.Error("filter should be inactive when all values are included")
+	}
+}
+
+// 2. SetFilter.View not editing - create a SetFilter with excluded values, don't focus, call View()
+func TestSetFilterViewNotEditingReturnsEmptyEvenWhenActive(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Exclude("a") // Make the filter active
+	if !f.Active() {
+		t.Error("filter should be active after excluding")
+	}
+	v := f.View()
+	if v != "" {
+		t.Errorf("View when not editing should return empty string even when active, got %q", v)
+	}
+}
+
+// 3. SetFilter.Update non-editing KeyMsg - send a KeyMsg without focusing first
+func TestSetFilterUpdateNonEditingKeyMsgIgnored(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	// Send a KeyMsg (Tab) without focusing first
+	result, cmd := f.Update(keyMsg(tea.KeyTab))
+	sf := result.(*SetFilter)
+	if sf.editing {
+		t.Error("should not be editing")
+	}
+	if sf.inList {
+		t.Error("should not enter list mode when not editing")
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil")
+	}
+}
+
+// 4. SetFilter.ensureVisible scroll up - navigate upward past the visible area
+func TestSetFilterEnsureVisibleScrollUp(t *testing.T) {
+	// Create a set with many values and a small maxLines to force scrolling
+	values := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+	f := NewSetFilter(values...)
+	f.Update(FilterFocusMsg{Width: 30, MaxLines: 3}) // 3 lines total, 2 for list (1 for search)
+
+	// Enter list mode and navigate to the bottom
+	f.Update(keyMsg(tea.KeyDown))
+	// Navigate down several times to push scrollTop forward
+	for i := 0; i < 8; i++ {
+		f.Update(keyMsg(tea.KeyDown))
+	}
+
+	// Now selectedIdx should be at 8, and scrollTop should have moved
+	if f.selectedIdx != 8 {
+		t.Errorf("expected selectedIdx 8, got %d", f.selectedIdx)
+	}
+	if f.scrollTop == 0 {
+		t.Error("scrollTop should have moved from 0")
+	}
+
+	savedScrollTop := f.scrollTop
+
+	// Now navigate UP past the visible area to trigger selectedIdx < scrollTop path
+	// We need to go up enough so that selectedIdx < scrollTop
+	f.Update(keyMsg(tea.KeyUp))
+	f.Update(keyMsg(tea.KeyUp))
+
+	// selectedIdx should now be less than the saved scrollTop,
+	// which should have triggered the ensureVisible scroll-up path
+	if f.selectedIdx != 6 {
+		t.Errorf("expected selectedIdx 6, got %d", f.selectedIdx)
+	}
+	// scrollTop should now be <= selectedIdx
+	if f.scrollTop > f.selectedIdx {
+		t.Errorf("scrollTop (%d) should be <= selectedIdx (%d)", f.scrollTop, f.selectedIdx)
+	}
+	// Verify it actually scrolled up from where it was
+	if f.scrollTop >= savedScrollTop {
+		t.Errorf("scrollTop (%d) should have decreased from %d", f.scrollTop, savedScrollTop)
+	}
+}
+
+// 5. NumberFilter.Matches with float32
+func TestNumberFilterMatchesFloat32(t *testing.T) {
+	f := NewNumberFilter()
+	f.SetText("5")
+	if !f.Matches(float32(5.0)) {
+		t.Error("should match float32(5.0)")
+	}
+	if f.Matches(float32(6.0)) {
+		t.Error("should not match float32(6.0)")
+	}
+}
+
+// 6. NumberFilter.Matches with unsupported type (string)
+func TestNumberFilterMatchesUnsupportedType(t *testing.T) {
+	f := NewNumberFilter()
+	f.SetText("5")
+	if f.Matches("five") {
+		t.Error("string value should not match (unsupported type returns false)")
+	}
+	if f.Matches("5") {
+		t.Error("string '5' should not match (unsupported type returns false)")
+	}
+}
+
+// 7. TextFilter.SetRegex empty text - call SetRegex(true) when text is ""
+func TestTextFilterSetRegexEmptyText(t *testing.T) {
+	f := NewTextFilter()
+	// Text is empty by default
+	f.SetRegex(true)
+	if f.compiled != nil {
+		t.Error("compiled should be nil when text is empty and regex is enabled")
+	}
+	if f.Active() {
+		t.Error("should not be active with empty text")
+	}
+	// Should still match anything since filter is inactive (empty text)
+	if !f.Matches("anything") {
+		t.Error("empty regex filter should match via substring (empty substring matches all)")
+	}
+}
+
+// 8. BoolFilter.View state=2 non-editing - toggle to false state, check View outside editing
+func TestBoolFilterViewFalseStateNotEditing(t *testing.T) {
+	f := NewBoolFilter()
+	f.Toggle() // any -> true (state=1)
+	f.Toggle() // true -> false (state=2)
+	// Not editing - should return "false"
+	v := f.View()
+	if v != "false" {
+		t.Errorf("expected 'false' for state=2 non-editing, got %q", v)
+	}
+}
+
+// 9. TimeFilter.Matches with *time.Time (non-nil pointer)
+func TestTimeFilterMatchesPointerToTime(t *testing.T) {
+	f := NewTimeFilter()
+	f.SetText("2024-06-15")
+	tm := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
+	if !f.Matches(&tm) {
+		t.Error("should match *time.Time pointing to a matching date")
+	}
+	tmOther := time.Date(2024, 7, 1, 0, 0, 0, 0, time.UTC)
+	if f.Matches(&tmOther) {
+		t.Error("should not match *time.Time pointing to a non-matching date")
+	}
+}
+
+// 10. TimeFilter.Matches with nil *time.Time
+func TestTimeFilterMatchesNilPointerToTime(t *testing.T) {
+	f := NewTimeFilter()
+	f.SetText("2024-06-15")
+	var tp *time.Time
+	if f.Matches(tp) {
+		t.Error("nil *time.Time should not match")
+	}
+}
+
+// Additional: TimeFilter.Matches with non-time type returns false
+func TestTimeFilterMatchesNonTimeType(t *testing.T) {
+	f := NewTimeFilter()
+	f.SetText("2024-06-15")
+	if f.Matches("2024-06-15") {
+		t.Error("string value should not match (not a time.Time)")
+	}
+	if f.Matches(42) {
+		t.Error("int value should not match (not a time.Time)")
+	}
+}
+
+// ==========================================================================
+// Final coverage gap tests
+// ==========================================================================
+
+// 1. TextFilter.SetRegex with text already set - covers line 44 in builtin.go
+//    (the `f.compiled, _ = regexp.Compile(f.editor.Text())` branch inside SetRegex)
+func TestTextFilterSetRegexWithTextAlreadySet(t *testing.T) {
+	f := NewTextFilter()
+	// Set text FIRST, then enable regex so SetRegex sees non-empty text
+	f.SetText(`^\d+$`)
+	f.SetRegex(true)
+	if f.compiled == nil {
+		t.Error("compiled should be non-nil after SetRegex(true) with non-empty text")
+	}
+	if !f.Matches("123") {
+		t.Error("regex should match digits after SetRegex(true) on pre-set text")
+	}
+	if f.Matches("abc") {
+		t.Error("regex should not match letters")
+	}
+}
+
+// 2. SetFilter.View with maxLines=1 - covers the `listLines < 1` branch in View()
+//    When maxLines=1, listLines = 1-1 = 0, which triggers listLines = 1.
+func TestSetFilterViewWithMaxLinesOne(t *testing.T) {
+	f := NewSetFilter("alpha", "beta", "gamma")
+	f.Update(FilterFocusMsg{Width: 30, MaxLines: 1})
+	v := f.View()
+	if v == "" {
+		t.Error("View should not be empty even with maxLines=1")
+	}
+	// Should contain the search line and at least one list item
+	if !strings.Contains(v, "alpha") {
+		t.Error("View should contain at least one list item when maxLines=1")
+	}
+}
+
+// 3. SetFilter.Update with an unknown message type - covers the final `return f, nil`
+//    after the type switch (reached only for message types other than Focus/Blur/KeyMsg).
+type unknownMsg struct{}
+
+func TestSetFilterUpdateUnknownMsgType(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	result, cmd := f.Update(unknownMsg{})
+	sf := result.(*SetFilter)
+	if sf.editing {
+		t.Error("should not be editing")
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil for unknown message type")
+	}
+}
+
+// 4. SetFilter.ensureVisible with maxLines=1 - covers the `listLines < 1` branch
+//    in ensureVisible(). When maxLines=1, listLines=0, which triggers listLines=1.
+func TestSetFilterEnsureVisibleWithMaxLinesOne(t *testing.T) {
+	values := []string{"a", "b", "c", "d", "e"}
+	f := NewSetFilter(values...)
+	// maxLines=1 means listLines = 1-1 = 0 < 1, so listLines is set to 1
+	f.Update(FilterFocusMsg{Width: 30, MaxLines: 1})
+
+	// Enter list mode and navigate down to trigger ensureVisible
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(keyMsg(tea.KeyDown))
+
+	if f.selectedIdx != 1 {
+		t.Errorf("expected selectedIdx 1, got %d", f.selectedIdx)
+	}
+	// scrollTop should have adjusted so selectedIdx is visible
+	if f.scrollTop > f.selectedIdx {
+		t.Errorf("scrollTop (%d) should be <= selectedIdx (%d)", f.scrollTop, f.selectedIdx)
+	}
+}
+
+// 5. BoolFilter.View state=2 while editing - covers `falseR = "(\u25cf)"` in View()
+//    Toggle twice to reach state=2 (false) while editing.
+func TestBoolFilterViewEditingFalseState(t *testing.T) {
+	f := NewBoolFilter()
+	f.Update(FilterFocusMsg{Width: 40, MaxLines: 5})
+
+	// Toggle to true (state=1)
+	f.Update(keyMsg(tea.KeySpace))
+	// Toggle to false (state=2)
+	f.Update(keyMsg(tea.KeySpace))
+	if f.state != 2 {
+		t.Fatalf("expected state 2, got %d", f.state)
+	}
+
+	v := f.View()
+	// The "False" radio should now be the one with a filled dot.
+	if !strings.Contains(v, "(\u25cf) False") {
+		t.Errorf("False radio should be selected in editing view, got %q", v)
+	}
+	// The "Any" and "True" radios should be empty
+	if !strings.Contains(v, "( ) Any") {
+		t.Errorf("Any radio should be empty in editing view, got %q", v)
+	}
+	if !strings.Contains(v, "( ) True") {
+		t.Errorf("True radio should be empty in editing view, got %q", v)
+	}
+}

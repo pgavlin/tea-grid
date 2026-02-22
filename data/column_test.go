@@ -466,3 +466,608 @@ func TestFromRowsUnsupportedType(t *testing.T) {
 		t.Errorf("expected nil for unsupported type, got %v", cols)
 	}
 }
+
+// --- FromType: nil pointer value ---
+
+func TestFromTypeNilPointerValue(t *testing.T) {
+	cols := FromType[*Person]()
+	if len(cols) != 2 {
+		t.Fatalf("expected 2 columns, got %d", len(cols))
+	}
+	// ValueGetter with a nil pointer should return nil.
+	var p *Person
+	v := cols[0].ValueGetter(p)
+	if v != nil {
+		t.Errorf("nil pointer ValueGetter should return nil, got %v", v)
+	}
+}
+
+// --- FromRows: interface type with nil rows ---
+
+func TestFromRowsInterfaceAllNil(t *testing.T) {
+	rows := []any{nil, nil, nil}
+	cols := FromRows(rows)
+	if cols != nil {
+		t.Errorf("all nil interface rows: expected nil, got %v", cols)
+	}
+}
+
+// --- FromRows: ptr-to-struct type ---
+
+func TestFromRowsPtrToStruct(t *testing.T) {
+	rows := []*Person{
+		{Name: "Alice", Age: 30},
+		{Name: "Bob", Age: 25},
+	}
+	cols := FromRows(rows)
+	if len(cols) != 2 {
+		t.Fatalf("expected 2 columns for *Person, got %d", len(cols))
+	}
+}
+
+// --- FromRows: ptr-to-non-struct ---
+
+func TestFromRowsPtrToNonStruct(t *testing.T) {
+	s := "hello"
+	rows := []*string{&s}
+	cols := FromRows(rows)
+	if cols != nil {
+		t.Errorf("ptr to non-struct: expected nil, got %v", cols)
+	}
+}
+
+// --- FromRows: int type (unsupported) ---
+
+func TestFromRowsIntType(t *testing.T) {
+	rows := []int{1, 2, 3}
+	cols := FromRows(rows)
+	if cols != nil {
+		t.Errorf("int type: expected nil, got %v", cols)
+	}
+}
+
+// --- columnsFromMap: interface-wrapped map row ---
+
+func TestColumnsFromMapInterfaceWrapped(t *testing.T) {
+	// Use any type with actual map[string]any values.
+	rows := []any{
+		map[string]any{"x": "hello"},
+		map[string]any{"x": "world"},
+	}
+	cols := columnsFromMap(rows)
+	if len(cols) != 1 {
+		t.Fatalf("expected 1 column, got %d", len(cols))
+	}
+	if cols[0].ColumnID != "x" {
+		t.Errorf("expected column ID 'x', got %q", cols[0].ColumnID)
+	}
+}
+
+// --- makeMapColumn: bool category with nil value ---
+
+func TestMakeMapColumnBoolNilValue(t *testing.T) {
+	col := makeMapColumn[map[string]any]("flag", "bool")
+	// Row with nil value for the key.
+	row := map[string]any{"flag": nil}
+	v := col.ValueGetter(row)
+	if v != nil {
+		t.Errorf("bool category nil value: expected nil, got %v", v)
+	}
+}
+
+// --- makeMapColumn: bool category with valid value ---
+
+func TestMakeMapColumnBoolValue(t *testing.T) {
+	col := makeMapColumn[map[string]any]("flag", "bool")
+	row := map[string]any{"flag": true}
+	v := col.ValueGetter(row)
+	if v != true {
+		t.Errorf("bool category: expected true, got %v", v)
+	}
+}
+
+// --- makeMapColumn: bool category with non-bool value ---
+
+func TestMakeMapColumnBoolNonBoolValue(t *testing.T) {
+	col := makeMapColumn[map[string]any]("flag", "bool")
+	row := map[string]any{"flag": "notbool"}
+	v := col.ValueGetter(row)
+	if v != "notbool" {
+		t.Errorf("bool category non-bool value: expected 'notbool', got %v", v)
+	}
+}
+
+// --- makeMapColumn: time category ---
+
+func TestMakeMapColumnTimeCategory(t *testing.T) {
+	col := makeMapColumn[map[string]any]("date", "time")
+
+	// Valid time string.
+	row := map[string]any{"date": "2025-06-15"}
+	v := col.ValueGetter(row)
+	if _, ok := v.(time.Time); !ok {
+		t.Errorf("time category: expected time.Time, got %T (%v)", v, v)
+	}
+
+	// Nil value.
+	row2 := map[string]any{"date": nil}
+	v2 := col.ValueGetter(row2)
+	if v2 != nil {
+		t.Errorf("time category nil: expected nil, got %v", v2)
+	}
+
+	// Non-parseable string.
+	row3 := map[string]any{"date": "not-a-date"}
+	v3 := col.ValueGetter(row3)
+	// Should return the string as-is since it doesn't parse.
+	if v3 != "not-a-date" {
+		t.Errorf("time category non-parseable: expected 'not-a-date', got %v", v3)
+	}
+
+	// Non-string value.
+	row4 := map[string]any{"date": 12345}
+	v4 := col.ValueGetter(row4)
+	if v4 != 12345 {
+		t.Errorf("time category non-string: expected 12345, got %v", v4)
+	}
+}
+
+// --- makeMapColumn: number category nil value ---
+
+func TestMakeMapColumnNumberNilValue(t *testing.T) {
+	col := makeMapColumn[map[string]any]("score", "number")
+	row := map[string]any{"score": nil}
+	v := col.ValueGetter(row)
+	if v != nil {
+		t.Errorf("number category nil: expected nil, got %v", v)
+	}
+}
+
+// --- makeMapColumn: number category non-float value ---
+
+func TestMakeMapColumnNumberNonFloat(t *testing.T) {
+	col := makeMapColumn[map[string]any]("score", "number")
+	row := map[string]any{"score": "notanumber"}
+	v := col.ValueGetter(row)
+	if v != "notanumber" {
+		t.Errorf("number category non-float: expected 'notanumber', got %v", v)
+	}
+}
+
+// --- makeMapColumn: string (default) category nil value ---
+
+func TestMakeMapColumnStringNilValue(t *testing.T) {
+	col := makeMapColumn[map[string]any]("label", "string")
+	row := map[string]any{"label": nil}
+	v := col.ValueGetter(row)
+	if v != nil {
+		t.Errorf("string category nil: expected nil, got %v", v)
+	}
+}
+
+// --- mapIndex: interface-wrapped value ---
+
+func TestMapIndexInterfaceWrapped(t *testing.T) {
+	// Use any type to wrap the map.
+	var row any = map[string]any{"key": "value"}
+	v := mapIndex(row, "key")
+	if v != "value" {
+		t.Errorf("interface-wrapped map: expected 'value', got %v", v)
+	}
+}
+
+// --- mapIndex: non-map row ---
+
+func TestMapIndexNonMap(t *testing.T) {
+	v := mapIndex("not a map", "key")
+	if v != nil {
+		t.Errorf("non-map row: expected nil, got %v", v)
+	}
+}
+
+// --- mapIndex: interface-wrapped nil value in map ---
+
+func TestMapIndexInterfaceNilValue(t *testing.T) {
+	// Create a map where the value is an interface wrapping nil.
+	row := map[string]any{"key": (any)(nil)}
+	v := mapIndex(row, "key")
+	if v != nil {
+		t.Errorf("interface nil value: expected nil, got %v", v)
+	}
+}
+
+// --- mapIndex: missing key ---
+
+func TestMapIndexMissingKey(t *testing.T) {
+	row := map[string]any{"key": "value"}
+	v := mapIndex(row, "missing")
+	if v != nil {
+		t.Errorf("missing key: expected nil, got %v", v)
+	}
+}
+
+// --- inferMapColumnType: all nil values ---
+
+func TestInferMapColumnTypeAllNil(t *testing.T) {
+	rows := []map[string]any{
+		{"x": nil},
+		{"x": nil},
+	}
+	result := inferMapColumnType("x", rows)
+	if result != "string" {
+		t.Errorf("all nil: expected 'string', got %q", result)
+	}
+}
+
+// --- inferMapColumnType: default case (non-bool/float/string/time) ---
+
+func TestInferMapColumnTypeDefaultCase(t *testing.T) {
+	// Use a value that is not bool, float64, or string - e.g., an int or a struct.
+	rows := []map[string]any{
+		{"x": struct{ A int }{A: 1}},
+		{"x": struct{ A int }{A: 2}},
+	}
+	result := inferMapColumnType("x", rows)
+	if result != "string" {
+		t.Errorf("non-standard type: expected 'string', got %q", result)
+	}
+}
+
+// --- inferMapColumnType: mixed string with non-time ---
+
+func TestInferMapColumnTypeNonTimeString(t *testing.T) {
+	rows := []map[string]any{
+		{"x": "not a date"},
+		{"x": "also not a date"},
+	}
+	result := inferMapColumnType("x", rows)
+	if result != "string" {
+		t.Errorf("non-time strings: expected 'string', got %q", result)
+	}
+}
+
+// --- columnsFromSlice: non-struct slice elements ---
+
+func TestColumnsFromSliceNonStructElements(t *testing.T) {
+	rows := [][]any{
+		{"just", "strings"},
+		{42, 43},
+	}
+	cols := columnsFromSlice(rows)
+	// Non-struct elements should be skipped, resulting in no columns.
+	if len(cols) != 0 {
+		t.Errorf("non-struct elements: expected 0 columns, got %d", len(cols))
+	}
+}
+
+// --- columnsFromSlice: empty rows ---
+
+func TestColumnsFromSliceEmpty(t *testing.T) {
+	cols := columnsFromSlice[[]any](nil)
+	if cols != nil {
+		t.Errorf("empty rows: expected nil, got %v", cols)
+	}
+}
+
+// --- columnsFromSlice: interface-wrapped structs ---
+
+func TestColumnsFromSliceInterfaceWrappedStructs(t *testing.T) {
+	rows := [][]any{
+		{any(sliceTestPerson{Name: "Alice", Age: 30, Email: "a@b.com"})},
+	}
+	cols := columnsFromSlice(rows)
+	if len(cols) < 3 {
+		t.Fatalf("expected at least 3 columns, got %d", len(cols))
+	}
+	ids := make(map[string]bool)
+	for _, c := range cols {
+		ids[c.ColumnID] = true
+	}
+	if !ids["Name"] || !ids["Age"] || !ids["Email"] {
+		t.Errorf("missing expected columns, got: %v", ids)
+	}
+}
+
+// --- columnsFromSlice: pointer-wrapped structs ---
+
+func TestColumnsFromSlicePtrWrappedStructs(t *testing.T) {
+	p := sliceTestPerson{Name: "Alice", Age: 30, Email: "a@b.com"}
+	rows := [][]any{
+		{&p},
+	}
+	cols := columnsFromSlice(rows)
+	if len(cols) < 3 {
+		t.Fatalf("expected at least 3 columns for ptr-wrapped struct, got %d", len(cols))
+	}
+}
+
+// --- sliceFieldValue: non-slice row ---
+
+func TestSliceFieldValueNonSlice(t *testing.T) {
+	v := sliceFieldValue("not a slice", "Name")
+	if v != nil {
+		t.Errorf("non-slice row: expected nil, got %v", v)
+	}
+}
+
+// --- sliceFieldValue: field not found ---
+
+func TestSliceFieldValueFieldNotFound(t *testing.T) {
+	row := []any{sliceTestPerson{Name: "Alice", Age: 30}}
+	v := sliceFieldValue(row, "NonExistentField")
+	if v != nil {
+		t.Errorf("field not found: expected nil, got %v", v)
+	}
+}
+
+// --- sliceFieldValue: ptr-wrapped struct ---
+
+func TestSliceFieldValuePtrWrappedStruct(t *testing.T) {
+	p := sliceTestPerson{Name: "Alice", Age: 30, Email: "a@b.com"}
+	row := []any{&p}
+	v := sliceFieldValue(row, "Name")
+	if v != "Alice" {
+		t.Errorf("ptr-wrapped struct: expected 'Alice', got %v", v)
+	}
+}
+
+// --- sliceFieldValue: interface-wrapped value ---
+
+func TestSliceFieldValueInterfaceWrapped(t *testing.T) {
+	var elem any = sliceTestPerson{Name: "Bob", Age: 25}
+	row := []any{elem}
+	v := sliceFieldValue(row, "Name")
+	if v != "Bob" {
+		t.Errorf("interface-wrapped struct: expected 'Bob', got %v", v)
+	}
+}
+
+// --- sliceFieldValue: non-struct element in slice ---
+
+func TestSliceFieldValueNonStructElement(t *testing.T) {
+	row := []any{"not a struct", 42}
+	v := sliceFieldValue(row, "Name")
+	if v != nil {
+		t.Errorf("non-struct element: expected nil, got %v", v)
+	}
+}
+
+// --- applyTypeDefaults: float category ---
+
+func TestApplyTypeDefaultsFloat(t *testing.T) {
+	col := Column[map[string]any]{
+		ColumnID: "score",
+	}
+	applyTypeDefaults(&col, "float", nil)
+	if _, ok := col.Filter.(*filter.NumberFilter); !ok {
+		t.Errorf("float category: expected NumberFilter, got %T", col.Filter)
+	}
+	if col.Width != 14 {
+		t.Errorf("float category: expected Width=14, got %d", col.Width)
+	}
+	if col.CellStyle == nil {
+		t.Fatal("float category: expected CellStyle to be set")
+	}
+	// Invoke the CellStyle function to cover the lambda body.
+	row := map[string]any{}
+	style := col.CellStyle(nil, row)
+	_ = style // just verify it doesn't panic
+}
+
+// --- applyTypeDefaults: number category ---
+
+func TestApplyTypeDefaultsNumber(t *testing.T) {
+	col := Column[map[string]any]{
+		ColumnID: "score",
+	}
+	applyTypeDefaults(&col, "number", nil)
+	if _, ok := col.Filter.(*filter.NumberFilter); !ok {
+		t.Errorf("number category: expected NumberFilter, got %T", col.Filter)
+	}
+	if col.Width != 14 {
+		t.Errorf("number category: expected Width=14, got %d", col.Width)
+	}
+}
+
+// --- applyTypeDefaults: int category CellStyle ---
+
+func TestApplyTypeDefaultsIntCellStyle(t *testing.T) {
+	col := Column[map[string]any]{
+		ColumnID: "count",
+	}
+	applyTypeDefaults(&col, "int", nil)
+	if col.CellStyle == nil {
+		t.Fatal("int category: expected CellStyle to be set")
+	}
+	// Invoke the CellStyle function to cover the lambda body.
+	row := map[string]any{}
+	style := col.CellStyle(nil, row)
+	_ = style // just verify it doesn't panic
+}
+
+// --- applyTypeDefaults: string with > 20 distinct values ---
+
+func TestApplyTypeDefaultsStringManyDistinct(t *testing.T) {
+	col := Column[map[string]any]{
+		ColumnID: "label",
+	}
+	// Generate more than 20 distinct values.
+	vals := make([]string, 25)
+	for i := range vals {
+		vals[i] = string(rune('A' + i))
+	}
+	applyTypeDefaults(&col, "string", vals)
+	// With > 20 distinct values, should get TextFilter instead of SetFilter.
+	if _, ok := col.Filter.(*filter.TextFilter); !ok {
+		t.Errorf("> 20 distinct values: expected TextFilter, got %T", col.Filter)
+	}
+	if col.MinWidth != 8 {
+		t.Errorf("string category: expected MinWidth=8, got %d", col.MinWidth)
+	}
+	if col.Flex != 1 {
+		t.Errorf("string category: expected Flex=1, got %d", col.Flex)
+	}
+}
+
+// --- applyTypeDefaults: string with 0 distinct values ---
+
+func TestApplyTypeDefaultsStringNoDistinct(t *testing.T) {
+	col := Column[map[string]any]{
+		ColumnID: "label",
+	}
+	applyTypeDefaults(&col, "string", nil)
+	// With 0 distinct values (nil), should get TextFilter.
+	if _, ok := col.Filter.(*filter.TextFilter); !ok {
+		t.Errorf("0 distinct values: expected TextFilter, got %T", col.Filter)
+	}
+}
+
+// --- parseTimeString: non-matching format ---
+
+func TestParseTimeStringNoMatch(t *testing.T) {
+	_, ok := parseTimeString("this is not a time at all")
+	if ok {
+		t.Error("non-matching string: expected false, got true")
+	}
+}
+
+// --- parseTimeString: valid format ---
+
+func TestParseTimeStringValid(t *testing.T) {
+	tm, ok := parseTimeString("2025-06-15")
+	if !ok {
+		t.Error("valid date string: expected true, got false")
+	}
+	if tm.Year() != 2025 || tm.Month() != time.June || tm.Day() != 15 {
+		t.Errorf("parsed time mismatch: got %v", tm)
+	}
+}
+
+// --- FromRows: nil slice of maps ---
+
+func TestFromRowsNilMapSlice(t *testing.T) {
+	var rows []map[string]any
+	cols := FromRows(rows)
+	if cols != nil {
+		t.Errorf("nil map slice: expected nil, got %v", cols)
+	}
+}
+
+// --- FromRows: slice type ([][]any) ---
+
+func TestFromRowsSliceType(t *testing.T) {
+	rows := [][]any{
+		{sliceTestPerson{Name: "Alice", Age: 30}},
+	}
+	cols := FromRows(rows)
+	if len(cols) < 2 {
+		t.Fatalf("expected at least 2 columns, got %d", len(cols))
+	}
+}
+
+// --- FromRows: empty slice of slices ---
+
+func TestFromRowsEmptySliceOfSlices(t *testing.T) {
+	rows := [][]any{}
+	cols := FromRows(rows)
+	if cols != nil {
+		t.Errorf("empty slice of slices: expected nil, got %v", cols)
+	}
+}
+
+// --- makeMapColumn: int category ---
+
+func TestMakeMapColumnIntCategory(t *testing.T) {
+	col := makeMapColumn[map[string]any]("count", "int")
+	row := map[string]any{"count": float64(42)}
+	v := col.ValueGetter(row)
+	if v != float64(42) {
+		t.Errorf("int category: expected 42, got %v", v)
+	}
+}
+
+// --- makeMapColumn: string (default) category ---
+
+func TestMakeMapColumnStringCategory(t *testing.T) {
+	col := makeMapColumn[map[string]any]("name", "string")
+	row := map[string]any{"name": 42}
+	v := col.ValueGetter(row)
+	// Default category calls fmt.Sprint on non-nil values.
+	if v != "42" {
+		t.Errorf("string category fmt.Sprint: expected '42', got %v", v)
+	}
+}
+
+// --- FromRows: interface with map (non-string key) ---
+
+func TestFromRowsMapNonStringKey(t *testing.T) {
+	rows := []map[int]any{
+		{1: "one"},
+	}
+	cols := FromRows(rows)
+	if cols != nil {
+		t.Errorf("map with non-string key: expected nil, got %v", cols)
+	}
+}
+
+// --- columnsFromMap: non-map row in interface rows ---
+
+func TestColumnsFromMapNonMapRow(t *testing.T) {
+	// Mix of map and non-map rows in interface-typed slice.
+	rows := []any{
+		map[string]any{"key": "value"},
+		"not a map",
+	}
+	cols := columnsFromMap(rows)
+	if len(cols) != 1 {
+		t.Fatalf("expected 1 column, got %d", len(cols))
+	}
+	if cols[0].ColumnID != "key" {
+		t.Errorf("expected column 'key', got %q", cols[0].ColumnID)
+	}
+}
+
+// --- columnsFromSlice: struct with unexported fields ---
+
+type sliceTestWithUnexported struct {
+	Public    string
+	private   int
+	AlsoPublic bool
+}
+
+func TestColumnsFromSliceUnexportedFields(t *testing.T) {
+	rows := [][]any{
+		{sliceTestWithUnexported{Public: "hello", private: 42, AlsoPublic: true}},
+	}
+	cols := columnsFromSlice(rows)
+	// Should only have Public and AlsoPublic columns (unexported skipped).
+	ids := make(map[string]bool)
+	for _, c := range cols {
+		ids[c.ColumnID] = true
+	}
+	if ids["private"] {
+		t.Error("unexported field 'private' should not appear as a column")
+	}
+	if !ids["Public"] {
+		t.Error("missing 'Public' column")
+	}
+	if !ids["AlsoPublic"] {
+		t.Error("missing 'AlsoPublic' column")
+	}
+	if len(cols) != 2 {
+		t.Errorf("expected 2 columns, got %d", len(cols))
+	}
+}
+
+// --- columnsFromSlice: row is not a slice ---
+
+func TestColumnsFromSliceNonSliceRow(t *testing.T) {
+	rows := []any{
+		"not a slice",
+		[]any{sliceTestPerson{Name: "Alice"}},
+	}
+	cols := columnsFromSlice(rows)
+	if len(cols) < 1 {
+		t.Fatalf("expected at least 1 column, got %d", len(cols))
+	}
+}

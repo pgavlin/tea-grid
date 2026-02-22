@@ -458,3 +458,17 @@ func TestAggregateMixedNumericTypes(t *testing.T) {
 		t.Errorf("mixed types sum: expected 6.5, got %v", result)
 	}
 }
+
+func TestAggregateFloat32Values(t *testing.T) {
+	result := Aggregate([]any{float32(1.5), float32(2.5)}, "sum")
+	if result != 4.0 {
+		t.Errorf("float32 sum: expected 4.0, got %v", result)
+	}
+}
+
+func TestAggregateNonNumericValues(t *testing.T) {
+	result := Aggregate([]any{"hello", "world"}, "sum")
+	if result != 0.0 {
+		t.Errorf("non-numeric sum: expected 0.0, got %v", result)
+	}
+}
