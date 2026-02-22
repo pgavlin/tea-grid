@@ -33,6 +33,7 @@ const (
 type SidebarModel struct {
 	// Target cell/column
 	targetCell bool // true = cell, false = column
+	hasCell    bool // true when a data cell is available (not a header row)
 	cellRef    string
 	colID      string
 
@@ -65,7 +66,13 @@ func NewSidebar() SidebarModel {
 func (s *SidebarModel) SetTarget(colID string, rowIndex int, cell *Cell, colFmt *CellFormat) {
 	s.colID = colID
 	s.cellRef = fmt.Sprintf("%s%d", colID, rowIndex+1)
+	s.hasCell = cell != nil
 	s.editing = false
+
+	// Force column target when no cell is available (e.g. header row).
+	if !s.hasCell {
+		s.targetCell = false
+	}
 
 	if s.targetCell {
 		if cell != nil && cell.Format != nil {
@@ -214,7 +221,9 @@ func (s *SidebarModel) commitEdit() {
 func (s *SidebarModel) handleLeftRight(dir int) {
 	switch s.focusedField {
 	case fieldTarget:
-		s.targetCell = !s.targetCell
+		if s.hasCell || s.targetCell {
+			s.targetCell = !s.targetCell
+		}
 	case fieldDataType:
 		dt := int(s.format.DataType) + dir
 		if dt < 0 {
@@ -264,8 +273,8 @@ func (s *SidebarModel) View() string {
 	border := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240")).
-		Width(s.width - 2).
-		Height(s.height - 2).
+		Width(s.width-2).
+		Height(s.height-2).
 		Padding(0, 1)
 
 	title := lipgloss.NewStyle().Bold(true).Render("Format")
@@ -345,21 +354,26 @@ func (s *SidebarModel) fieldLabel(f SidebarField) string {
 func (s *SidebarModel) fieldValue(f SidebarField) string {
 	switch f {
 	case fieldTarget:
-		if s.targetCell {
-			return "< Cell " + s.cellRef + " >"
+		switch {
+		case s.targetCell:
+			return "◀ Cell " + s.cellRef + " ▶"
+		case s.hasCell:
+			return "◀ Column " + s.colID + " ▶"
+		default:
+			return "Column " + s.colID
 		}
-		return "< Column " + s.colID + " >"
+
 	case fieldDataType:
 		switch s.format.DataType {
 		case DataTypeText:
-			return "< Text >"
+			return "◀ Text ▶"
 		case DataTypeNumber:
-			return "< Number >"
+			return "◀ Number ▶"
 		case DataTypeDate:
-			return "< Date >"
+			return "◀ Date ▶"
 		}
 	case fieldDecimals:
-		return "< " + strconv.Itoa(s.format.NumDecimals) + " >"
+		return "◀ " + strconv.Itoa(s.format.NumDecimals) + " ▶"
 	case fieldPrefix:
 		if s.format.Prefix == "" {
 			return "(none)"
@@ -388,13 +402,13 @@ func (s *SidebarModel) fieldValue(f SidebarField) string {
 	case fieldAlign:
 		switch s.format.Align {
 		case AlignAuto:
-			return "< Auto >"
+			return "◀ Auto ▶"
 		case AlignLeft:
-			return "< Left >"
+			return "◀ Left ▶"
 		case AlignCenter:
-			return "< Center >"
+			return "◀ Center ▶"
 		case AlignRight:
-			return "< Right >"
+			return "◀ Right ▶"
 		}
 	case fieldBold:
 		return boolCheck(s.format.Bold)
