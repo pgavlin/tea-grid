@@ -16,4 +16,5 @@ type RowNode[T any] struct {
 	GroupLevel int         // Nesting depth (0 = top).
 	Children   []*RowNode[T]
 	Parent     *RowNode[T]
+	AggValues  map[string]any // Cached aggregation values keyed by column ID (group nodes only).
 }

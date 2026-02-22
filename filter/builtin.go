@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/pgavlin/tea-grid/internal/lineedit"
 )
@@ -312,7 +313,7 @@ func (f *SetFilter) View() string {
 	searchLine := f.search.RenderLine(f.width, "")
 	if f.inList {
 		// Dim the search line when in list mode
-		searchLine = "\x1b[2m" + searchLine + "\x1b[22m"
+		searchLine = lipgloss.NewStyle().Faint(true).Render(searchLine)
 	}
 	lines = append(lines, searchLine)
 
@@ -339,7 +340,7 @@ func (f *SetFilter) View() string {
 		entry = lineedit.TruncateOrPad(entry, f.width)
 
 		if f.inList && i == f.selectedIdx {
-			entry = "\x1b[7m" + entry + "\x1b[27m"
+			entry = lipgloss.NewStyle().Reverse(true).Render(entry)
 		}
 
 		lines = append(lines, entry)

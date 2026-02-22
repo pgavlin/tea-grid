@@ -2,10 +2,10 @@ package grid
 
 // viewport manages virtual scrolling state.
 type viewport struct {
-	topRow      int // Index of the first visible row.
-	leftCol     int // Index of the first visible (unpinned) column.
-	visibleRows int // Number of rows that fit in the viewport height.
-	visibleCols int // Number of columns that fit in the viewport width.
+	topRow       int // Index of the first visible row.
+	leftCol      int // Index of the first visible (unpinned) column.
+	visibleLines int // Number of terminal lines that fit in the viewport height.
+	visibleCols  int // Number of columns that fit in the viewport width.
 }
 
 // newViewport creates a new viewport with default settings.
@@ -13,12 +13,40 @@ func newViewport() viewport {
 	return viewport{}
 }
 
-// ensureVisible adjusts the scroll position to ensure the given row is visible.
-func (v *viewport) ensureRowVisible(row int) {
+// ensureRowVisible adjusts the scroll position to ensure the given row is visible.
+// rowHeight returns the height in terminal lines for a given row index.
+func (v *viewport) ensureRowVisible(row int, totalRows int, rowHeight func(int) int) {
 	if row < v.topRow {
 		v.topRow = row
-	} else if row >= v.topRow+v.visibleRows {
-		v.topRow = row - v.visibleRows + 1
+	} else {
+		// Check if row is already visible by walking from topRow
+		usedLines := 0
+		visible := false
+		for i := v.topRow; i < totalRows; i++ {
+			h := rowHeight(i)
+			if i == row && usedLines+h <= v.visibleLines {
+				visible = true
+				break
+			}
+			usedLines += h
+			if usedLines >= v.visibleLines {
+				break
+			}
+		}
+		if !visible {
+			// row is below the visible area — scroll down
+			// Walk backward from row to find the new topRow
+			usedLines := rowHeight(row)
+			v.topRow = row
+			for i := row - 1; i >= 0; i-- {
+				h := rowHeight(i)
+				if usedLines+h > v.visibleLines {
+					break
+				}
+				usedLines += h
+				v.topRow = i
+			}
+		}
 	}
 	if v.topRow < 0 {
 		v.topRow = 0
@@ -38,16 +66,27 @@ func (v *viewport) ensureColVisible(col int) {
 }
 
 // visibleRowRange returns the start and end indices of visible rows.
-func (v *viewport) visibleRowRange(totalRows int) (start, end int) {
+// rowHeight returns the height in terminal lines for a given row index.
+func (v *viewport) visibleRowRange(totalRows int, rowHeight func(int) int) (start, end int) {
 	start = v.topRow
 	if start < 0 {
 		start = 0
 	}
-	end = v.topRow + v.visibleRows
-	if end > totalRows {
-		end = totalRows
+	usedLines := 0
+	end = start
+	for end < totalRows {
+		h := rowHeight(end)
+		if usedLines+h > v.visibleLines {
+			break
+		}
+		usedLines += h
+		end++
 	}
-	return start, end
+	// Ensure at least one row is visible
+	if end == start && start < totalRows {
+		end = start + 1
+	}
+	return
 }
 
 // scrollToTop scrolls to the first row.
@@ -56,8 +95,18 @@ func (v *viewport) scrollToTop() {
 }
 
 // scrollToBottom scrolls to the last page.
-func (v *viewport) scrollToBottom(totalRows int) {
-	v.topRow = totalRows - v.visibleRows
+// rowHeight returns the height in terminal lines for a given row index.
+func (v *viewport) scrollToBottom(totalRows int, rowHeight func(int) int) {
+	usedLines := 0
+	v.topRow = totalRows
+	for i := totalRows - 1; i >= 0; i-- {
+		h := rowHeight(i)
+		if usedLines+h > v.visibleLines {
+			break
+		}
+		usedLines += h
+		v.topRow = i
+	}
 	if v.topRow < 0 {
 		v.topRow = 0
 	}

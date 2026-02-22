@@ -485,9 +485,11 @@ func (m *Model[T]) CollapseAll() {
 
 // --- Scrolling ---
 
-func (m *Model[T]) ScrollToRow(index int) { m.vp.ensureRowVisible(index) }
-func (m *Model[T]) ScrollToTop()          { m.vp.scrollToTop() }
-func (m *Model[T]) ScrollToBottom()       { m.vp.scrollToBottom(len(m.displayRows)) }
+func (m *Model[T]) ScrollToRow(index int) {
+	m.vp.ensureRowVisible(index, len(m.displayRows), m.rowHeightFunc())
+}
+func (m *Model[T]) ScrollToTop()    { m.vp.scrollToTop() }
+func (m *Model[T]) ScrollToBottom() { m.vp.scrollToBottom(len(m.displayRows), m.rowHeightFunc()) }
 
 // --- Pinning ---
 
@@ -545,6 +547,18 @@ func (m Model[T]) FullHelp() [][]key.Binding {
 }
 
 // --- Internal ---
+
+// rowHeightFunc returns a function that maps a display row index to its height in terminal lines.
+func (m *Model[T]) rowHeightFunc() func(int) int {
+	return func(i int) int {
+		if i >= 0 && i < len(m.displayRows) {
+			if h := m.displayRows[i].RowHeight; h > 0 {
+				return h
+			}
+		}
+		return 1
+	}
+}
 
 func (m *Model[T]) setRowData(rows []T) {
 	oldRows := m.rows
@@ -654,12 +668,26 @@ func (m *Model[T]) updateViewportSize() {
 		}
 	}
 
-	pinnedTopHeight := len(m.pinnedTop)
-	pinnedBotHeight := len(m.pinnedBot)
+	pinnedTopHeight := 0
+	for _, rn := range m.pinnedTop {
+		h := rn.RowHeight
+		if h < 1 {
+			h = 1
+		}
+		pinnedTopHeight += h
+	}
+	pinnedBotHeight := 0
+	for _, rn := range m.pinnedBot {
+		h := rn.RowHeight
+		if h < 1 {
+			h = 1
+		}
+		pinnedBotHeight += h
+	}
 
-	m.vp.visibleRows = m.height - headerHeight - filterHeight - pinnedTopHeight - pinnedBotHeight
-	if m.vp.visibleRows < 1 {
-		m.vp.visibleRows = 1
+	m.vp.visibleLines = m.height - headerHeight - filterHeight - pinnedTopHeight - pinnedBotHeight
+	if m.vp.visibleLines < 1 {
+		m.vp.visibleLines = 1
 	}
 }
 
@@ -749,8 +777,34 @@ func (m *Model[T]) recomputeDisplayRows() {
 		m.displayRows[i].RowIndex = i
 	}
 
+	// Pre-compute aggregation values for group nodes
+	m.precomputeAggValues()
+
 	m.dirty = false
 	m.updateViewportSize()
+}
+
+// precomputeAggValues computes and caches aggregation values on group RowNodes
+// so that renderAggCells doesn't need to walk the tree every frame.
+func (m *Model[T]) precomputeAggValues() {
+	for i := range m.displayRows {
+		rn := &m.displayRows[i]
+		if !rn.IsGroup {
+			continue
+		}
+		rn.AggValues = make(map[string]any, len(m.cols))
+		for _, col := range m.cols {
+			if col.AggFuncCustom == nil && col.AggFunc == "" {
+				continue
+			}
+			values := collectLeafValues(rn, &col)
+			if col.AggFuncCustom != nil {
+				rn.AggValues[col.ColumnID] = col.AggFuncCustom(values)
+			} else {
+				rn.AggValues[col.ColumnID] = grouping.Aggregate(values, col.AggFunc)
+			}
+		}
+	}
 }
 
 func (m *Model[T]) passesColumnFilters(data T) bool {

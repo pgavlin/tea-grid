@@ -56,24 +56,24 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		return m.moveFocus(m.focusedCell.Row+1, m.focusedCell.Col)
 
 	case key.Matches(msg, m.KeyMap.PageUp):
-		newRow := m.focusedCell.Row - m.vp.visibleRows
+		newRow := m.focusedCell.Row - m.vp.visibleLines
 		if newRow < 0 {
 			newRow = 0
 		}
 		return m.moveFocus(newRow, m.focusedCell.Col)
 
 	case key.Matches(msg, m.KeyMap.PageDown):
-		return m.moveFocus(m.focusedCell.Row+m.vp.visibleRows, m.focusedCell.Col)
+		return m.moveFocus(m.focusedCell.Row+m.vp.visibleLines, m.focusedCell.Col)
 
 	case key.Matches(msg, m.KeyMap.HalfPageUp):
-		newRow := m.focusedCell.Row - m.vp.visibleRows/2
+		newRow := m.focusedCell.Row - m.vp.visibleLines/2
 		if newRow < 0 {
 			newRow = 0
 		}
 		return m.moveFocus(newRow, m.focusedCell.Col)
 
 	case key.Matches(msg, m.KeyMap.HalfPageDown):
-		return m.moveFocus(m.focusedCell.Row+m.vp.visibleRows/2, m.focusedCell.Col)
+		return m.moveFocus(m.focusedCell.Row+m.vp.visibleLines/2, m.focusedCell.Col)
 
 	case key.Matches(msg, m.KeyMap.Home):
 		return m.moveFocus(0, m.focusedCell.Col)
@@ -332,6 +332,7 @@ func (m Model[T]) handleEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		}
 
 		m.editState = nil
+		m.dirty = true
 		data := m.displayRows[pos.Row].Data
 
 		return m, tea.Batch(
@@ -537,7 +538,7 @@ func (m Model[T]) moveFocus(newRow, newCol int) (Model[T], tea.Cmd) {
 
 	// Scroll viewport to keep focus visible
 	if newRow >= 0 {
-		m.vp.ensureRowVisible(newRow)
+		m.vp.ensureRowVisible(newRow, len(m.displayRows), m.rowHeightFunc())
 	}
 
 	// Handle horizontal scrolling for center columns

@@ -961,17 +961,20 @@ func TestDisplayRows_PinnedRowsExcludedFromSortFilter(t *testing.T) {
 // 8e. Viewport
 // -----------------------------------------------------------------------
 
+// height1 is a rowHeight function that always returns 1 (used in viewport unit tests).
+func height1(int) int { return 1 }
+
 func TestViewport_EnsureRowVisible(t *testing.T) {
-	v := viewport{topRow: 0, visibleRows: 5}
-	v.ensureRowVisible(3)
+	v := viewport{topRow: 0, visibleLines: 5}
+	v.ensureRowVisible(3, 10, height1)
 	if v.topRow != 0 {
 		t.Errorf("row 3 is visible, topRow should stay 0, got %d", v.topRow)
 	}
-	v.ensureRowVisible(7)
+	v.ensureRowVisible(7, 10, height1)
 	if v.topRow != 3 {
 		t.Errorf("expected topRow=3 to show row 7, got %d", v.topRow)
 	}
-	v.ensureRowVisible(1)
+	v.ensureRowVisible(1, 10, height1)
 	if v.topRow != 1 {
 		t.Errorf("expected topRow=1 to show row 1, got %d", v.topRow)
 	}
@@ -990,24 +993,24 @@ func TestViewport_EnsureColVisible(t *testing.T) {
 }
 
 func TestViewport_VisibleRowRange(t *testing.T) {
-	v := viewport{topRow: 2, visibleRows: 5}
-	start, end := v.visibleRowRange(10)
+	v := viewport{topRow: 2, visibleLines: 5}
+	start, end := v.visibleRowRange(10, height1)
 	if start != 2 || end != 7 {
 		t.Errorf("expected [2,7), got [%d,%d)", start, end)
 	}
-	start, end = v.visibleRowRange(4)
+	start, end = v.visibleRowRange(4, height1)
 	if start != 2 || end != 4 {
 		t.Errorf("expected [2,4) when totalRows=4, got [%d,%d)", start, end)
 	}
 }
 
 func TestViewport_ScrollToTopBottom(t *testing.T) {
-	v := viewport{topRow: 5, visibleRows: 10}
+	v := viewport{topRow: 5, visibleLines: 10}
 	v.scrollToTop()
 	if v.topRow != 0 {
 		t.Errorf("expected topRow=0 after scrollToTop, got %d", v.topRow)
 	}
-	v.scrollToBottom(30)
+	v.scrollToBottom(30, height1)
 	expected := 30 - 10
 	if v.topRow != expected {
 		t.Errorf("expected topRow=%d after scrollToBottom, got %d", expected, v.topRow)
@@ -1015,8 +1018,8 @@ func TestViewport_ScrollToTopBottom(t *testing.T) {
 }
 
 func TestViewport_ScrollToBottom_SmallList(t *testing.T) {
-	v := viewport{topRow: 0, visibleRows: 10}
-	v.scrollToBottom(5) // fewer rows than viewport
+	v := viewport{topRow: 0, visibleLines: 10}
+	v.scrollToBottom(5, height1) // fewer rows than viewport
 	if v.topRow != 0 {
 		t.Errorf("expected topRow=0 when rows < viewport, got %d", v.topRow)
 	}
@@ -1088,9 +1091,9 @@ func TestNavigation_PageUpDown(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyPgDown})
-	// Page down should move by vp.visibleRows
-	if m.focusedCell.Row != min(m.vp.visibleRows, len(m.displayRows)-1) {
-		t.Errorf("expected row=%d after PgDown, got %d", min(m.vp.visibleRows, len(m.displayRows)-1), m.focusedCell.Row)
+	// Page down should move by vp.visibleLines
+	if m.focusedCell.Row != min(m.vp.visibleLines, len(m.displayRows)-1) {
+		t.Errorf("expected row=%d after PgDown, got %d", min(m.vp.visibleLines, len(m.displayRows)-1), m.focusedCell.Row)
 	}
 
 	m.focusedCell = CellPosition{Row: 4, Col: 0}
@@ -1867,7 +1870,7 @@ func TestPublicAPI_ScrollToRow(t *testing.T) {
 	m := newTestGrid()
 	m.ScrollToRow(4)
 	// Should ensure row 4 is visible
-	start, end := m.vp.visibleRowRange(len(m.displayRows))
+	start, end := m.vp.visibleRowRange(len(m.displayRows), m.rowHeightFunc())
 	if !(4 >= start && 4 < end) {
 		t.Errorf("row 4 not in visible range [%d,%d)", start, end)
 	}
@@ -1885,7 +1888,7 @@ func TestPublicAPI_ScrollToTop(t *testing.T) {
 func TestPublicAPI_ScrollToBottom(t *testing.T) {
 	m := newTestGrid()
 	m.ScrollToBottom()
-	expected := len(m.displayRows) - m.vp.visibleRows
+	expected := len(m.displayRows) - m.vp.visibleLines
 	if expected < 0 {
 		expected = 0
 	}
@@ -4258,7 +4261,7 @@ func TestHandleKeyMsg_HalfPageUp(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 4, Col: 0}
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlU})
-	expected := 4 - m.vp.visibleRows/2
+	expected := 4 - m.vp.visibleLines/2
 	if expected < 0 {
 		expected = 0
 	}
@@ -4271,7 +4274,7 @@ func TestHandleKeyMsg_HalfPageDown(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlD})
-	expected := m.vp.visibleRows / 2
+	expected := m.vp.visibleLines / 2
 	if expected >= len(m.displayRows) {
 		expected = len(m.displayRows) - 1
 	}
@@ -4792,9 +4795,9 @@ func TestShiftMoveFocus_RectAnchorAlreadySet(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestEnsureRowVisible_TopRowNegativeClamp(t *testing.T) {
-	v := viewport{topRow: 5, visibleRows: 10}
+	v := viewport{topRow: 5, visibleLines: 10}
 	// Ensure row -1 is visible; this would set topRow = -1
-	v.ensureRowVisible(-1)
+	v.ensureRowVisible(-1, 20, height1)
 	if v.topRow < 0 {
 		t.Errorf("expected topRow >= 0 after clamping, got %d", v.topRow)
 	}
@@ -4817,8 +4820,8 @@ func TestEnsureColVisible_LeftColNegativeClamp(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestVisibleRowRange_StartNegative(t *testing.T) {
-	v := viewport{topRow: -5, visibleRows: 10}
-	start, end := v.visibleRowRange(20)
+	v := viewport{topRow: -5, visibleLines: 10}
+	start, end := v.visibleRowRange(20, height1)
 	if start < 0 {
 		t.Errorf("expected start >= 0, got %d", start)
 	}

@@ -53,7 +53,7 @@ func (m Model[T]) View() string {
 	}
 
 	// Body rows (virtual scrolled)
-	start, end := m.vp.visibleRowRange(len(m.displayRows))
+	start, end := m.vp.visibleRowRange(len(m.displayRows), m.rowHeightFunc())
 	for i := start; i < end; i++ {
 		sections = append(sections, m.renderRow(&m.displayRows[i], i, false))
 		if m.styles.BorderRow && i < end-1 {
@@ -362,6 +362,10 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 
 		// Use custom renderer if available, otherwise default to formatted text
 		cellContent := formatted
+		rowHeight := rn.RowHeight
+		if rowHeight < 1 {
+			rowHeight = 1
+		}
 		ctx := data.CellContext[T]{
 			Value:          val,
 			FormattedValue: formatted,
@@ -373,7 +377,7 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 			IsSelected:     isSelected,
 			IsFocused:      isFocused,
 			Width:          contentWidth,
-			Height:         1,
+			Height:         rowHeight,
 		}
 
 		var renderer data.CellRenderer[T]
@@ -479,12 +483,18 @@ func (m Model[T]) renderAggCells(rn *data.RowNode[T], colIndices []int) string {
 
 		var cellContent string
 		if col.AggFuncCustom != nil || col.AggFunc != "" {
-			values := collectLeafValues(rn, &col)
 			var aggResult any
-			if col.AggFuncCustom != nil {
-				aggResult = col.AggFuncCustom(values)
-			} else {
-				aggResult = grouping.Aggregate(values, col.AggFunc)
+			if rn.AggValues != nil {
+				aggResult = rn.AggValues[col.ColumnID]
+			}
+			if aggResult == nil {
+				// Fallback: compute on the fly if not cached
+				values := collectLeafValues(rn, &col)
+				if col.AggFuncCustom != nil {
+					aggResult = col.AggFuncCustom(values)
+				} else {
+					aggResult = grouping.Aggregate(values, col.AggFunc)
+				}
 			}
 			formatted := fmt.Sprintf("%v", aggResult)
 			if col.ValueFormatter != nil {
