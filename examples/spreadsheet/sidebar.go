@@ -10,6 +10,15 @@ import (
 	"github.com/pgavlin/tea-grid/internal/lineedit"
 )
 
+// SidebarTarget identifies what the sidebar format applies to.
+type SidebarTarget int
+
+const (
+	TargetCell SidebarTarget = iota
+	TargetRow
+	TargetColumn
+)
+
 // SidebarField identifies a field in the sidebar.
 type SidebarField int
 
@@ -31,11 +40,14 @@ const (
 
 // SidebarModel is the formatting sidebar component.
 type SidebarModel struct {
-	// Target cell/column
-	targetCell bool // true = cell, false = column
-	hasCell    bool // true when a data cell is available (not a header row)
-	cellRef    string
-	colID      string
+	// Target cell/row/column
+	target  SidebarTarget
+	hasCell bool   // true when a data cell is available (not a header row)
+	hasRow  bool   // true when on the row number column
+	hasCol  bool   // true when on a data column
+	cellRef string // e.g. "A3"
+	rowRef  string // e.g. "3"
+	colID   string
 
 	// Current format being edited
 	format CellFormat
@@ -54,7 +66,7 @@ type SidebarModel struct {
 
 func NewSidebar() SidebarModel {
 	return SidebarModel{
-		targetCell: true,
+		target: TargetCell,
 		format: CellFormat{
 			NumDecimals: 2,
 			DateFormat:  "2006-01-02",
@@ -63,26 +75,54 @@ func NewSidebar() SidebarModel {
 }
 
 // SetTarget configures the sidebar for the given cell.
-func (s *SidebarModel) SetTarget(colID string, rowIndex int, cell *Cell, colFmt *CellFormat) {
+// hasRow indicates whether the Row target should be available (true when on the row number column).
+func (s *SidebarModel) SetTarget(colID string, rowIndex int, cell *Cell, hasRow bool, rowFmt *CellFormat, colFmt *CellFormat) {
 	s.colID = colID
 	s.cellRef = fmt.Sprintf("%s%d", colID, rowIndex+1)
+	s.rowRef = fmt.Sprintf("%d", rowIndex+1)
 	s.hasCell = cell != nil
+	s.hasRow = hasRow
+	s.hasCol = colID != ""
 	s.editing = false
 
-	// Force column target when no cell is available (e.g. header row).
-	if !s.hasCell {
-		s.targetCell = false
+	// Force target to an available option.
+	if !s.hasCell && s.target == TargetCell {
+		if s.hasRow {
+			s.target = TargetRow
+		} else {
+			s.target = TargetColumn
+		}
+	}
+	if !s.hasRow && s.target == TargetRow {
+		s.target = TargetColumn
+	}
+	if !s.hasCol && s.target == TargetColumn {
+		if s.hasRow {
+			s.target = TargetRow
+		}
 	}
 
-	if s.targetCell {
+	// Load format from the active target's source.
+	switch s.target {
+	case TargetCell:
 		if cell != nil && cell.Format != nil {
 			s.format = *cell.Format
+		} else if rowFmt != nil {
+			s.format = *rowFmt
 		} else if colFmt != nil {
 			s.format = *colFmt
 		} else {
 			s.format = CellFormat{NumDecimals: 2, DateFormat: "2006-01-02"}
 		}
-	} else {
+	case TargetRow:
+		if rowFmt != nil {
+			s.format = *rowFmt
+		} else if colFmt != nil {
+			s.format = *colFmt
+		} else {
+			s.format = CellFormat{NumDecimals: 2, DateFormat: "2006-01-02"}
+		}
+	case TargetColumn:
 		if colFmt != nil {
 			s.format = *colFmt
 		} else {
@@ -107,9 +147,9 @@ func (s *SidebarModel) Format() *CellFormat {
 	return &f
 }
 
-// TargetCell returns whether targeting cell (true) or column (false).
-func (s *SidebarModel) TargetCell() bool {
-	return s.targetCell
+// Target returns the current sidebar target (Cell, Row, or Column).
+func (s *SidebarModel) Target() SidebarTarget {
+	return s.target
 }
 
 // visibleFields returns the fields visible for the current data type.
@@ -221,9 +261,33 @@ func (s *SidebarModel) commitEdit() {
 func (s *SidebarModel) handleLeftRight(dir int) {
 	switch s.focusedField {
 	case fieldTarget:
-		if s.hasCell || s.targetCell {
-			s.targetCell = !s.targetCell
+		// Build list of available targets.
+		var avail []SidebarTarget
+		if s.hasCell {
+			avail = append(avail, TargetCell)
 		}
+		if s.hasRow {
+			avail = append(avail, TargetRow)
+		}
+		if s.hasCol {
+			avail = append(avail, TargetColumn)
+		}
+		// Find current index and cycle.
+		cur := 0
+		for i, t := range avail {
+			if t == s.target {
+				cur = i
+				break
+			}
+		}
+		next := cur + dir
+		if next < 0 {
+			next = len(avail) - 1
+		}
+		if next >= len(avail) {
+			next = 0
+		}
+		s.target = avail[next]
 	case fieldDataType:
 		dt := int(s.format.DataType) + dir
 		if dt < 0 {
@@ -354,13 +418,28 @@ func (s *SidebarModel) fieldLabel(f SidebarField) string {
 func (s *SidebarModel) fieldValue(f SidebarField) string {
 	switch f {
 	case fieldTarget:
-		switch {
-		case s.targetCell:
-			return "◀ Cell " + s.cellRef + " ▶"
-		case s.hasCell:
-			return "◀ Column " + s.colID + " ▶"
+		// Build available targets to determine if arrows should show.
+		var count int
+		if s.hasCell {
+			count++
+		}
+		if s.hasRow {
+			count++
+		}
+		if s.hasCol {
+			count++
+		}
+		left, right := "", ""
+		if count > 1 {
+			left, right = "◀ ", " ▶"
+		}
+		switch s.target {
+		case TargetCell:
+			return left + "Cell " + s.cellRef + right
+		case TargetRow:
+			return left + "Row " + s.rowRef + right
 		default:
-			return "Column " + s.colID
+			return left + "Column " + s.colID + right
 		}
 
 	case fieldDataType:

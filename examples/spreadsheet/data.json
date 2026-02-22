@@ -1,7 +1,24 @@
 {
   "version": 1,
   "numCols": 6,
-  "numRows": 16,
+  "numRows": 17,
+  "colFormats": {
+    "C": {
+      "dataType": 1,
+      "dateFormat": "2006-01-02"
+    },
+    "E": {
+      "dataType": 1,
+      "dateFormat": "2006-01-02"
+    }
+  },
+  "rowFormats": {
+    "0": {
+      "numDecimals": 2,
+      "dateFormat": "2006-01-02",
+      "bold": true
+    }
+  },
   "cells": {
     "A1": {
       "raw": "City"
@@ -26,6 +43,14 @@
     },
     "A16": {
       "raw": "Sydney"
+    },
+    "A17": {
+      "raw": "Total population:",
+      "format": {
+        "numDecimals": 2,
+        "dateFormat": "2006-01-02",
+        "bold": true
+      }
     },
     "A2": {
       "raw": "Tokyo"
@@ -122,6 +147,14 @@
     },
     "C16": {
       "raw": "5312000"
+    },
+    "C17": {
+      "raw": "=sum(C2:C16)",
+      "format": {
+        "dataType": 1,
+        "dateFormat": "2006-01-02",
+        "bold": true
+      }
     },
     "C2": {
       "raw": "13960000"

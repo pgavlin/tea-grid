@@ -33,6 +33,7 @@ type model struct {
 	rows         []*SpreadsheetRow
 	numCols      int
 	colFmts      map[string]*CellFormat
+	rowFmts      map[int]*CellFormat
 	deps         DepGraph
 	sidebar      SidebarModel
 	sidebarOn    bool
@@ -51,6 +52,7 @@ func newModel(filename string, csvImport string) model {
 	m := model{
 		numCols:   defaultCols,
 		colFmts:   make(map[string]*CellFormat),
+		rowFmts:   make(map[int]*CellFormat),
 		deps:      NewDepGraph(),
 		sidebar:   NewSidebar(),
 		gridFocus: true,
@@ -71,9 +73,10 @@ func newModel(filename string, csvImport string) model {
 		}
 		m.status = fmt.Sprintf("Imported %s", csvImport)
 	} else if filename != "" {
-		if rows, colFmts, numCols, err := loadJSON(filename); err == nil {
+		if rows, colFmts, rowFmts, numCols, err := loadJSON(filename); err == nil {
 			m.rows = rows
 			m.colFmts = colFmts
+			m.rowFmts = rowFmts
 			m.numCols = numCols
 			m.status = fmt.Sprintf("Loaded %s", filename)
 		} else {
@@ -151,6 +154,7 @@ func (m *model) buildColumns() []data.Column[*SpreadsheetRow] {
 		colLetter := indexToColLetter(i)
 		colID := colLetter
 		colFmts := m.colFmts // capture reference
+		rowFmts := m.rowFmts // capture reference
 
 		col := data.Column[*SpreadsheetRow]{
 			ColumnID:   colID,
@@ -171,7 +175,7 @@ func (m *model) buildColumns() []data.Column[*SpreadsheetRow] {
 			},
 			ValueFormatter: func(v any, r *SpreadsheetRow) string {
 				cell := r.Cells[colID]
-				resolved := resolveFormat(cell, colFmts[colID])
+				resolved := resolveFormat(cell, rowFmts[r.RowIndex], colFmts[colID])
 				return formatValue(v, resolved)
 			},
 			ValueSetter: func(r **SpreadsheetRow, value any) {
@@ -180,7 +184,7 @@ func (m *model) buildColumns() []data.Column[*SpreadsheetRow] {
 			},
 			CellStyle: func(v any, r *SpreadsheetRow) lipgloss.Style {
 				cell := r.Cells[colID]
-				resolved := resolveFormat(cell, colFmts[colID])
+				resolved := resolveFormat(cell, rowFmts[r.RowIndex], colFmts[colID])
 				return cellStyle(v, resolved)
 			},
 		}
@@ -370,6 +374,17 @@ func (m *model) insertRowBelow() tea.Cmd {
 	copy(m.rows[insertIdx+1:], m.rows[insertIdx:])
 	m.rows[insertIdx] = newRow
 
+	// Shift row formats: indices >= insertIdx move up by 1
+	newRowFmts := make(map[int]*CellFormat)
+	for idx, f := range m.rowFmts {
+		if idx >= insertIdx {
+			newRowFmts[idx+1] = f
+		} else {
+			newRowFmts[idx] = f
+		}
+	}
+	m.rowFmts = newRowFmts
+
 	// Reindex all rows
 	for i, r := range m.rows {
 		r.RowIndex = i
@@ -421,6 +436,20 @@ func (m *model) deleteCurrentRow() tea.Cmd {
 
 	deletedNum := idx + 1
 	m.rows = append(m.rows[:idx], m.rows[idx+1:]...)
+
+	// Shift row formats: delete at idx, shift indices > idx down by 1
+	newRowFmts := make(map[int]*CellFormat)
+	for i, f := range m.rowFmts {
+		if i == idx {
+			continue
+		}
+		if i > idx {
+			newRowFmts[i-1] = f
+		} else {
+			newRowFmts[i] = f
+		}
+	}
+	m.rowFmts = newRowFmts
 
 	// Reindex
 	for i, r := range m.rows {
@@ -558,7 +587,7 @@ func (m *model) completeFileForm() tea.Cmd {
 		if format == "csv" {
 			err = exportCSV(path, m.rows, m.numCols)
 		} else {
-			err = saveJSON(path, m.rows, m.colFmts, m.numCols)
+			err = saveJSON(path, m.rows, m.colFmts, m.rowFmts, m.numCols)
 		}
 		if err != nil {
 			return m.setStatus(fmt.Sprintf("Save error: %v", err))
@@ -576,13 +605,15 @@ func (m *model) completeFileForm() tea.Cmd {
 		m.rows = rows
 		m.numCols = numCols
 		m.colFmts = make(map[string]*CellFormat)
+		m.rowFmts = make(map[int]*CellFormat)
 	} else {
-		rows, colFmts, numCols, err := loadJSON(path)
+		rows, colFmts, rowFmts, numCols, err := loadJSON(path)
 		if err != nil {
 			return m.setStatus(fmt.Sprintf("Load error: %v", err))
 		}
 		m.rows = rows
 		m.colFmts = colFmts
+		m.rowFmts = rowFmts
 		m.numCols = numCols
 	}
 	m.filename = path
@@ -612,14 +643,23 @@ func (m *model) resizeComponents() {
 
 func (m *model) updateSidebarTarget() {
 	pos := m.grid.FocusedCell()
-	if pos.Col > 0 && pos.Col <= m.numCols {
+	rowIdx := pos.Row
+
+	if pos.Col == 0 {
+		// Row number column — only row formatting is available.
+		var rowFmt *CellFormat
+		if rowIdx >= 0 && rowIdx < len(m.rows) {
+			rowFmt = m.rowFmts[rowIdx]
+		}
+		m.sidebar.SetTarget("", rowIdx, nil, true, rowFmt, nil)
+	} else if pos.Col > 0 && pos.Col <= m.numCols {
+		// Data column — cell and column formatting available, not row.
 		colLetter := indexToColLetter(pos.Col - 1)
-		rowIdx := pos.Row
 		var cell *Cell
 		if rowIdx >= 0 && rowIdx < len(m.rows) {
 			cell = m.rows[rowIdx].Cells[colLetter]
 		}
-		m.sidebar.SetTarget(colLetter, rowIdx, cell, m.colFmts[colLetter])
+		m.sidebar.SetTarget(colLetter, rowIdx, cell, false, m.rowFmts[rowIdx], m.colFmts[colLetter])
 	}
 }
 
@@ -627,8 +667,8 @@ func (m *model) applySidebarFormat() {
 	fmt := m.sidebar.Format()
 	colID := m.sidebar.colID
 
-	if m.sidebar.TargetCell() {
-		// Apply to cell
+	switch m.sidebar.Target() {
+	case TargetCell:
 		pos := m.grid.FocusedCell()
 		if pos.Col > 0 && pos.Col <= m.numCols {
 			rowIdx := pos.Row
@@ -637,8 +677,13 @@ func (m *model) applySidebarFormat() {
 				cell.Format = fmt
 			}
 		}
-	} else {
-		// Apply to column
+	case TargetRow:
+		pos := m.grid.FocusedCell()
+		rowIdx := pos.Row
+		if rowIdx >= 0 && rowIdx < len(m.rows) {
+			m.rowFmts[rowIdx] = fmt
+		}
+	case TargetColumn:
 		m.colFmts[colID] = fmt
 	}
 

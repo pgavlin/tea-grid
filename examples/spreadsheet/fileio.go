@@ -16,6 +16,7 @@ type jsonFile struct {
 	NumCols    int                         `json:"numCols"`
 	NumRows    int                         `json:"numRows"`
 	ColFormats map[string]*jsonCellFormat  `json:"colFormats,omitempty"`
+	RowFormats map[int]*jsonCellFormat     `json:"rowFormats,omitempty"`
 	Cells      map[string]*jsonCell        `json:"cells"`
 }
 
@@ -77,7 +78,7 @@ func jsonToCellFormat(j *jsonCellFormat) *CellFormat {
 }
 
 // saveJSON writes the spreadsheet to a JSON file.
-func saveJSON(filename string, rows []*SpreadsheetRow, colFmts map[string]*CellFormat, numCols int) error {
+func saveJSON(filename string, rows []*SpreadsheetRow, colFmts map[string]*CellFormat, rowFmts map[int]*CellFormat, numCols int) error {
 	file := jsonFile{
 		Version:    1,
 		NumCols:    numCols,
@@ -89,6 +90,15 @@ func saveJSON(filename string, rows []*SpreadsheetRow, colFmts map[string]*CellF
 	for col, fmt := range colFmts {
 		if fmt != nil {
 			file.ColFormats[col] = cellFormatToJSON(fmt)
+		}
+	}
+
+	if len(rowFmts) > 0 {
+		file.RowFormats = make(map[int]*jsonCellFormat)
+		for idx, fmt := range rowFmts {
+			if fmt != nil {
+				file.RowFormats[idx] = cellFormatToJSON(fmt)
+			}
 		}
 	}
 
@@ -114,16 +124,16 @@ func saveJSON(filename string, rows []*SpreadsheetRow, colFmts map[string]*CellF
 }
 
 // loadJSON reads a spreadsheet from a JSON file.
-// Returns rows, column formats, number of columns.
-func loadJSON(filename string) ([]*SpreadsheetRow, map[string]*CellFormat, int, error) {
+// Returns rows, column formats, row formats, number of columns.
+func loadJSON(filename string) ([]*SpreadsheetRow, map[string]*CellFormat, map[int]*CellFormat, int, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
 
 	var file jsonFile
 	if err := json.Unmarshal(data, &file); err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
 
 	numCols := file.NumCols
@@ -173,7 +183,13 @@ func loadJSON(filename string) ([]*SpreadsheetRow, map[string]*CellFormat, int, 
 		colFmts[col] = jsonToCellFormat(jf)
 	}
 
-	return rows, colFmts, numCols, nil
+	// Convert row formats
+	rowFmts := make(map[int]*CellFormat)
+	for idx, jf := range file.RowFormats {
+		rowFmts[idx] = jsonToCellFormat(jf)
+	}
+
+	return rows, colFmts, rowFmts, numCols, nil
 }
 
 // --- CSV Import/Export ---

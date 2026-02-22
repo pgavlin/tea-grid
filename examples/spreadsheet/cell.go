@@ -155,10 +155,13 @@ func formatValue(v any, fmt *CellFormat) string {
 	}
 }
 
-// resolveFormat returns the effective format: cell overrides column.
-func resolveFormat(cell *Cell, colFmt *CellFormat) *CellFormat {
+// resolveFormat returns the effective format with precedence: cell > row > column.
+func resolveFormat(cell *Cell, rowFmt *CellFormat, colFmt *CellFormat) *CellFormat {
 	if cell != nil && cell.Format != nil {
 		return cell.Format
+	}
+	if rowFmt != nil {
+		return rowFmt
 	}
 	return colFmt
 }
@@ -198,9 +201,7 @@ func cellStyle(v any, fmt *CellFormat) lipgloss.Style {
 	case AlignRight:
 		s = s.Align(lipgloss.Right)
 	default: // AlignAuto
-		if fmt.DataType == DataTypeNumber {
-			s = s.Align(lipgloss.Right)
-		} else if _, ok := toFloat(v); ok {
+		if _, ok := toFloat(v); ok {
 			s = s.Align(lipgloss.Right)
 		}
 	}
