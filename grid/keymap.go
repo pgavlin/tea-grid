@@ -209,12 +209,12 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("←", "collapse"),
 		),
 		ExpandAll: key.NewBinding(
-			key.WithKeys("shift+right"),
-			key.WithHelp("shift+→", "expand all"),
+			key.WithKeys("ctrl+shift+right"),
+			key.WithHelp("ctrl+shift+→", "expand all"),
 		),
 		CollapseAll: key.NewBinding(
-			key.WithKeys("shift+left"),
-			key.WithHelp("shift+←", "collapse all"),
+			key.WithKeys("ctrl+shift+left"),
+			key.WithHelp("ctrl+shift+←", "collapse all"),
 		),
 	}
 }

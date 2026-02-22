@@ -4860,20 +4860,20 @@ func TestHandleKeyMsg_ExpandAllCollapseAll(t *testing.T) {
 	)
 	collapsedCount := len(m.displayRows)
 
-	// Shift+Right should expand all (when groups exist)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
+	// Ctrl+Shift+Right should expand all (when groups exist)
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlShiftRight})
 	m.recomputeDisplayRows()
 	if len(m.displayRows) <= collapsedCount {
-		t.Error("expected more rows after Shift+Right (ExpandAll)")
+		t.Error("expected more rows after Ctrl+Shift+Right (ExpandAll)")
 	}
 
 	expandedCount := len(m.displayRows)
 
-	// Shift+Left should collapse all (when groups exist)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftLeft})
+	// Ctrl+Shift+Left should collapse all (when groups exist)
+	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlShiftLeft})
 	m.recomputeDisplayRows()
 	if len(m.displayRows) >= expandedCount {
-		t.Error("expected fewer rows after Shift+Left (CollapseAll)")
+		t.Error("expected fewer rows after Ctrl+Shift+Left (CollapseAll)")
 	}
 }
 

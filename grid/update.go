@@ -93,16 +93,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	case key.Matches(msg, m.KeyMap.GoToHeader):
 		return m.moveFocus(-1, m.focusedCell.Col)
 
-	case key.Matches(msg, m.KeyMap.SelectAll):
-		m.SelectAll()
-		return m, func() tea.Msg {
-			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
-		}
-
-	case key.Matches(msg, m.KeyMap.DeselectAll):
-		m.DeselectAll()
-		return m, nil
-
 	// Sort column from any row
 	case key.Matches(msg, m.KeyMap.SortColumn):
 		if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
@@ -142,6 +132,15 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		}
 		return m, nil
 
+	// Expand/collapse groupings
+	case key.Matches(msg, m.KeyMap.CollapseAll):
+		m.CollapseAll()
+		return m, nil
+
+	case key.Matches(msg, m.KeyMap.ExpandAll):
+		m.ExpandAll()
+		return m, nil
+
 	// Quick filter
 	case key.Matches(msg, m.KeyMap.QuickFilter):
 		if m.quickFilterEnabled {
@@ -162,6 +161,17 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	case key.Matches(msg, m.KeyMap.ColumnFilter):
 		return m.startFilterEdit()
 
+	// Select/deselect all
+	case key.Matches(msg, m.KeyMap.SelectAll):
+		m.SelectAll()
+		return m, func() tea.Msg {
+			return SelectionChangedMsg[T]{Selected: m.selectedRowNodes()}
+		}
+
+	case key.Matches(msg, m.KeyMap.DeselectAll):
+		m.DeselectAll()
+		return m, nil
+
 	// Shift+nav selection expansion
 	case key.Matches(msg, m.KeyMap.ShiftUp):
 		return m.shiftMoveFocus(m.focusedCell.Row-1, m.focusedCell.Col)
@@ -169,20 +179,10 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 	case key.Matches(msg, m.KeyMap.ShiftDown):
 		return m.shiftMoveFocus(m.focusedCell.Row+1, m.focusedCell.Col)
 
-	// Expand/collapse all overlap with shift+left/right.
-	// When groups exist, grouping takes priority; otherwise shift+nav handles it.
-	case key.Matches(msg, m.KeyMap.CollapseAll, m.KeyMap.ShiftLeft):
-		if key.Matches(msg, m.KeyMap.CollapseAll) && len(m.groupModel.GroupColumns) > 0 {
-			m.CollapseAll()
-			return m, nil
-		}
+	case key.Matches(msg, m.KeyMap.ShiftLeft):
 		return m.shiftMoveFocus(m.focusedCell.Row, m.focusedCell.Col-1)
 
-	case key.Matches(msg, m.KeyMap.ExpandAll, m.KeyMap.ShiftRight):
-		if key.Matches(msg, m.KeyMap.ExpandAll) && len(m.groupModel.GroupColumns) > 0 {
-			m.ExpandAll()
-			return m, nil
-		}
+	case key.Matches(msg, m.KeyMap.ShiftRight):
 		return m.shiftMoveFocus(m.focusedCell.Row, m.focusedCell.Col+1)
 	}
 
@@ -226,11 +226,6 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 			}
 			return m, nil
 
-		case key.Matches(msg, m.KeyMap.ShiftLeft):
-			return m.shiftMoveFocus(m.focusedCell.Row, m.focusedCell.Col-1)
-
-		case key.Matches(msg, m.KeyMap.ShiftRight):
-			return m.shiftMoveFocus(m.focusedCell.Row, m.focusedCell.Col+1)
 		}
 
 		return m, nil
