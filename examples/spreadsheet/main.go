@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -48,7 +47,11 @@ type model struct {
 	filename     string
 }
 
-func newModel(filename string, csvImport string) model {
+func newModel(filename string) model {
+	if filename == "" {
+		filename = "spreadsheet.txs"
+	}
+
 	m := model{
 		numCols:   defaultCols,
 		colFmts:   make(map[string]*CellFormat),
@@ -59,32 +62,14 @@ func newModel(filename string, csvImport string) model {
 		filename:  filename,
 	}
 
-	// Load initial data: CSV import, JSON file, or empty
-	if csvImport != "" {
-		rows, numCols, err := importCSV(csvImport)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error importing CSV: %v\n", err)
-			os.Exit(1)
-		}
+	if rows, colFmts, rowFmts, numCols, err := loadNative(filename); err == nil {
 		m.rows = rows
+		m.colFmts = colFmts
+		m.rowFmts = rowFmts
 		m.numCols = numCols
-		if m.filename == "" {
-			m.filename = "spreadsheet.txs"
-		}
-		m.status = fmt.Sprintf("Imported %s", csvImport)
-	} else if filename != "" {
-		if rows, colFmts, rowFmts, numCols, err := loadNative(filename); err == nil {
-			m.rows = rows
-			m.colFmts = colFmts
-			m.rowFmts = rowFmts
-			m.numCols = numCols
-			m.status = fmt.Sprintf("Loaded %s", filename)
-		} else {
-			m.status = fmt.Sprintf("New file: %s", filename)
-			m.rows = makeEmptyRows(defaultRows, m.numCols)
-		}
+		m.status = fmt.Sprintf("Loaded %s", filename)
 	} else {
-		m.filename = "spreadsheet.txs"
+		m.status = fmt.Sprintf("New file: %s", filename)
 		m.rows = makeEmptyRows(defaultRows, m.numCols)
 	}
 
@@ -832,15 +817,12 @@ func (m model) renderHelp() string {
 }
 
 func main() {
-	csvFlag := flag.String("csv", "", "import a CSV file on startup")
-	flag.Parse()
-
 	filename := ""
-	if flag.NArg() > 0 {
-		filename = flag.Arg(0)
+	if len(os.Args) > 1 {
+		filename = os.Args[1]
 	}
 
-	m := newModel(filename, *csvFlag)
+	m := newModel(filename)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
