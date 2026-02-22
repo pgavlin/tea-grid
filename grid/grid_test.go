@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -2082,6 +2083,31 @@ func TestDefaultCompare_MixedTypesFallback(t *testing.T) {
 	// "42" vs "hello" -> "42" < "hello"
 	if got >= 0 {
 		t.Errorf("expected defaultCompare(42, 'hello') < 0, got %d", got)
+	}
+}
+
+func TestDefaultCompare_Time(t *testing.T) {
+	t1 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	t2 := time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC)
+	t3 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC) // equal to t1
+
+	if got := defaultCompare(t1, t2); got >= 0 {
+		t.Errorf("expected t1 < t2, got %d", got)
+	}
+	if got := defaultCompare(t2, t1); got <= 0 {
+		t.Errorf("expected t2 > t1, got %d", got)
+	}
+	if got := defaultCompare(t1, t3); got != 0 {
+		t.Errorf("expected t1 == t3, got %d", got)
+	}
+}
+
+func TestDefaultCompare_TimeMixedFallback(t *testing.T) {
+	// time.Time vs non-time falls through to string comparison
+	t1 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	got := defaultCompare(t1, "not a time")
+	if got == 0 {
+		t.Error("expected non-zero for time vs string")
 	}
 }
 

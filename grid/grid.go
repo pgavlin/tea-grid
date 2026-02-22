@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -1174,6 +1175,16 @@ func defaultCompare(a, b any) int {
 				return -1
 			}
 			return 1
+		}
+	case time.Time:
+		if bv, ok := b.(time.Time); ok {
+			if av.Before(bv) {
+				return -1
+			}
+			if av.After(bv) {
+				return 1
+			}
+			return 0
 		}
 	}
 
