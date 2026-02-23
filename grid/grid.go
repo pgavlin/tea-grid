@@ -331,7 +331,7 @@ func (m Model[T]) HasSelection() bool {
 
 // IsCellSelected returns true if the cell at (row, col) is within any selection region.
 func (m Model[T]) IsCellSelected(row, col int) bool {
-	return m.sel.ContainsCell(row, col, false)
+	return m.sel.ContainsCell(row, col)
 }
 
 // IsRowSelected returns true if the given row ID is covered by any KindFullRow rect.

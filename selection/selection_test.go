@@ -147,17 +147,17 @@ func TestToggleFullRow_SingleModeReplacesExisting(t *testing.T) {
 
 // --- ContainsCell ---
 
-func TestContainsCell_NoSelect(t *testing.T) {
+func TestContainsCell_InSelection(t *testing.T) {
 	m := New(SelectMulti)
 	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{0, 0}, Cursor: Position{0, 3}})
-	if m.ContainsCell(0, 1, true) {
-		t.Error("ContainsCell should return false when noSelect is true")
+	if !m.ContainsCell(0, 1) {
+		t.Error("ContainsCell should return true for cell within selection")
 	}
 }
 
 func TestContainsCell_Empty(t *testing.T) {
 	m := New(SelectMulti)
-	if m.ContainsCell(0, 0, false) {
+	if m.ContainsCell(0, 0) {
 		t.Error("ContainsCell should return false with no rects")
 	}
 }
@@ -166,16 +166,16 @@ func TestContainsCell_FullRow(t *testing.T) {
 	m := New(SelectMulti)
 	m.Replace(Rect{Kind: KindFullRow, Anchor: Position{2, 0}, Cursor: Position{4, 3}})
 
-	if !m.ContainsCell(2, 0, false) {
+	if !m.ContainsCell(2, 0) {
 		t.Error("expected (2,0) in full-row selection")
 	}
-	if !m.ContainsCell(3, 99, false) {
+	if !m.ContainsCell(3, 99) {
 		t.Error("expected (3,99) in full-row selection (any column)")
 	}
-	if m.ContainsCell(1, 0, false) {
+	if m.ContainsCell(1, 0) {
 		t.Error("expected (1,0) NOT in full-row selection")
 	}
-	if m.ContainsCell(5, 0, false) {
+	if m.ContainsCell(5, 0) {
 		t.Error("expected (5,0) NOT in full-row selection")
 	}
 }
@@ -184,16 +184,16 @@ func TestContainsCell_FullCol(t *testing.T) {
 	m := New(SelectMulti)
 	m.Replace(Rect{Kind: KindFullCol, Anchor: Position{0, 2}, Cursor: Position{9, 4}})
 
-	if !m.ContainsCell(0, 2, false) {
+	if !m.ContainsCell(0, 2) {
 		t.Error("expected (0,2) in full-col selection")
 	}
-	if !m.ContainsCell(99, 3, false) {
+	if !m.ContainsCell(99, 3) {
 		t.Error("expected (99,3) in full-col selection (any row)")
 	}
-	if m.ContainsCell(0, 1, false) {
+	if m.ContainsCell(0, 1) {
 		t.Error("expected (0,1) NOT in full-col selection")
 	}
-	if m.ContainsCell(0, 5, false) {
+	if m.ContainsCell(0, 5) {
 		t.Error("expected (0,5) NOT in full-col selection")
 	}
 }
@@ -202,19 +202,19 @@ func TestContainsCell_Rect(t *testing.T) {
 	m := New(SelectMulti)
 	m.Replace(Rect{Kind: KindRect, Anchor: Position{1, 1}, Cursor: Position{3, 3}})
 
-	if !m.ContainsCell(2, 2, false) {
+	if !m.ContainsCell(2, 2) {
 		t.Error("expected (2,2) in rect selection")
 	}
-	if !m.ContainsCell(1, 1, false) {
+	if !m.ContainsCell(1, 1) {
 		t.Error("expected (1,1) in rect selection (anchor corner)")
 	}
-	if !m.ContainsCell(3, 3, false) {
+	if !m.ContainsCell(3, 3) {
 		t.Error("expected (3,3) in rect selection (cursor corner)")
 	}
-	if m.ContainsCell(0, 2, false) {
+	if m.ContainsCell(0, 2) {
 		t.Error("expected (0,2) NOT in rect selection")
 	}
-	if m.ContainsCell(2, 0, false) {
+	if m.ContainsCell(2, 0) {
 		t.Error("expected (2,0) NOT in rect selection")
 	}
 }
@@ -224,10 +224,10 @@ func TestContainsCell_RectReversedAnchors(t *testing.T) {
 	m := New(SelectMulti)
 	m.Replace(Rect{Kind: KindRect, Anchor: Position{5, 5}, Cursor: Position{2, 2}})
 
-	if !m.ContainsCell(3, 3, false) {
+	if !m.ContainsCell(3, 3) {
 		t.Error("expected (3,3) in reversed-anchor rect")
 	}
-	if m.ContainsCell(1, 3, false) {
+	if m.ContainsCell(1, 3) {
 		t.Error("expected (1,3) NOT in reversed-anchor rect")
 	}
 }

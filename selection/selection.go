@@ -123,9 +123,8 @@ func (m *Model) ToggleFullRow(row int) {
 }
 
 // ContainsCell returns true if the cell at (row, col) is within any selection rectangle.
-// Always returns false if noSelect is true.
-func (m *Model) ContainsCell(row, col int, noSelect bool) bool {
-	if noSelect || len(m.Rects) == 0 {
+func (m *Model) ContainsCell(row, col int) bool {
+	if len(m.Rects) == 0 {
 		return false
 	}
 	for _, r := range m.Rects {
