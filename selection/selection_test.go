@@ -305,6 +305,33 @@ func TestBoundingRect_MultipleRects(t *testing.T) {
 	}
 }
 
+func TestBoundingRect_AllBranches(t *testing.T) {
+	// Exercise all four comparison branches:
+	// Second rect has: rLo < rowLo, rHi > rowHi, cLo < colLo, cHi > colHi
+	m := New(SelectMulti)
+	m.Rects = []Rect{
+		{Kind: KindRect, Anchor: Position{3, 3}, Cursor: Position{5, 5}},
+		{Kind: KindRect, Anchor: Position{1, 1}, Cursor: Position{8, 8}},
+	}
+	rLo, rHi, cLo, cHi := m.BoundingRect()
+	if rLo != 1 || rHi != 8 || cLo != 1 || cHi != 8 {
+		t.Errorf("expected (1,8,1,8), got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
+func TestBoundingRect_PartialBranches(t *testing.T) {
+	// First rect already has the lowest row but highest col
+	m := New(SelectMulti)
+	m.Rects = []Rect{
+		{Kind: KindRect, Anchor: Position{1, 5}, Cursor: Position{6, 8}},
+		{Kind: KindRect, Anchor: Position{0, 2}, Cursor: Position{3, 4}},
+	}
+	rLo, rHi, cLo, cHi := m.BoundingRect()
+	if rLo != 0 || rHi != 6 || cLo != 2 || cHi != 8 {
+		t.Errorf("expected (0,6,2,8), got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
+	}
+}
+
 func TestBoundingRect_ReversedAnchors(t *testing.T) {
 	m := New(SelectMulti)
 	m.Replace(Rect{Kind: KindRect, Anchor: Position{5, 5}, Cursor: Position{1, 1}})

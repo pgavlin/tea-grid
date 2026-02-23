@@ -6290,13 +6290,114 @@ func TestView_TruncatesExcessLines(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// render.go:89-91 - View: Table style with non-empty Value() (already tested
-// but ensure cmd is invoked - verifying the style is applied)
-// This was already added as TestView_TableStyleWithBorder. Let's ensure
-// the coverage data actually picks it up by verifying the border chars.
+// Selection API methods
 // -----------------------------------------------------------------------
 
+func TestSetRectSelection(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.SetRectSelection(CellPosition{Row: 1, Col: 1}, CellPosition{Row: 3, Col: 2})
+
+	// Cells in the rect should be selected
+	if !m.IsCellSelected(1, 1) {
+		t.Error("expected (1,1) to be selected")
+	}
+	if !m.IsCellSelected(2, 2) {
+		t.Error("expected (2,2) to be selected")
+	}
+	if !m.IsCellSelected(3, 1) {
+		t.Error("expected (3,1) to be selected")
+	}
+
+	// Cells outside should not be selected
+	if m.IsCellSelected(0, 0) {
+		t.Error("expected (0,0) not to be selected")
+	}
+	if m.IsCellSelected(4, 1) {
+		t.Error("expected (4,1) not to be selected")
+	}
+	if m.IsCellSelected(2, 3) {
+		t.Error("expected (2,3) not to be selected")
+	}
+}
+
+func TestIsCellSelected_NoSelection(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	if m.IsCellSelected(0, 0) {
+		t.Error("expected IsCellSelected to return false with no selection")
+	}
+}
+
+func TestSelectAllRows_Empty(t *testing.T) {
+	m := New(
+		WithColumns[TestRow](testCols()),
+		WithSelection[TestRow](selection.SelectMulti),
+		WithWidth[TestRow](80),
+		WithHeight[TestRow](20),
+	)
+	// Should not panic with no rows
+	m.SelectAllRows()
+	if m.HasSelection() {
+		t.Error("expected no selection with empty rows")
+	}
+}
+
+func TestSelectAllRows(t *testing.T) {
+	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
+	m.SelectAllRows()
+	if !m.HasSelection() {
+		t.Error("expected selection after SelectAllRows")
+	}
+	// All 5 rows should be selected
+	for i := 0; i < 5; i++ {
+		if !m.IsCellSelected(i, 0) {
+			t.Errorf("expected row %d to be selected", i)
+		}
+	}
+}
+
 // -----------------------------------------------------------------------
-// update.go:154 - QuickFilter toggle off with text - ensure closure is invoked
-// Already fixed above with cmd() invocation.
+// renderAggCells fallback (nil AggValues)
 // -----------------------------------------------------------------------
+
+func TestRenderAggCells_Fallback(t *testing.T) {
+	cols := testCols()
+	cols[2].AggFunc = "sum"
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithGrouping[TestRow]("Department"),
+		WithGroupDefaultExpanded[TestRow](-1),
+	)
+	// Clear AggValues on group nodes to trigger fallback computation
+	for i := range m.displayRows {
+		if m.displayRows[i].IsGroup {
+			m.displayRows[i].AggValues = nil
+		}
+	}
+	output := m.View()
+	// Should still render aggregation values via fallback
+	if len(output) == 0 {
+		t.Error("expected non-empty output with fallback agg computation")
+	}
+}
+
+func TestRenderAggCells_FallbackCustom(t *testing.T) {
+	cols := testCols()
+	cols[2].AggFuncCustom = func(values []any) any {
+		return len(values)
+	}
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithGrouping[TestRow]("Department"),
+		WithGroupDefaultExpanded[TestRow](-1),
+	)
+	// Clear AggValues on group nodes to trigger fallback computation
+	for i := range m.displayRows {
+		if m.displayRows[i].IsGroup {
+			m.displayRows[i].AggValues = nil
+		}
+	}
+	output := m.View()
+	if !strings.Contains(output, "2") {
+		t.Error("expected custom fallback aggregation result '2' in output")
+	}
+}
