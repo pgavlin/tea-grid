@@ -7,7 +7,7 @@ import (
 
 // SortCriterion describes a single sort column and direction.
 type SortCriterion struct {
-	ColumnID     string
+	ColumnID  string
 	Direction data.SortDirection // Asc or Desc.
 }
 

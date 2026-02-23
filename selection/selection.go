@@ -15,9 +15,9 @@ type Kind int
 
 const (
 	KindNone    Kind = iota
-	KindRect                // Arbitrary rectangle (Shift+nav)
-	KindFullRow             // Full-row selection (R, Space, Ctrl+A) — all columns
-	KindFullCol             // Full-column selection (C key) — all rows
+	KindRect         // Arbitrary rectangle (Shift+nav)
+	KindFullRow      // Full-row selection (R, Space, Ctrl+A) — all columns
+	KindFullCol      // Full-column selection (C key) — all rows
 )
 
 // Position identifies a cell by row and column index.

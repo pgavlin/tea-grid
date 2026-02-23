@@ -9,11 +9,11 @@ type RowNode[T any] struct {
 	ID         string // Unique row ID.
 	RowIndex   int    // Current display index (post sort/filter/group).
 	Expanded   bool   // For group rows.
-	RowHeight  int  // In terminal lines. Default: 1.
-	Pinned     Pin  // Top, Bottom, or None.
-	IsGroup    bool // True if this is a synthetic group row.
-	GroupKey   string      // The value this group represents.
-	GroupLevel int         // Nesting depth (0 = top).
+	RowHeight  int    // In terminal lines. Default: 1.
+	Pinned     Pin    // Top, Bottom, or None.
+	IsGroup    bool   // True if this is a synthetic group row.
+	GroupKey   string // The value this group represents.
+	GroupLevel int    // Nesting depth (0 = top).
 	Children   []*RowNode[T]
 	Parent     *RowNode[T]
 	AggValues  map[string]any // Cached aggregation values keyed by column ID (group nodes only).

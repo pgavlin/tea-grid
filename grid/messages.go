@@ -66,8 +66,8 @@ type SortChangedMsg struct {
 
 // FilterChangedMsg is emitted when a column filter changes.
 type FilterChangedMsg struct {
-	ColumnID  string
-	Active bool
+	ColumnID string
+	Active   bool
 }
 
 // QuickFilterChangedMsg is emitted when the quick filter text changes.
@@ -114,4 +114,3 @@ type GroupCollapsedMsg struct {
 type GroupColumnsChangedMsg struct {
 	GroupColumns []string
 }
-

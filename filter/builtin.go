@@ -690,4 +690,3 @@ func (f *TimeFilter) Active() bool {
 func (f *TimeFilter) Clear() {
 	f.SetText("")
 }
-

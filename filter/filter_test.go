@@ -1354,8 +1354,8 @@ func TestTimeFilterMatchesNonTimeType(t *testing.T) {
 // Final coverage gap tests
 // ==========================================================================
 
-// 1. TextFilter.SetRegex with text already set - covers line 44 in builtin.go
-//    (the `f.compiled, _ = regexp.Compile(f.editor.Text())` branch inside SetRegex)
+//  1. TextFilter.SetRegex with text already set - covers line 44 in builtin.go
+//     (the `f.compiled, _ = regexp.Compile(f.editor.Text())` branch inside SetRegex)
 func TestTextFilterSetRegexWithTextAlreadySet(t *testing.T) {
 	f := NewTextFilter()
 	// Set text FIRST, then enable regex so SetRegex sees non-empty text
@@ -1372,8 +1372,8 @@ func TestTextFilterSetRegexWithTextAlreadySet(t *testing.T) {
 	}
 }
 
-// 2. SetFilter.View with maxLines=1 - covers the `listLines < 1` branch in View()
-//    When maxLines=1, listLines = 1-1 = 0, which triggers listLines = 1.
+//  2. SetFilter.View with maxLines=1 - covers the `listLines < 1` branch in View()
+//     When maxLines=1, listLines = 1-1 = 0, which triggers listLines = 1.
 func TestSetFilterViewWithMaxLinesOne(t *testing.T) {
 	f := NewSetFilter("alpha", "beta", "gamma")
 	f.Update(FilterFocusMsg{Width: 30, MaxLines: 1})
@@ -1387,8 +1387,8 @@ func TestSetFilterViewWithMaxLinesOne(t *testing.T) {
 	}
 }
 
-// 3. SetFilter.Update with an unknown message type - covers the final `return f, nil`
-//    after the type switch (reached only for message types other than Focus/Blur/KeyMsg).
+//  3. SetFilter.Update with an unknown message type - covers the final `return f, nil`
+//     after the type switch (reached only for message types other than Focus/Blur/KeyMsg).
 type unknownMsg struct{}
 
 func TestSetFilterUpdateUnknownMsgType(t *testing.T) {
@@ -1403,8 +1403,8 @@ func TestSetFilterUpdateUnknownMsgType(t *testing.T) {
 	}
 }
 
-// 4. SetFilter.ensureVisible with maxLines=1 - covers the `listLines < 1` branch
-//    in ensureVisible(). When maxLines=1, listLines=0, which triggers listLines=1.
+//  4. SetFilter.ensureVisible with maxLines=1 - covers the `listLines < 1` branch
+//     in ensureVisible(). When maxLines=1, listLines=0, which triggers listLines=1.
 func TestSetFilterEnsureVisibleWithMaxLinesOne(t *testing.T) {
 	values := []string{"a", "b", "c", "d", "e"}
 	f := NewSetFilter(values...)
@@ -1424,8 +1424,8 @@ func TestSetFilterEnsureVisibleWithMaxLinesOne(t *testing.T) {
 	}
 }
 
-// 5. BoolFilter.View state=2 while editing - covers `falseR = "(\u25cf)"` in View()
-//    Toggle twice to reach state=2 (false) while editing.
+//  5. BoolFilter.View state=2 while editing - covers `falseR = "(\u25cf)"` in View()
+//     Toggle twice to reach state=2 (false) while editing.
 func TestBoolFilterViewEditingFalseState(t *testing.T) {
 	f := NewBoolFilter()
 	f.Update(FilterFocusMsg{Width: 40, MaxLines: 5})

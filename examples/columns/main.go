@@ -45,7 +45,7 @@ func (m model) View() string { return m.grid.View() }
 func main() {
 	cols := []data.Column[Employee]{
 		{
-			ColumnID:       "name",
+			ColumnID:    "name",
 			HeaderName:  "Employee Name",
 			ValueGetter: func(e Employee) any { return e.Name },
 			Pinned:      data.PinLeft,
@@ -55,7 +55,7 @@ func main() {
 			Filter:      filter.NewTextFilter(),
 		},
 		{
-			ColumnID:       "department",
+			ColumnID:    "department",
 			HeaderName:  "Dept",
 			ValueGetter: func(e Employee) any { return e.Department },
 			Width:       15,
@@ -64,7 +64,7 @@ func main() {
 			Filter:      filter.NewSetFilter("Engineering", "Marketing", "Sales"),
 		},
 		{
-			ColumnID:       "salary",
+			ColumnID:    "salary",
 			HeaderName:  "Salary",
 			ValueGetter: func(e Employee) any { return e.Salary },
 			Width:       12,
@@ -77,7 +77,7 @@ func main() {
 			AggFunc: "sum",
 		},
 		{
-			ColumnID:       "active",
+			ColumnID:    "active",
 			HeaderName:  "Active",
 			ValueGetter: func(e Employee) any { return e.Active },
 			Width:       8,

@@ -1030,8 +1030,8 @@ func TestColumnsFromMapNonMapRow(t *testing.T) {
 // --- columnsFromSlice: struct with unexported fields ---
 
 type sliceTestWithUnexported struct {
-	Public    string
-	private   int
+	Public     string
+	private    int
 	AlsoPublic bool
 }
 

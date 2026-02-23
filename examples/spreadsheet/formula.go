@@ -15,9 +15,9 @@ type tokenKind int
 const (
 	tokNumber tokenKind = iota
 	tokString
-	tokCellRef   // e.g. A1
-	tokRange     // e.g. A1:B5
-	tokFunc      // e.g. SUM
+	tokCellRef // e.g. A1
+	tokRange   // e.g. A1:B5
+	tokFunc    // e.g. SUM
 	tokPlus
 	tokMinus
 	tokStar
@@ -182,15 +182,17 @@ type exprNode interface {
 	exprNode()
 }
 
-type numberLit struct{ val float64 }
-type stringLit struct{ val string }
-type cellRefExpr struct{ ref string } // e.g. "A1"
-type rangeExpr struct{ from, to string }
-type binaryExpr struct {
-	op    tokenKind
-	left  exprNode
-	right exprNode
-}
+type (
+	numberLit   struct{ val float64 }
+	stringLit   struct{ val string }
+	cellRefExpr struct{ ref string } // e.g. "A1"
+	rangeExpr   struct{ from, to string }
+	binaryExpr  struct {
+		op    tokenKind
+		left  exprNode
+		right exprNode
+	}
+)
 type unaryExpr struct {
 	op      tokenKind
 	operand exprNode
@@ -200,13 +202,13 @@ type funcCall struct {
 	args []exprNode
 }
 
-func (numberLit) exprNode()  {}
-func (stringLit) exprNode()  {}
+func (numberLit) exprNode()   {}
+func (stringLit) exprNode()   {}
 func (cellRefExpr) exprNode() {}
-func (rangeExpr) exprNode()  {}
-func (binaryExpr) exprNode() {}
-func (unaryExpr) exprNode()  {}
-func (funcCall) exprNode()   {}
+func (rangeExpr) exprNode()   {}
+func (binaryExpr) exprNode()  {}
+func (unaryExpr) exprNode()   {}
+func (funcCall) exprNode()    {}
 
 // --- Parser ---
 

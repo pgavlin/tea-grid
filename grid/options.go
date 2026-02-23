@@ -177,4 +177,3 @@ func WithDynamicRowHeight[T any](fn func(T) int) Option[T] {
 		m.dynamicRowHeight = fn
 	}
 }
-

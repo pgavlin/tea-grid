@@ -15,17 +15,17 @@ type testRow struct {
 func testCols() []data.Column[testRow] {
 	return []data.Column[testRow]{
 		{
-			ColumnID:       "Name",
+			ColumnID:    "Name",
 			HeaderName:  "Name",
 			ValueGetter: func(r testRow) any { return r.Name },
 		},
 		{
-			ColumnID:       "Department",
+			ColumnID:    "Department",
 			HeaderName:  "Department",
 			ValueGetter: func(r testRow) any { return r.Department },
 		},
 		{
-			ColumnID:       "Salary",
+			ColumnID:    "Salary",
 			HeaderName:  "Salary",
 			ValueGetter: func(r testRow) any { return r.Salary },
 		},

@@ -136,7 +136,7 @@ func saveNative(filename string, rows []*SpreadsheetRow, colFmts map[string]*Cel
 	out := make([]byte, 0, len(nativeMagic)+len(compressed))
 	out = append(out, nativeMagic[:]...)
 	out = append(out, compressed...)
-	return os.WriteFile(filename, out, 0644)
+	return os.WriteFile(filename, out, 0o644)
 }
 
 // loadNative reads a spreadsheet from a binary file (CBOR + zstd).

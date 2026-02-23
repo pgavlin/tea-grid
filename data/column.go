@@ -35,7 +35,7 @@ const (
 // Column defines a single column in the grid.
 type Column[T any] struct {
 	// Identity
-	ColumnID      string // Unique identifier. Required.
+	ColumnID   string // Unique identifier. Required.
 	HeaderName string // Display name in the header row.
 
 	// Data access
@@ -49,8 +49,8 @@ type Column[T any] struct {
 	Flex     int // Flex weight for distributing remaining space. 0 = no flex.
 
 	// Sorting
-	Sortable   bool                  // Default: true.
-	Comparator func(a, b any) int   // Custom sort.
+	Sortable   bool               // Default: true.
+	Comparator func(a, b any) int // Custom sort.
 
 	// Filtering
 	Filterable bool          // Default: true.
@@ -85,7 +85,7 @@ type Column[T any] struct {
 // ColumnGroup produces a single level of grouped headers.
 type ColumnGroup[T any] struct {
 	HeaderName string
-	Columns []Column[T] // Leaf columns in this group.
+	Columns    []Column[T] // Leaf columns in this group.
 }
 
 // FromType returns a []Column[T] derived from T's exported struct fields.
@@ -112,7 +112,7 @@ func FromType[T any]() []Column[T] {
 		}
 		idx := i // capture for closure
 		col := Column[T]{
-			ColumnID:      field.Name,
+			ColumnID:   field.Name,
 			HeaderName: field.Name,
 			ValueGetter: func(data T) any {
 				v := reflect.ValueOf(data)
@@ -235,7 +235,7 @@ func columnsFromMap[T any](rows []T) []Column[T] {
 // makeMapColumn builds a Column for a map column with the given key and type category.
 func makeMapColumn[T any](key, category string) Column[T] {
 	col := Column[T]{
-		ColumnID:      key,
+		ColumnID:   key,
 		HeaderName: key,
 		Sortable:   true,
 		Filterable: true,
@@ -440,7 +440,7 @@ func columnsFromSlice[T any](rows []T) []Column[T] {
 		}
 
 		col := Column[T]{
-			ColumnID:       fieldName,
+			ColumnID:    fieldName,
 			HeaderName:  fieldName,
 			ValueGetter: getter,
 			Sortable:    true,

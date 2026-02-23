@@ -11,7 +11,7 @@ type CellContext[T any] struct {
 	Data           T      // The full row data.
 	RowNode        *RowNode[T]
 	Column         *Column[T]
-	ColumnIndex       int
+	ColumnIndex    int
 	RowIndex       int
 	IsSelected     bool
 	IsFocused      bool

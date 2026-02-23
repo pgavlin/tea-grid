@@ -100,7 +100,6 @@ type Model[T any] struct {
 
 	// Styles
 	styles Styles
-
 }
 
 // New creates a new grid model with the given options.
@@ -110,7 +109,7 @@ func New[T any](opts ...Option[T]) Model[T] {
 		Help:             help.New(),
 		styles:           DefaultStyles(),
 		vp:               newViewport(),
-		sel: selection.New(selection.SelectNone),
+		sel:              selection.New(selection.SelectNone),
 		groupModel:       grouping.Model[T]{Expanded: make(map[string]bool), DefaultExpanded: -1},
 		defaultRowHeight: 1,
 		dirty:            true,
