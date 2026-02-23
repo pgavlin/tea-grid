@@ -2115,11 +2115,337 @@ func TestDefaultCompare_TimeMixedFallback(t *testing.T) {
 // Additional edge case tests
 // -----------------------------------------------------------------------
 
-func TestInit_ReturnsNil(t *testing.T) {
+func TestInit_ReturnsCmd(t *testing.T) {
 	m := newTestGrid()
 	cmd := m.Init()
+	if cmd == nil {
+		t.Fatal("expected Init() to return a non-nil Cmd")
+	}
+	msg := cmd()
+	if _, ok := msg.(initMsg); !ok {
+		t.Errorf("expected initMsg, got %T", msg)
+	}
+}
+
+// initUpdate simulates the Bubble Tea Init → Update cycle: it calls Init to
+// obtain the command, executes it, and feeds the resulting message into Update.
+func initUpdate(m Model[TestRow]) Model[TestRow] {
+	cmd := m.Init()
 	if cmd != nil {
-		t.Error("expected Init() to return nil")
+		m, _ = m.Update(cmd())
+	}
+	return m
+}
+
+// -----------------------------------------------------------------------
+// Init Lifecycle – pre-set options applied by New()
+// -----------------------------------------------------------------------
+
+func TestInitLifecycle_PresetExternalFilter(t *testing.T) {
+	m := newTestGrid(
+		WithExternalFilter[TestRow](func(r TestRow) bool {
+			return r.Department == "Engineering"
+		}),
+	)
+	// New() computes display rows, so the first View should show only Engineering rows.
+	output := m.View()
+	if !strings.Contains(output, "Alice") {
+		t.Error("expected 'Alice' (Engineering) in pre-Init View")
+	}
+	if !strings.Contains(output, "Carol") {
+		t.Error("expected 'Carol' (Engineering) in pre-Init View")
+	}
+	if strings.Contains(output, "Bob") {
+		t.Error("did not expect 'Bob' (Sales) in filtered View")
+	}
+	if strings.Contains(output, "Dave") {
+		t.Error("did not expect 'Dave' (Marketing) in filtered View")
+	}
+}
+
+func TestInitLifecycle_PresetSort(t *testing.T) {
+	m := newTestGrid(
+		WithDefaultSort[TestRow]([]gridsort.SortCriterion{
+			{ColumnID: "Name", Direction: data.SortAsc},
+		}),
+	)
+
+	// New() applies the sort, so display rows should be in alphabetical order.
+	names := make([]string, len(m.displayRows))
+	for i, rn := range m.displayRows {
+		names[i] = rn.Data.Name
+	}
+	expected := []string{"Alice", "Bob", "Carol", "Dave", "Eve"}
+	for i, want := range expected {
+		if names[i] != want {
+			t.Errorf("position %d: expected %q, got %q (full order: %v)", i, want, names[i], names)
+			break
+		}
+	}
+}
+
+func TestInitLifecycle_PresetGrouping(t *testing.T) {
+	m := newTestGrid(
+		WithGrouping[TestRow]("Department"),
+		WithGroupDefaultExpanded[TestRow](-1),
+	)
+
+	hasGroup := false
+	for _, rn := range m.displayRows {
+		if rn.IsGroup {
+			hasGroup = true
+			break
+		}
+	}
+	if !hasGroup {
+		t.Error("expected at least one group row in display rows after New()")
+	}
+	output := m.View()
+	if !strings.Contains(output, "Engineering") {
+		t.Error("expected 'Engineering' group in pre-Init View")
+	}
+}
+
+func TestInitLifecycle_PresetColumnFilter(t *testing.T) {
+	cols := testCols()
+	tf := filter.NewTextFilter()
+	tf.SetText("Sales")
+	cols[1].Filter = tf
+
+	m := newTestGrid(WithColumns[TestRow](cols))
+
+	// New() applies column filters during recomputeDisplayRows().
+	if len(m.displayRows) != 2 {
+		t.Fatalf("expected 2 Sales rows with preset column filter, got %d", len(m.displayRows))
+	}
+	for _, rn := range m.displayRows {
+		if rn.Data.Department != "Sales" {
+			t.Errorf("expected only Sales rows, found %q (%s)", rn.Data.Name, rn.Data.Department)
+		}
+	}
+}
+
+func TestInitLifecycle_PresetNumberFilter(t *testing.T) {
+	cols := testCols()
+	nf := filter.NewNumberFilter()
+	nf.SetText(">90000")
+	cols[2].Filter = nf // Salary column
+
+	m := newTestGrid(WithColumns[TestRow](cols))
+
+	// Only rows with salary > 90000: Alice (95000), Carol (110000)
+	if len(m.displayRows) != 2 {
+		t.Fatalf("expected 2 rows with salary > 90000, got %d", len(m.displayRows))
+	}
+	for _, rn := range m.displayRows {
+		if rn.Data.Salary <= 90000 {
+			t.Errorf("expected salary > 90000, found %q with salary %.0f", rn.Data.Name, rn.Data.Salary)
+		}
+	}
+}
+
+func TestInitLifecycle_PresetPostSort(t *testing.T) {
+	m := newTestGrid(
+		WithPostSort[TestRow](func(rows []data.RowNode[TestRow]) []data.RowNode[TestRow] {
+			n := len(rows)
+			reversed := make([]data.RowNode[TestRow], n)
+			for i, rn := range rows {
+				reversed[n-1-i] = rn
+			}
+			return reversed
+		}),
+	)
+	// Original order: Alice, Bob, Carol, Dave, Eve → reversed by post-sort hook.
+	if m.displayRows[0].Data.Name != "Eve" {
+		t.Errorf("expected first row to be Eve (reversed), got %s", m.displayRows[0].Data.Name)
+	}
+	if m.displayRows[4].Data.Name != "Alice" {
+		t.Errorf("expected last row to be Alice (reversed), got %s", m.displayRows[4].Data.Name)
+	}
+}
+
+func TestInitLifecycle_PresetPinnedTopRows(t *testing.T) {
+	m := newTestGrid(
+		WithPinnedTopRows[TestRow](func(r TestRow) bool {
+			return r.Name == "Alice"
+		}),
+	)
+
+	if len(m.pinnedTop) != 1 || m.pinnedTop[0].Data.Name != "Alice" {
+		t.Errorf("expected Alice pinned to top, got %d pinned rows", len(m.pinnedTop))
+	}
+	for _, rn := range m.displayRows {
+		if rn.Data.Name == "Alice" {
+			t.Error("expected Alice to be removed from display rows (pinned to top)")
+		}
+	}
+	output := m.View()
+	if !strings.Contains(output, "Alice") {
+		t.Error("expected pinned 'Alice' in View output")
+	}
+}
+
+func TestInitLifecycle_PresetStaticPinnedBottom(t *testing.T) {
+	summary := TestRow{Name: "Total", Department: "", Salary: 450000, Active: true}
+	m := newTestGrid(
+		WithStaticPinnedBottom[TestRow]([]TestRow{summary}),
+	)
+
+	if len(m.pinnedBot) != 1 || m.pinnedBot[0].Data.Name != "Total" {
+		t.Errorf("expected 'Total' pinned to bottom, got %d pinned rows", len(m.pinnedBot))
+	}
+	output := m.View()
+	if !strings.Contains(output, "Total") {
+		t.Error("expected pinned 'Total' in View output")
+	}
+}
+
+// -----------------------------------------------------------------------
+// Init Lifecycle – setters called after New(), resolved by Init → Update
+// -----------------------------------------------------------------------
+
+func TestInitLifecycle_SetSortAfterNew(t *testing.T) {
+	m := newTestGrid()
+
+	m.SetSort([]gridsort.SortCriterion{
+		{ColumnID: "Salary", Direction: data.SortDesc},
+	})
+	if !m.dirty {
+		t.Fatal("expected dirty=true after SetSort")
+	}
+
+	m = initUpdate(m)
+	if m.dirty {
+		t.Fatal("expected dirty=false after Init→Update")
+	}
+
+	for i := 1; i < len(m.displayRows); i++ {
+		prev := m.displayRows[i-1].Data.Salary
+		curr := m.displayRows[i].Data.Salary
+		if prev < curr {
+			t.Errorf("rows not sorted by salary desc after Init→Update: %.0f < %.0f at index %d", prev, curr, i)
+		}
+	}
+}
+
+func TestInitLifecycle_SetQuickFilterAfterNew(t *testing.T) {
+	m := newTestGrid()
+
+	m.SetQuickFilter("engineering")
+	if !m.dirty {
+		t.Fatal("expected dirty=true after SetQuickFilter")
+	}
+
+	m = initUpdate(m)
+
+	if len(m.displayRows) != 2 {
+		t.Fatalf("expected 2 Engineering rows, got %d", len(m.displayRows))
+	}
+	for _, rn := range m.displayRows {
+		if rn.Data.Department != "Engineering" {
+			t.Errorf("expected only Engineering rows, found %q (%s)", rn.Data.Name, rn.Data.Department)
+		}
+	}
+}
+
+func TestInitLifecycle_SetColumnFilterAfterNew(t *testing.T) {
+	m := newTestGrid()
+
+	// All rows visible initially.
+	if len(m.displayRows) != 5 {
+		t.Fatalf("expected 5 rows before filter, got %d", len(m.displayRows))
+	}
+
+	// Activate a column filter via the public API.
+	tf := filter.NewTextFilter()
+	tf.SetText("Sales")
+	m.SetColumnFilter("Department", tf)
+	if !m.dirty {
+		t.Fatal("expected dirty=true after SetColumnFilter")
+	}
+
+	m = initUpdate(m)
+
+	if len(m.displayRows) != 2 {
+		t.Fatalf("expected 2 Sales rows, got %d", len(m.displayRows))
+	}
+	for _, rn := range m.displayRows {
+		if rn.Data.Department != "Sales" {
+			t.Errorf("expected only Sales rows, found %q (%s)", rn.Data.Name, rn.Data.Department)
+		}
+	}
+}
+
+func TestInitLifecycle_SetRowsAfterNew(t *testing.T) {
+	m := newTestGrid()
+
+	m.SetRows([]TestRow{
+		{"Zara", "Engineering", 120000, true},
+		{"Yuki", "Design", 95000, true},
+	})
+	if !m.dirty {
+		t.Fatal("expected dirty=true after SetRows")
+	}
+
+	m = initUpdate(m)
+
+	if len(m.displayRows) != 2 {
+		t.Fatalf("expected 2 display rows, got %d", len(m.displayRows))
+	}
+	if m.displayRows[0].Data.Name != "Zara" {
+		t.Errorf("expected first row Zara, got %s", m.displayRows[0].Data.Name)
+	}
+	if m.displayRows[1].Data.Name != "Yuki" {
+		t.Errorf("expected second row Yuki, got %s", m.displayRows[1].Data.Name)
+	}
+}
+
+func TestInitLifecycle_MultipleSettersAfterNew(t *testing.T) {
+	m := newTestGrid()
+
+	m.SetQuickFilter("engineering")
+	m.SetSort([]gridsort.SortCriterion{
+		{ColumnID: "Salary", Direction: data.SortAsc},
+	})
+
+	m = initUpdate(m)
+
+	// Only Engineering rows (Alice: 95000, Carol: 110000), sorted by salary asc.
+	if len(m.displayRows) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(m.displayRows))
+	}
+	if m.displayRows[0].Data.Name != "Alice" {
+		t.Errorf("expected first row Alice (lower salary), got %s", m.displayRows[0].Data.Name)
+	}
+	if m.displayRows[1].Data.Name != "Carol" {
+		t.Errorf("expected second row Carol (higher salary), got %s", m.displayRows[1].Data.Name)
+	}
+}
+
+func TestInitLifecycle_ViewBeforeAndAfterUpdate(t *testing.T) {
+	m := newTestGrid()
+
+	// Initial View should show all 5 rows.
+	output := m.View()
+	for _, name := range []string{"Alice", "Bob", "Carol", "Dave", "Eve"} {
+		if !strings.Contains(output, name) {
+			t.Errorf("expected %q in initial View", name)
+		}
+	}
+
+	// Set a filter after construction — dirty but not yet recomputed.
+	m.SetQuickFilter("alice")
+
+	// Simulate Init → Update cycle.
+	m = initUpdate(m)
+
+	// After Init→Update, only Alice should be visible.
+	output = m.View()
+	if !strings.Contains(output, "Alice") {
+		t.Error("expected 'Alice' in View after Init→Update with quick filter")
+	}
+	if strings.Contains(output, "Bob") {
+		t.Error("did not expect 'Bob' in View after Init→Update with quick filter 'alice'")
 	}
 }
 

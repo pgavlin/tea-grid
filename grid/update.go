@@ -463,9 +463,12 @@ func (m Model[T]) startFilterEdit() (Model[T], tea.Cmd) {
 		maxLines = 2
 	}
 
-	// Send focus message to the filter
+	// Send focus message to the filter.
+	// Subtract the FilterInput horizontal frame size so the filter content
+	// fits within the styled container without overflowing.
+	filterWidth := m.width - m.styles.FilterInput.GetHorizontalFrameSize()
 	newFilter, cmd := col.Filter.Update(filter.FilterFocusMsg{
-		Width:    m.width,
+		Width:    filterWidth,
 		MaxLines: maxLines,
 	})
 	m.cols[colIdx].Filter = newFilter

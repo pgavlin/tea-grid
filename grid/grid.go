@@ -138,9 +138,11 @@ func New[T any](opts ...Option[T]) Model[T] {
 	return m
 }
 
-// Init returns an initial command. Currently always returns nil.
+// Init returns a command that ensures Update is called before the second render.
+// The first View uses the display rows computed by New; the Init command triggers
+// an Update pass that recomputes any state dirtied after construction.
 func (m Model[T]) Init() tea.Cmd {
-	return nil
+	return func() tea.Msg { return initMsg{} }
 }
 
 // --- Data ---
@@ -504,6 +506,45 @@ func (m *Model[T]) CollapseAll() {
 		m.groupModel.Expanded, m.groupModel.DefaultExpanded)
 	m.groupModel.CollapseAll(groups)
 	m.dirty = true
+}
+
+// --- Row Access ---
+
+// FocusedRowData returns the data of the currently focused row.
+// Returns the zero value and false if the focus is on the header, a group row,
+// or if the focus position is out of range.
+func (m Model[T]) FocusedRowData() (T, bool) {
+	if m.focusedCell.Row < 0 || m.focusedCell.Row >= len(m.displayRows) {
+		var zero T
+		return zero, false
+	}
+	rn := m.displayRows[m.focusedCell.Row]
+	if rn.IsGroup {
+		var zero T
+		return zero, false
+	}
+	return rn.Data, true
+}
+
+// Filtering reports whether the grid is currently in a filter editing mode
+// (column filter editor or quick filter). When true, the grid is consuming
+// keys like Escape internally, and parent models should not handle them.
+func (m Model[T]) Filtering() bool {
+	return m.filterEditColIdx >= 0 || m.quickFilterActive
+}
+
+// ScrollToRowByID scrolls to and focuses the row with the given ID.
+// Returns true if the row was found, false otherwise.
+func (m *Model[T]) ScrollToRowByID(id string) bool {
+	m.recomputeDisplayRows()
+	for i, rn := range m.displayRows {
+		if rn.ID == id {
+			m.focusedCell = CellPosition{Row: i, Col: m.focusedCell.Col}
+			m.vp.ensureRowVisible(i, len(m.displayRows), m.rowHeightFunc())
+			return true
+		}
+	}
+	return false
 }
 
 // --- Scrolling ---
