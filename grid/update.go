@@ -15,31 +15,24 @@ import (
 func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 	m.recomputeDisplayRows()
 
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if !m.focused {
-			return m, nil
+			// no-op
+		} else if m.editState != nil {
+			m, cmd = m.handleEditKeyMsg(msg)
+		} else if m.filterEditColIdx >= 0 {
+			m, cmd = m.handleFilterEditKeyMsg(msg)
+		} else if m.quickFilterActive {
+			m, cmd = m.handleQuickFilterKeyMsg(msg)
+		} else {
+			m, cmd = m.handleKeyMsg(msg)
 		}
-
-		// If editing, route to editor
-		if m.editState != nil {
-			return m.handleEditKeyMsg(msg)
-		}
-
-		// If filter editor is active, route there
-		if m.filterEditColIdx >= 0 {
-			return m.handleFilterEditKeyMsg(msg)
-		}
-
-		// If quick filter is active, route there
-		if m.quickFilterActive {
-			return m.handleQuickFilterKeyMsg(msg)
-		}
-
-		return m.handleKeyMsg(msg)
 	}
 
-	return m, nil
+	m.recomputeDisplayRows()
+	return m, cmd
 }
 
 // handleKeyMsg handles key messages in normal (non-editing) mode.

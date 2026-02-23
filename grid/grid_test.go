@@ -6401,3 +6401,29 @@ func TestRenderAggCells_FallbackCustom(t *testing.T) {
 		t.Error("expected custom fallback aggregation result '2' in output")
 	}
 }
+
+func TestView_DoesNotMutateModel(t *testing.T) {
+	m := newTestGrid(
+		WithColumns[TestRow](testCols()),
+		WithRows[TestRow](testData()),
+	)
+
+	// Force a recompute so we have valid display rows, then mark dirty again.
+	m, _ = m.Update(nil)
+	m.dirty = true
+
+	// Call View on a copy — since View uses a value receiver, it operates on a copy.
+	// After the call, the original model's dirty flag must still be true.
+	_ = m.View()
+	if !m.dirty {
+		t.Fatal("View() must not clear the dirty flag on the original model")
+	}
+
+	// Two consecutive View calls on the same model value must produce identical output,
+	// proving View has no hidden state dependency between calls.
+	out1 := m.View()
+	out2 := m.View()
+	if out1 != out2 {
+		t.Fatal("consecutive View() calls on the same model produced different output")
+	}
+}
