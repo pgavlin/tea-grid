@@ -524,16 +524,6 @@ func (m *model) insertRowBelow() tea.Cmd {
 }
 
 func (m *model) insertColRight() tea.Cmd {
-	pos := m.grid.FocusedCell()
-	// pos.Col is grid column index (0 = row-number column), so data column = pos.Col - 1
-	insertDataIdx := pos.Col // insert after current data column (right of it)
-	if insertDataIdx < 0 {
-		insertDataIdx = 0
-	}
-	if insertDataIdx > m.numCols {
-		insertDataIdx = m.numCols
-	}
-
 	m.numCols++
 	newColLetter := indexToColLetter(m.numCols - 1)
 

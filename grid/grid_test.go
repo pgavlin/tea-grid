@@ -1872,7 +1872,7 @@ func TestPublicAPI_ScrollToRow(t *testing.T) {
 	m.ScrollToRow(4)
 	// Should ensure row 4 is visible
 	start, end := m.vp.visibleRowRange(len(m.displayRows), m.rowHeightFunc())
-	if !(4 >= start && 4 < end) {
+	if 4 < start || 4 >= end {
 		t.Errorf("row 4 not in visible range [%d,%d)", start, end)
 	}
 }
@@ -4950,10 +4950,8 @@ func TestHeaderRow_ShiftNavigation(t *testing.T) {
 	m.focusedCell = CellPosition{Row: -1, Col: 1}
 	// Shift+Right in header should extend selection
 	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
-	rLo, _, _, _ := m.SelectionBounds()
-	if rLo < 0 {
-		// Rect may or may not activate in header; just check no crash
-	}
+	// Rect may or may not activate in header; just check no crash
+	_, _, _, _ = m.SelectionBounds()
 }
 
 // -----------------------------------------------------------------------
@@ -5929,7 +5927,7 @@ func TestMoveFocus_NoVisibleCols(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithHeight[TestRow](20),
 	)
-	m, cmd := m.moveFocus(0, 0)
+	_, cmd := m.moveFocus(0, 0)
 	if cmd != nil {
 		t.Error("expected nil cmd when no visible cols")
 	}

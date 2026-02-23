@@ -133,7 +133,7 @@ func (m *Model) RenderLine(width int, suffix string) string {
 
 	runes := []rune(m.text)
 
-	var cursorRune rune = ' '
+	cursorRune := ' '
 	if m.cursor < len(runes) {
 		cursorRune = runes[m.cursor]
 	}

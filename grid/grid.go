@@ -1014,11 +1014,10 @@ func (m *Model[T]) computeColWidths() {
 
 	// Track which columns still need sizing
 	type colInfo struct {
-		idx   int
-		flex  int
-		min   int
-		max   int
-		fixed bool
+		idx  int
+		flex int
+		min  int
+		max  int
 	}
 
 	var flexCols []colInfo

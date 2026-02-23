@@ -16,7 +16,7 @@ type Person struct {
 
 type mixedFields struct {
 	Exported   string
-	unexported string
+	unexported string //nolint:unused
 	Another    int
 }
 

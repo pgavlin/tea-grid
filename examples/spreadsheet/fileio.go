@@ -4,7 +4,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/fxamacker/cbor/v2"
@@ -130,7 +129,7 @@ func saveNative(filename string, rows []*SpreadsheetRow, colFmts map[string]*Cel
 	if err != nil {
 		return err
 	}
-	defer enc.Close()
+	defer func() { _ = enc.Close() }()
 	compressed := enc.EncodeAll(payload, nil)
 
 	out := make([]byte, 0, len(nativeMagic)+len(compressed))
@@ -231,7 +230,7 @@ func exportCSV(filename string, rows []*SpreadsheetRow, numCols int) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	w := csv.NewWriter(f)
 	defer w.Flush()
@@ -271,7 +270,7 @@ func importCSV(filename string) ([]*SpreadsheetRow, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	r := csv.NewReader(f)
 	records, err := r.ReadAll()
@@ -328,22 +327,4 @@ func isColHeader(headers []string) bool {
 		}
 	}
 	return true
-}
-
-// csvFilename derives a CSV filename from the current filename.
-func csvFilename(name string) string {
-	if strings.HasSuffix(name, ".txs") {
-		return strings.TrimSuffix(name, ".txs") + ".csv"
-	}
-	return name + ".csv"
-}
-
-// sortedColLetters returns column letters in sorted order.
-func sortedColLetters(numCols int) []string {
-	cols := make([]string, numCols)
-	for i := range cols {
-		cols[i] = indexToColLetter(i)
-	}
-	sort.Strings(cols)
-	return cols
 }

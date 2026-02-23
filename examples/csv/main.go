@@ -47,7 +47,7 @@ func loadCSV(path string) ([]string, []Row, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	r := csv.NewReader(f)
 	records, err := r.ReadAll()
@@ -60,9 +60,7 @@ func loadCSV(path string) ([]string, []Row, error) {
 
 	headers := records[0]
 	rows := make([]Row, len(records)-1)
-	for i, rec := range records[1:] {
-		rows[i] = rec
-	}
+	copy(rows, records[1:])
 	return headers, rows, nil
 }
 
