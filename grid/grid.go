@@ -138,11 +138,10 @@ func New[T any](opts ...Option[T]) Model[T] {
 	return m
 }
 
-// Init returns a command that ensures Update is called before the second render.
-// The first View uses the display rows computed by New; the Init command triggers
-// an Update pass that recomputes any state dirtied after construction.
+// Init is a no-op. The model is always in a consistent state because every
+// public setter eagerly recomputes display rows after mutating state.
 func (m Model[T]) Init() tea.Cmd {
-	return func() tea.Msg { return initMsg{} }
+	return nil
 }
 
 // --- Data ---
@@ -152,6 +151,7 @@ func (m *Model[T]) SetRows(rows []T) {
 	m.setRowData(rows)
 	m.pruneSelection()
 	m.dirty = true
+	m.recomputeDisplayRows()
 }
 
 // Rows returns the raw row data.
@@ -167,6 +167,7 @@ func (m Model[T]) Rows() []T {
 func (m *Model[T]) SetColumns(cols []data.Column[T]) {
 	m.cols = cols
 	m.dirty = true
+	m.recomputeDisplayRows()
 	m.computeColWidths()
 }
 
@@ -181,6 +182,7 @@ func (m *Model[T]) UpdateRow(id string, d T) {
 		if m.rows[i].ID == id {
 			m.rows[i].Data = d
 			m.dirty = true
+			m.recomputeDisplayRows()
 			return
 		}
 	}
@@ -196,6 +198,7 @@ func (m *Model[T]) InsertRow(index int, d T) {
 		m.rows[index] = rn
 	}
 	m.dirty = true
+	m.recomputeDisplayRows()
 }
 
 // RemoveRow removes the row with the given ID.
@@ -205,6 +208,7 @@ func (m *Model[T]) RemoveRow(id string) {
 			m.rows = append(m.rows[:i], m.rows[i+1:]...)
 			m.sel.Clear()
 			m.dirty = true
+			m.recomputeDisplayRows()
 			return
 		}
 	}
@@ -443,6 +447,7 @@ func (m Model[T]) SelectionBounds() (rowLo, rowHi, colLo, colHi int) {
 func (m *Model[T]) SetSort(criteria []gridsort.SortCriterion) {
 	m.sortModel.SortOrder = criteria
 	m.dirty = true
+	m.recomputeDisplayRows()
 }
 
 // SortOrder returns the current sort criteria.
@@ -456,6 +461,7 @@ func (m Model[T]) SortOrder() []gridsort.SortCriterion {
 func (m *Model[T]) SetQuickFilter(text string) {
 	m.quickFilterText = text
 	m.dirty = true
+	m.recomputeDisplayRows()
 }
 
 // SetColumnFilter sets the filter for the column with the given ID.
@@ -464,6 +470,7 @@ func (m *Model[T]) SetColumnFilter(colID string, f filter.Filter) {
 		if m.cols[i].ColumnID == colID {
 			m.cols[i].Filter = f
 			m.dirty = true
+			m.recomputeDisplayRows()
 			return
 		}
 	}
@@ -476,6 +483,7 @@ func (m *Model[T]) ClearFilters() {
 		m.cols[i].Filter = nil
 	}
 	m.dirty = true
+	m.recomputeDisplayRows()
 }
 
 // --- Grouping ---
@@ -484,12 +492,14 @@ func (m *Model[T]) ClearFilters() {
 func (m *Model[T]) ExpandGroup(groupKey string) {
 	m.groupModel.SetExpanded(groupKey, true)
 	m.dirty = true
+	m.recomputeDisplayRows()
 }
 
 // CollapseGroup collapses the group with the given key.
 func (m *Model[T]) CollapseGroup(groupKey string) {
 	m.groupModel.SetExpanded(groupKey, false)
 	m.dirty = true
+	m.recomputeDisplayRows()
 }
 
 // ExpandAll expands all groups at all levels.
@@ -498,6 +508,7 @@ func (m *Model[T]) ExpandAll() {
 		m.groupModel.Expanded, m.groupModel.DefaultExpanded)
 	m.groupModel.ExpandAll(groups)
 	m.dirty = true
+	m.recomputeDisplayRows()
 }
 
 // CollapseAll collapses all groups at all levels.
@@ -506,6 +517,7 @@ func (m *Model[T]) CollapseAll() {
 		m.groupModel.Expanded, m.groupModel.DefaultExpanded)
 	m.groupModel.CollapseAll(groups)
 	m.dirty = true
+	m.recomputeDisplayRows()
 }
 
 // --- Row Access ---
@@ -584,6 +596,7 @@ func (m *Model[T]) PinRow(id string, pos data.Pin) {
 		if m.rows[i].ID == id {
 			m.rows[i].Pinned = pos
 			m.dirty = true
+			m.recomputeDisplayRows()
 			return
 		}
 	}

@@ -31,7 +31,7 @@ type model struct {
 	height int
 }
 
-func (m model) Init() tea.Cmd { return m.grid.Init() }
+func (m model) Init() tea.Cmd { return nil }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {

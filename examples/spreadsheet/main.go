@@ -203,7 +203,7 @@ func (m model) Init() tea.Cmd {
 	clearStatus := tea.Tick(3*time.Second, func(time.Time) tea.Msg {
 		return clearStatusMsg{}
 	})
-	return tea.Batch(clearStatus, m.grid.Init())
+	return clearStatus
 }
 
 func (m *model) setStatus(s string) tea.Cmd {

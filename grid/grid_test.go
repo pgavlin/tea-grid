@@ -456,9 +456,9 @@ func TestDirtyFlag(t *testing.T) {
 		t.Error("expected dirty=false after full init")
 	}
 	m.SetRows(testData())
-	// SetRows sets dirty=true; recomputation is deferred to Update/View
-	if !m.dirty {
-		t.Error("expected dirty=true after SetRows")
+	// SetRows eagerly recomputes, so dirty should be false afterward.
+	if m.dirty {
+		t.Error("expected dirty=false after SetRows (eager recompute)")
 	}
 }
 
@@ -2115,26 +2115,12 @@ func TestDefaultCompare_TimeMixedFallback(t *testing.T) {
 // Additional edge case tests
 // -----------------------------------------------------------------------
 
-func TestInit_ReturnsCmd(t *testing.T) {
+func TestInit_ReturnsNil(t *testing.T) {
 	m := newTestGrid()
 	cmd := m.Init()
-	if cmd == nil {
-		t.Fatal("expected Init() to return a non-nil Cmd")
-	}
-	msg := cmd()
-	if _, ok := msg.(initMsg); !ok {
-		t.Errorf("expected initMsg, got %T", msg)
-	}
-}
-
-// initUpdate simulates the Bubble Tea Init → Update cycle: it calls Init to
-// obtain the command, executes it, and feeds the resulting message into Update.
-func initUpdate(m Model[TestRow]) Model[TestRow] {
-	cmd := m.Init()
 	if cmd != nil {
-		m, _ = m.Update(cmd())
+		t.Fatal("expected Init() to return nil")
 	}
-	return m
 }
 
 // -----------------------------------------------------------------------
@@ -2301,7 +2287,7 @@ func TestInitLifecycle_PresetStaticPinnedBottom(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// Init Lifecycle – setters called after New(), resolved by Init → Update
+// Init Lifecycle – setters called after New() eagerly recompute
 // -----------------------------------------------------------------------
 
 func TestInitLifecycle_SetSortAfterNew(t *testing.T) {
@@ -2310,20 +2296,15 @@ func TestInitLifecycle_SetSortAfterNew(t *testing.T) {
 	m.SetSort([]gridsort.SortCriterion{
 		{ColumnID: "Salary", Direction: data.SortDesc},
 	})
-	if !m.dirty {
-		t.Fatal("expected dirty=true after SetSort")
-	}
-
-	m = initUpdate(m)
 	if m.dirty {
-		t.Fatal("expected dirty=false after Init→Update")
+		t.Fatal("expected dirty=false after SetSort (eager recompute)")
 	}
 
 	for i := 1; i < len(m.displayRows); i++ {
 		prev := m.displayRows[i-1].Data.Salary
 		curr := m.displayRows[i].Data.Salary
 		if prev < curr {
-			t.Errorf("rows not sorted by salary desc after Init→Update: %.0f < %.0f at index %d", prev, curr, i)
+			t.Errorf("rows not sorted by salary desc after SetSort: %.0f < %.0f at index %d", prev, curr, i)
 		}
 	}
 }
@@ -2332,11 +2313,9 @@ func TestInitLifecycle_SetQuickFilterAfterNew(t *testing.T) {
 	m := newTestGrid()
 
 	m.SetQuickFilter("engineering")
-	if !m.dirty {
-		t.Fatal("expected dirty=true after SetQuickFilter")
+	if m.dirty {
+		t.Fatal("expected dirty=false after SetQuickFilter (eager recompute)")
 	}
-
-	m = initUpdate(m)
 
 	if len(m.displayRows) != 2 {
 		t.Fatalf("expected 2 Engineering rows, got %d", len(m.displayRows))
@@ -2360,11 +2339,9 @@ func TestInitLifecycle_SetColumnFilterAfterNew(t *testing.T) {
 	tf := filter.NewTextFilter()
 	tf.SetText("Sales")
 	m.SetColumnFilter("Department", tf)
-	if !m.dirty {
-		t.Fatal("expected dirty=true after SetColumnFilter")
+	if m.dirty {
+		t.Fatal("expected dirty=false after SetColumnFilter (eager recompute)")
 	}
-
-	m = initUpdate(m)
 
 	if len(m.displayRows) != 2 {
 		t.Fatalf("expected 2 Sales rows, got %d", len(m.displayRows))
@@ -2383,11 +2360,9 @@ func TestInitLifecycle_SetRowsAfterNew(t *testing.T) {
 		{"Zara", "Engineering", 120000, true},
 		{"Yuki", "Design", 95000, true},
 	})
-	if !m.dirty {
-		t.Fatal("expected dirty=true after SetRows")
+	if m.dirty {
+		t.Fatal("expected dirty=false after SetRows (eager recompute)")
 	}
-
-	m = initUpdate(m)
 
 	if len(m.displayRows) != 2 {
 		t.Fatalf("expected 2 display rows, got %d", len(m.displayRows))
@@ -2408,8 +2383,6 @@ func TestInitLifecycle_MultipleSettersAfterNew(t *testing.T) {
 		{ColumnID: "Salary", Direction: data.SortAsc},
 	})
 
-	m = initUpdate(m)
-
 	// Only Engineering rows (Alice: 95000, Carol: 110000), sorted by salary asc.
 	if len(m.displayRows) != 2 {
 		t.Fatalf("expected 2 rows, got %d", len(m.displayRows))
@@ -2422,7 +2395,7 @@ func TestInitLifecycle_MultipleSettersAfterNew(t *testing.T) {
 	}
 }
 
-func TestInitLifecycle_ViewBeforeAndAfterUpdate(t *testing.T) {
+func TestInitLifecycle_ViewBeforeAndAfterSetQuickFilter(t *testing.T) {
 	m := newTestGrid()
 
 	// Initial View should show all 5 rows.
@@ -2433,19 +2406,16 @@ func TestInitLifecycle_ViewBeforeAndAfterUpdate(t *testing.T) {
 		}
 	}
 
-	// Set a filter after construction — dirty but not yet recomputed.
+	// Set a filter — eagerly recomputed.
 	m.SetQuickFilter("alice")
 
-	// Simulate Init → Update cycle.
-	m = initUpdate(m)
-
-	// After Init→Update, only Alice should be visible.
+	// After SetQuickFilter, only Alice should be visible.
 	output = m.View()
 	if !strings.Contains(output, "Alice") {
-		t.Error("expected 'Alice' in View after Init→Update with quick filter")
+		t.Error("expected 'Alice' in View after SetQuickFilter")
 	}
 	if strings.Contains(output, "Bob") {
-		t.Error("did not expect 'Bob' in View after Init→Update with quick filter 'alice'")
+		t.Error("did not expect 'Bob' in View after SetQuickFilter('alice')")
 	}
 }
 

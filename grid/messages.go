@@ -115,7 +115,3 @@ type GroupColumnsChangedMsg struct {
 	GroupColumns []string
 }
 
-// initMsg is sent by Init to guarantee that Update is called (and display rows
-// are recomputed) before the second View. The first View uses the state
-// computed by New.
-type initMsg struct{}
