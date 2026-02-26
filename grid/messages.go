@@ -114,4 +114,3 @@ type GroupCollapsedMsg struct {
 type GroupColumnsChangedMsg struct {
 	GroupColumns []string
 }
-
