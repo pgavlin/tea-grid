@@ -6787,3 +6787,133 @@ func TestWithColumnFilter_MultipleColumns(t *testing.T) {
 		t.Errorf("expected Carol, got %s", m.displayRows[0].Data.Name)
 	}
 }
+
+// -----------------------------------------------------------------------
+// WithColumnPin
+// -----------------------------------------------------------------------
+
+func TestWithColumnPin_AppliesPin(t *testing.T) {
+	m := newTestGrid(
+		WithColumnPin[TestRow]("Name", data.PinLeft),
+	)
+	for _, col := range m.cols {
+		if col.ColumnID == "Name" {
+			if col.Pinned != data.PinLeft {
+				t.Errorf("expected Name pinned left, got %v", col.Pinned)
+			}
+			return
+		}
+	}
+	t.Fatal("Name column not found")
+}
+
+func TestWithColumnPin_BeforeWithColumns(t *testing.T) {
+	// WithColumnPin specified before WithColumns — should still work
+	m := New[TestRow](
+		WithColumnPin[TestRow]("Department", data.PinRight),
+		WithColumns[TestRow](testCols()),
+		WithRows[TestRow](testData()),
+		WithFocused[TestRow](true),
+		WithWidth[TestRow](80),
+		WithHeight[TestRow](20),
+	)
+	for _, col := range m.cols {
+		if col.ColumnID == "Department" {
+			if col.Pinned != data.PinRight {
+				t.Errorf("expected Department pinned right, got %v", col.Pinned)
+			}
+			return
+		}
+	}
+	t.Fatal("Department column not found")
+}
+
+func TestWithColumnPin_MultipleColumns(t *testing.T) {
+	m := newTestGrid(
+		WithColumnPin[TestRow]("Name", data.PinLeft),
+		WithColumnPin[TestRow]("Active", data.PinRight),
+	)
+	found := 0
+	for _, col := range m.cols {
+		switch col.ColumnID {
+		case "Name":
+			if col.Pinned != data.PinLeft {
+				t.Errorf("expected Name pinned left, got %v", col.Pinned)
+			}
+			found++
+		case "Active":
+			if col.Pinned != data.PinRight {
+				t.Errorf("expected Active pinned right, got %v", col.Pinned)
+			}
+			found++
+		}
+	}
+	if found != 2 {
+		t.Errorf("expected 2 pinned columns, found %d", found)
+	}
+}
+
+// -----------------------------------------------------------------------
+// WithQuickFilterText
+// -----------------------------------------------------------------------
+
+func TestWithQuickFilterText_FiltersRows(t *testing.T) {
+	m := newTestGrid(
+		WithQuickFilterText[TestRow]("Engineering"),
+	)
+	// Only Engineering rows: Alice, Carol
+	if len(m.displayRows) != 2 {
+		t.Errorf("expected 2 rows after WithQuickFilterText, got %d", len(m.displayRows))
+	}
+	for _, rn := range m.displayRows {
+		if rn.Data.Department != "Engineering" {
+			t.Errorf("expected Engineering, got %s", rn.Data.Department)
+		}
+	}
+}
+
+func TestWithQuickFilterText_WithQuickFilterEnabled(t *testing.T) {
+	m := newTestGrid(
+		WithQuickFilter[TestRow](true),
+		WithQuickFilterText[TestRow]("Sales"),
+	)
+	// Only Sales rows: Bob, Eve
+	if len(m.displayRows) != 2 {
+		t.Errorf("expected 2 rows after WithQuickFilterText+WithQuickFilter, got %d", len(m.displayRows))
+	}
+	for _, rn := range m.displayRows {
+		if rn.Data.Department != "Sales" {
+			t.Errorf("expected Sales, got %s", rn.Data.Department)
+		}
+	}
+}
+
+// -----------------------------------------------------------------------
+// WithFocusedCell
+// -----------------------------------------------------------------------
+
+func TestWithFocusedCell_SetsPosition(t *testing.T) {
+	m := newTestGrid(
+		WithFocusedCell[TestRow](CellPosition{Row: 2, Col: 1}),
+	)
+	if m.focusedCell.Row != 2 || m.focusedCell.Col != 1 {
+		t.Errorf("expected focused cell (2,1), got (%d,%d)", m.focusedCell.Row, m.focusedCell.Col)
+	}
+}
+
+func TestWithFocusedCell_WithFocused(t *testing.T) {
+	m := New[TestRow](
+		WithColumns[TestRow](testCols()),
+		WithRows[TestRow](testData()),
+		WithWidth[TestRow](80),
+		WithHeight[TestRow](20),
+		WithFocused[TestRow](true),
+		WithFocusedCell[TestRow](CellPosition{Row: 3, Col: 2}),
+	)
+	if !m.focused {
+		t.Error("expected grid to be focused")
+	}
+	if m.focusedCell.Row != 3 || m.focusedCell.Col != 2 {
+		t.Errorf("expected focused cell (3,2), got (%d,%d)", m.focusedCell.Row, m.focusedCell.Col)
+	}
+}

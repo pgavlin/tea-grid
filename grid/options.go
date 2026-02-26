@@ -190,3 +190,30 @@ func WithDynamicRowHeight[T any](fn func(T) int) Option[T] {
 		m.dynamicRowHeight = fn
 	}
 }
+
+// WithColumnPin pins the column with the given ID to the specified direction.
+// This can be called multiple times for different columns.
+// Pins are applied after all options, so ordering with WithColumns doesn't matter.
+func WithColumnPin[T any](colID string, dir data.Pin) Option[T] {
+	return func(m *Model[T]) {
+		if m.pendingColumnPins == nil {
+			m.pendingColumnPins = make(map[string]data.Pin)
+		}
+		m.pendingColumnPins[colID] = dir
+	}
+}
+
+// WithQuickFilterText sets the initial quick filter text.
+// Use alongside WithQuickFilter(true) to enable the quick filter UI.
+func WithQuickFilterText[T any](text string) Option[T] {
+	return func(m *Model[T]) {
+		m.quickFilterText = text
+	}
+}
+
+// WithFocusedCell sets the initial focused cell position.
+func WithFocusedCell[T any](pos CellPosition) Option[T] {
+	return func(m *Model[T]) {
+		m.focusedCell = pos
+	}
+}
