@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/internal/lineedit"
@@ -94,7 +94,7 @@ func (e *FormulaEditor) Init(ctx data.CellContext[*SpreadsheetRow]) tea.Cmd {
 }
 
 func (e *FormulaEditor) Update(msg tea.Msg) (data.CellEditor[*SpreadsheetRow], tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		e.editor.HandleKeyMsg(msg)
 	}
 	return e, nil

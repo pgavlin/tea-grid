@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // ANSI escape sequences used in tests to match rendered output.
@@ -382,8 +382,8 @@ func TestTextEditorRuneInput(t *testing.T) {
 	e := NewTextEditor[string]()
 	ctx := CellContext[string]{FormattedValue: "", Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	e.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	e.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	e.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	if e.Value() != "ab" {
 		t.Errorf("after typing 'ab', got %v", e.Value())
 	}
@@ -393,7 +393,7 @@ func TestTextEditorBackspace(t *testing.T) {
 	e := NewTextEditor[string]()
 	ctx := CellContext[string]{FormattedValue: "hello", Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	if e.Value() != "hell" {
 		t.Errorf("after backspace, got %v", e.Value())
 	}
@@ -404,8 +404,8 @@ func TestTextEditorDelete(t *testing.T) {
 	ctx := CellContext[string]{FormattedValue: "hello", Width: 20}
 	e.Init(ctx)
 	// Move cursor to start
-	e.Update(tea.KeyMsg{Type: tea.KeyHome})
-	e.Update(tea.KeyMsg{Type: tea.KeyDelete})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyHome})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyDelete})
 	if e.Value() != "ello" {
 		t.Errorf("after delete at start, got %v", e.Value())
 	}
@@ -416,8 +416,8 @@ func TestTextEditorCursorMovement(t *testing.T) {
 	ctx := CellContext[string]{FormattedValue: "abc", Width: 20}
 	e.Init(ctx)
 	// Cursor starts at end (3)
-	e.Update(tea.KeyMsg{Type: tea.KeyLeft})
-	e.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'X'}})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+	e.Update(tea.KeyPressMsg{Code: 'X', Text: "X"})
 	if e.Value() != "abXc" {
 		t.Errorf("insert at cursor: got %v", e.Value())
 	}
@@ -427,8 +427,8 @@ func TestTextEditorHomeEnd(t *testing.T) {
 	e := NewTextEditor[string]()
 	ctx := CellContext[string]{FormattedValue: "hello", Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeyHome})
-	e.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'X'}})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyHome})
+	e.Update(tea.KeyPressMsg{Code: 'X', Text: "X"})
 	if e.Value() != "Xhello" {
 		t.Errorf("after Home+type: got %v", e.Value())
 	}
@@ -460,11 +460,11 @@ func TestNumberEditorOnlyDigits(t *testing.T) {
 	e.Init(ctx)
 	// Clear existing text
 	for range len(e.text) {
-		e.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+		e.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	}
-	e.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
-	e.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}) // should be ignored
-	e.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	e.Update(tea.KeyPressMsg{Code: '1', Text: "1"})
+	e.Update(tea.KeyPressMsg{Code: 'a', Text: "a"}) // should be ignored
+	e.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
 	if e.text != "12" {
 		t.Errorf("non-digit should be rejected, got text=%q", e.text)
 	}
@@ -474,13 +474,13 @@ func TestNumberEditorUpDown(t *testing.T) {
 	e := NewNumberEditor[string]()
 	ctx := CellContext[string]{Value: float64(10), Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeyUp})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	v := e.Value().(float64)
 	if v != 11 {
 		t.Errorf("Up should increment by 1, got %v", v)
 	}
-	e.Update(tea.KeyMsg{Type: tea.KeyDown})
-	e.Update(tea.KeyMsg{Type: tea.KeyDown})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	v = e.Value().(float64)
 	if v != 9 {
 		t.Errorf("Down twice should give 9, got %v", v)
@@ -527,7 +527,7 @@ func TestSelectEditorCycleForward(t *testing.T) {
 	e := NewSelectEditor[string]([]string{"a", "b", "c"})
 	ctx := CellContext[string]{Value: "a", Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeyDown})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if e.Value() != "b" {
 		t.Errorf("Down from a: expected b, got %v", e.Value())
 	}
@@ -537,7 +537,7 @@ func TestSelectEditorCycleBackward(t *testing.T) {
 	e := NewSelectEditor[string]([]string{"a", "b", "c"})
 	ctx := CellContext[string]{Value: "a", Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeyUp})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if e.Value() != "c" {
 		t.Errorf("Up from a (wrap): expected c, got %v", e.Value())
 	}
@@ -547,7 +547,7 @@ func TestSelectEditorWrapForward(t *testing.T) {
 	e := NewSelectEditor[string]([]string{"a", "b", "c"})
 	ctx := CellContext[string]{Value: "c", Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeyDown})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if e.Value() != "a" {
 		t.Errorf("Down from c (wrap): expected a, got %v", e.Value())
 	}
@@ -568,11 +568,11 @@ func TestBoolEditorToggle(t *testing.T) {
 	e := NewBoolEditor[string]()
 	ctx := CellContext[string]{Value: false, Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeySpace})
+	e.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	if e.Value() != true {
 		t.Errorf("after toggle: expected true, got %v", e.Value())
 	}
-	e.Update(tea.KeyMsg{Type: tea.KeySpace})
+	e.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	if e.Value() != false {
 		t.Errorf("after second toggle: expected false, got %v", e.Value())
 	}

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // --- CellRendererFunc ---
@@ -283,12 +283,12 @@ func TestNumberEditorWithStep(t *testing.T) {
 	e := NewNumberEditor[string]().WithStep(5)
 	ctx := CellContext[string]{Value: float64(10), Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeyUp})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	v := e.Value().(float64)
 	if v != 15 {
 		t.Errorf("WithStep(5) + Up: expected 15, got %v", v)
 	}
-	e.Update(tea.KeyMsg{Type: tea.KeyDown})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	v = e.Value().(float64)
 	if v != 10 {
 		t.Errorf("WithStep(5) + Down: expected 10, got %v", v)
@@ -313,7 +313,7 @@ func TestSelectEditorKeyLeftWrapPastZero(t *testing.T) {
 	e.Init(ctx)
 	// index starts at 0 for "a"
 	// KeyLeft at 0 should wrap to len(options)-1
-	e.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
 	if e.Value() != "c" {
 		t.Errorf("KeyLeft from 0: expected wrap to 'c', got %v", e.Value())
 	}
@@ -325,7 +325,7 @@ func TestSelectEditorKeyLeftDecrement(t *testing.T) {
 	ctx := CellContext[string]{Value: "b", Width: 20}
 	e.Init(ctx)
 	// index starts at 1 for "b"
-	e.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
 	if e.Value() != "a" {
 		t.Errorf("KeyLeft from b: expected 'a', got %v", e.Value())
 	}
@@ -419,7 +419,7 @@ func TestTimeEditorUpdate(t *testing.T) {
 	e.Init(ctx)
 
 	// Type a character
-	e.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'X'}})
+	e.Update(tea.KeyPressMsg{Code: 'X', Text: "X"})
 	text := e.editor.Text()
 	if !strings.Contains(text, "X") {
 		t.Errorf("Update should pass key to editor, got %q", text)
@@ -427,7 +427,7 @@ func TestTimeEditorUpdate(t *testing.T) {
 
 	// Set parseErr manually and verify Update clears it
 	e.parseErr = "some error"
-	e.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
+	e.Update(tea.KeyPressMsg{Code: 'Y', Text: "Y"})
 	if e.parseErr != "" {
 		t.Errorf("Update should clear parseErr, got %q", e.parseErr)
 	}
@@ -548,7 +548,7 @@ func TestSelectEditorKeyRightCycle(t *testing.T) {
 	e := NewSelectEditor[string]([]string{"a", "b", "c"})
 	ctx := CellContext[string]{Value: "a", Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeyRight})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	if e.Value() != "b" {
 		t.Errorf("KeyRight from a: expected b, got %v", e.Value())
 	}
@@ -560,11 +560,11 @@ func TestBoolEditorToggleUpDown(t *testing.T) {
 	e := NewBoolEditor[string]()
 	ctx := CellContext[string]{Value: false, Width: 20}
 	e.Init(ctx)
-	e.Update(tea.KeyMsg{Type: tea.KeyUp})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if e.Value() != true {
 		t.Errorf("KeyUp toggle: expected true, got %v", e.Value())
 	}
-	e.Update(tea.KeyMsg{Type: tea.KeyDown})
+	e.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if e.Value() != false {
 		t.Errorf("KeyDown toggle: expected false, got %v", e.Value())
 	}

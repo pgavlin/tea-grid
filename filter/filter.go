@@ -2,7 +2,7 @@
 package filter
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // FilterFocusMsg is sent to a filter when it begins interactive editing.

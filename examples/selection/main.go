@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/grid"
@@ -40,7 +40,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.grid.SetWidth(msg.Width)
 		m.grid.SetHeight(msg.Height - 1) // reserve one line for status bar
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if msg.String() == "q" || msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -50,7 +50,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
 	gridView := m.grid.View()
 
 	selected := m.grid.SelectedRows()
@@ -66,7 +66,9 @@ func (m model) View() string {
 	}
 
 	bar := statusStyle.Width(m.width).Render(status)
-	return gridView + "\n" + bar
+	v := tea.NewView(gridView + "\n" + bar)
+	v.AltScreen = true
+	return v
 }
 
 func main() {
@@ -95,7 +97,7 @@ func main() {
 		grid.WithFocused[Employee](true),
 	)
 
-	p := tea.NewProgram(model{grid: g}, tea.WithAltScreen())
+	p := tea.NewProgram(model{grid: g})
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

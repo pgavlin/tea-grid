@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"

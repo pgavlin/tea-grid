@@ -1,7 +1,7 @@
 package data
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // CellContext provides all information a renderer needs.

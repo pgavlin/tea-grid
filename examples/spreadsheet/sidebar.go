@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/internal/lineedit"
 )
@@ -181,7 +181,7 @@ func (s *SidebarModel) Update(msg tea.Msg) tea.Cmd {
 }
 
 func (s *SidebarModel) updateNavigation(msg tea.Msg) tea.Cmd {
-	keyMsg, ok := msg.(tea.KeyMsg)
+	keyMsg, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return nil
 	}
@@ -214,7 +214,7 @@ func (s *SidebarModel) updateNavigation(msg tea.Msg) tea.Cmd {
 }
 
 func (s *SidebarModel) updateEditing(msg tea.Msg) tea.Cmd {
-	keyMsg, ok := msg.(tea.KeyMsg)
+	keyMsg, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return nil
 	}

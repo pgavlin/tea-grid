@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/filter"
 )

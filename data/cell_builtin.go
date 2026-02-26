@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/internal/lineedit"
 )
@@ -220,7 +220,7 @@ func (e *TextEditorModel[T]) Init(ctx CellContext[T]) tea.Cmd {
 }
 
 func (e *TextEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		e.editor.HandleKeyMsg(msg)
 	}
 	return e, nil
@@ -275,17 +275,11 @@ func (e *NumberEditorModel[T]) Init(ctx CellContext[T]) tea.Cmd {
 }
 
 func (e *NumberEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch msg.Type {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
+		switch msg.Code {
 		case tea.KeyBackspace:
 			if len(e.text) > 0 {
 				e.text = e.text[:len(e.text)-1]
-			}
-		case tea.KeyRunes:
-			for _, r := range msg.Runes {
-				if (r >= '0' && r <= '9') || r == '.' || r == '-' {
-					e.text += string(r)
-				}
 			}
 		case tea.KeyUp:
 			if v, err := strconv.ParseFloat(e.text, 64); err == nil {
@@ -294,6 +288,12 @@ func (e *NumberEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
 		case tea.KeyDown:
 			if v, err := strconv.ParseFloat(e.text, 64); err == nil {
 				e.text = strconv.FormatFloat(v-e.step, 'f', -1, 64)
+			}
+		default:
+			for _, r := range msg.Text {
+				if (r >= '0' && r <= '9') || r == '.' || r == '-' {
+					e.text += string(r)
+				}
 			}
 		}
 	}
@@ -346,8 +346,8 @@ func (e *SelectEditorModel[T]) Init(ctx CellContext[T]) tea.Cmd {
 }
 
 func (e *SelectEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch msg.Type {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
+		switch msg.Code {
 		case tea.KeyUp, tea.KeyLeft:
 			if e.index > 0 {
 				e.index--
@@ -397,8 +397,8 @@ func (e *BoolEditorModel[T]) Init(ctx CellContext[T]) tea.Cmd {
 }
 
 func (e *BoolEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch msg.Type {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
+		switch msg.Code {
 		case tea.KeySpace, tea.KeyUp, tea.KeyDown:
 			e.value = !e.value
 		}
@@ -460,7 +460,7 @@ func (e *TimeEditorModel[T]) Init(ctx CellContext[T]) tea.Cmd {
 }
 
 func (e *TimeEditorModel[T]) Update(msg tea.Msg) (CellEditor[T], tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		e.editor.HandleKeyMsg(msg)
 		e.parseErr = ""
 	}

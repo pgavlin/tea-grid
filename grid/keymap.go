@@ -1,7 +1,7 @@
 package grid
 
 import (
-	"github.com/charmbracelet/bubbles/key"
+	"charm.land/bubbles/v2/key"
 )
 
 // KeyMap defines the key bindings for the grid.
@@ -121,7 +121,7 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("g", "go to header"),
 		),
 		Select: key.NewBinding(
-			key.WithKeys(" "),
+			key.WithKeys("space"),
 			key.WithHelp("space", "select"),
 		),
 		SelectAll: key.NewBinding(

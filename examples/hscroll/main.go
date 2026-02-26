@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/grid"
@@ -41,7 +41,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.grid.SetWidth(w)
 		m.grid.SetHeight(msg.Height)
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if msg.String() == "q" || msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -51,7 +51,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) View() string { return m.grid.View() }
+func (m model) View() tea.View {
+	v := tea.NewView(m.grid.View())
+	v.AltScreen = true
+	return v
+}
 
 func main() {
 	cols := []data.Column[Stock]{
@@ -95,7 +99,7 @@ func main() {
 		grid.WithMultiSort[Stock](true),
 	)
 
-	p := tea.NewProgram(model{grid: g}, tea.WithAltScreen())
+	p := tea.NewProgram(model{grid: g})
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

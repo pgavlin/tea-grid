@@ -1,7 +1,7 @@
 package grid
 
 import (
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // Styles defines all visual styling for the grid.

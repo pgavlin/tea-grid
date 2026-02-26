@@ -7,13 +7,14 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/filepicker"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/grid"
+	"github.com/pgavlin/tea-grid/internal/lineedit"
 	"github.com/pgavlin/tea-grid/selection"
 )
 
@@ -39,29 +40,195 @@ type clipboard struct {
 	originCol int // 0-based column letter index of top-left corner
 }
 
+// fileForm is an ad-hoc form for save/load file dialogs.
+type fileForm struct {
+	mode      string // "save" or "load"
+	pathInput lineedit.Model
+	picker    filepicker.Model
+	format    string // "txs" or "csv"
+	focus     int    // 0 = path/picker, 1 = format
+	completed bool
+	cancelled bool
+	path      string // populated on completion
+}
+
+func newFileForm(mode, currentPath string) (*fileForm, tea.Cmd) {
+	ext := strings.TrimPrefix(filepath.Ext(currentPath), ".")
+	if ext != "csv" {
+		ext = "txs"
+	}
+	f := &fileForm{mode: mode, format: ext}
+
+	if mode == "save" {
+		f.pathInput.SetText(currentPath)
+		f.pathInput.CursorToEnd()
+		return f, nil
+	}
+
+	// load mode
+	cwd, _ := os.Getwd()
+	f.picker = filepicker.New()
+	f.picker.CurrentDirectory = cwd
+	f.picker.AllowedTypes = []string{".txs", ".csv"}
+	f.picker.FileAllowed = true
+	f.picker.DirAllowed = false
+	f.picker.ShowSize = true
+	f.picker.SetHeight(10)
+	return f, f.picker.Init()
+}
+
+func (f *fileForm) update(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "esc":
+			f.cancelled = true
+			return nil
+		case "tab", "shift+tab":
+			f.focus = (f.focus + 1) % 2
+			return nil
+		case "enter":
+			if f.focus == 1 || f.mode == "save" {
+				if f.mode == "save" {
+					f.path = f.pathInput.Text()
+				} else {
+					f.path = f.picker.HighlightedPath()
+				}
+				if f.path != "" {
+					f.completed = true
+				}
+				return nil
+			}
+		}
+
+		// Format field handles left/right to toggle
+		if f.focus == 1 {
+			switch msg.String() {
+			case "left", "right", "h", "l":
+				if f.format == "txs" {
+					f.format = "csv"
+				} else {
+					f.format = "txs"
+				}
+			}
+			return nil
+		}
+
+		// Path/picker field
+		if f.mode == "save" {
+			f.pathInput.HandleKeyMsg(msg)
+			return nil
+		}
+	}
+
+	// Load mode: always route to filepicker (it needs non-key messages too)
+	if f.mode == "load" {
+		var cmd tea.Cmd
+		f.picker, cmd = f.picker.Update(msg)
+		if didSelect, path := f.picker.DidSelectFile(msg); didSelect {
+			f.path = path
+			f.completed = true
+		}
+		return cmd
+	}
+	return nil
+}
+
+func (f *fileForm) view(width, height int) string {
+	var title string
+	if f.mode == "save" {
+		title = "Save As"
+	} else {
+		title = "Open File"
+	}
+
+	const formWidth = 50
+	innerWidth := formWidth - 6 // borders + padding
+
+	var body strings.Builder
+
+	if f.mode == "save" {
+		label := "File: "
+		body.WriteString(label)
+		if f.focus == 0 {
+			body.WriteString(f.pathInput.RenderLine(innerWidth-len(label), ""))
+		} else {
+			txt := f.pathInput.Text()
+			body.WriteString(lineedit.TruncateOrPad(txt, innerWidth-len(label)))
+		}
+		body.WriteString("\n\n")
+	} else {
+		body.WriteString(f.picker.View())
+		body.WriteString("\n")
+	}
+
+	// Format selector
+	body.WriteString("Format: ")
+	txsLabel := " Sheet "
+	csvLabel := " CSV "
+	if f.focus == 1 {
+		if f.format == "txs" {
+			body.WriteString(lipgloss.NewStyle().Reverse(true).Render(txsLabel))
+			body.WriteString("  ")
+			body.WriteString(csvLabel)
+		} else {
+			body.WriteString(txsLabel)
+			body.WriteString("  ")
+			body.WriteString(lipgloss.NewStyle().Reverse(true).Render(csvLabel))
+		}
+	} else {
+		if f.format == "txs" {
+			body.WriteString(lipgloss.NewStyle().Bold(true).Render(txsLabel))
+			body.WriteString("  ")
+			body.WriteString(lipgloss.NewStyle().Faint(true).Render(csvLabel))
+		} else {
+			body.WriteString(lipgloss.NewStyle().Faint(true).Render(txsLabel))
+			body.WriteString("  ")
+			body.WriteString(lipgloss.NewStyle().Bold(true).Render(csvLabel))
+		}
+	}
+	body.WriteString("\n\n")
+
+	help := "enter: submit · esc: cancel · tab: next field"
+	if f.mode == "load" && f.focus == 0 {
+		help = "enter: select · esc: cancel · tab: next field"
+	}
+	body.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Render(help))
+
+	titleRendered := lipgloss.NewStyle().Bold(true).Render(title)
+	content := titleRendered + "\n\n" + body.String()
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62")).
+		Padding(1, 2).
+		Width(formWidth)
+
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box.Render(content))
+}
+
 var statusStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("252")).
 	Background(lipgloss.Color("235"))
 
 type model struct {
-	grid         grid.Model[*SpreadsheetRow]
-	rows         []*SpreadsheetRow
-	numCols      int
-	colFmts      map[string]*CellFormat
-	rowFmts      map[int]*CellFormat
-	deps         DepGraph
-	sidebar      SidebarModel
-	sidebarOn    bool
-	gridFocus    bool
-	helpOn       bool
-	fileForm     *huh.Form
-	fileFormMode string // "save" or "load"
-	status       string
-	statusSeq    int
-	width        int
-	height       int
-	filename     string
-	clip         clipboard
+	grid      grid.Model[*SpreadsheetRow]
+	rows      []*SpreadsheetRow
+	numCols   int
+	colFmts   map[string]*CellFormat
+	rowFmts   map[int]*CellFormat
+	deps      DepGraph
+	sidebar   SidebarModel
+	sidebarOn bool
+	gridFocus bool
+	helpOn    bool
+	fileForm  *fileForm
+	status    string
+	statusSeq int
+	width     int
+	height    int
+	filename  string
+	clip      clipboard
 }
 
 func newModel(filename string) model {
@@ -218,19 +385,22 @@ func (m *model) setStatus(s string) tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// File form active — route all messages to it
 	if m.fileForm != nil {
-		_, cmd := m.fileForm.Update(msg)
-		switch m.fileForm.State {
-		case huh.StateCompleted:
+		if msg, ok := msg.(tea.WindowSizeMsg); ok {
+			m.width = msg.Width
+			m.height = msg.Height
+		}
+		cmd := m.fileForm.update(msg)
+		if m.fileForm.completed {
 			statusCmd := m.completeFileForm()
 			m.fileForm = nil
 			return m, statusCmd
-		case huh.StateAborted:
-			statusCmd := m.setStatus("Cancelled")
-			m.fileForm = nil
-			return m, statusCmd
-		default:
-			return m, cmd
 		}
+		if m.fileForm.cancelled {
+			m.fileForm = nil
+			statusCmd := m.setStatus("Cancelled")
+			return m, statusCmd
+		}
+		return m, cmd
 	}
 
 	switch msg := msg.(type) {
@@ -248,7 +418,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.grid, cmd = m.grid.Update(msg)
 		return m, cmd
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// Help screen absorbs all keys
 		if m.helpOn {
 			m.helpOn = false
@@ -294,7 +464,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *model) handleAppKey(msg tea.KeyMsg) tea.Cmd {
+func (m *model) handleAppKey(msg tea.KeyPressMsg) tea.Cmd {
 	key := msg.String()
 
 	switch key {
@@ -640,66 +810,20 @@ func (m *model) deleteCurrentCol() tea.Cmd {
 }
 
 func (m *model) showFileForm(mode string) tea.Cmd {
-	m.fileFormMode = mode
-	fileFormPath := m.filename
-	fileFormFmt := strings.TrimPrefix(filepath.Ext(m.filename), ".")
-	if fileFormFmt != "csv" {
-		fileFormFmt = "txs"
-	}
-
-	var title string
-	if mode == "save" {
-		title = "Save As"
-	} else {
-		title = "Open File"
-	}
-
-	var pathField huh.Field
-	if mode == "load" {
-		cwd, _ := os.Getwd()
-		pathField = huh.NewFilePicker().
-			Title("File").
-			CurrentDirectory(cwd).
-			FileAllowed(true).
-			DirAllowed(false).
-			ShowSize(true).
-			AllowedTypes([]string{".txs", ".csv"}).
-			Height(10).
-			Value(&fileFormPath).
-			Key("path")
-	} else {
-		pathField = huh.NewInput().
-			Title("File").
-			Placeholder("spreadsheet.txs").
-			Value(&fileFormPath).
-			Key("path")
-	}
-
-	formatField := huh.NewSelect[string]().
-		Title("Format").
-		Options(
-			huh.NewOption("Sheet", "txs"),
-			huh.NewOption("CSV", "csv"),
-		).
-		Value(&fileFormFmt).
-		Key("format")
-
-	m.fileForm = huh.NewForm(
-		huh.NewGroup(pathField, formatField).Title(title),
-	).WithWidth(50).WithShowHelp(true).WithShowErrors(true)
-
-	return m.fileForm.Init()
+	var cmd tea.Cmd
+	m.fileForm, cmd = newFileForm(mode, m.filename)
+	return cmd
 }
 
 func (m *model) completeFileForm() tea.Cmd {
-	path := m.fileForm.GetString("path")
-	format := m.fileForm.GetString("format")
+	path := m.fileForm.path
+	format := m.fileForm.format
 
 	if path == "" {
 		return m.setStatus("No file specified")
 	}
 
-	if m.fileFormMode == "save" {
+	if m.fileForm.mode == "save" {
 		var err error
 		if format == "csv" {
 			err = exportCSV(path, m.rows, m.numCols)
@@ -833,29 +957,29 @@ func (m *model) applySidebarFormat() {
 	m.grid.SetRows(m.rows)
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
+	var content string
 	if m.helpOn {
-		return m.renderHelp()
-	}
-
-	if m.fileForm != nil {
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.fileForm.View())
-	}
-
-	gridView := m.grid.View()
-
-	var view string
-	if m.sidebarOn {
-		sidebarView := m.sidebar.View()
-		view = lipgloss.JoinHorizontal(lipgloss.Top, gridView, sidebarView)
+		content = m.renderHelp()
+	} else if m.fileForm != nil {
+		content = m.fileForm.view(m.width, m.height)
 	} else {
-		view = gridView
+		gridView := m.grid.View()
+
+		var view string
+		if m.sidebarOn {
+			sidebarView := m.sidebar.View()
+			view = lipgloss.JoinHorizontal(lipgloss.Top, gridView, sidebarView)
+		} else {
+			view = gridView
+		}
+
+		content = view + "\n" + m.renderStatusBar()
 	}
 
-	// Status bar
-	bar := m.renderStatusBar()
-
-	return view + "\n" + bar
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
 }
 
 func (m model) renderStatusBar() string {
@@ -987,7 +1111,7 @@ func main() {
 	}
 
 	m := newModel(filename)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

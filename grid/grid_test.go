@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
@@ -57,7 +57,7 @@ func newTestGrid(opts ...Option[TestRow]) Model[TestRow] {
 }
 
 // sendKey sends a single key message and returns the updated model.
-func sendKey(m Model[TestRow], k tea.KeyMsg) Model[TestRow] {
+func sendKey(m Model[TestRow], k tea.KeyPressMsg) Model[TestRow] {
 	m, _ = m.Update(k)
 	return m
 }
@@ -1038,25 +1038,25 @@ func TestNavigation_ArrowKeys(t *testing.T) {
 	}
 
 	// Down
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.focusedCell.Row != 1 {
 		t.Errorf("expected row=1 after Down, got %d", m.focusedCell.Row)
 	}
 
 	// Right
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	if m.focusedCell.Col != 1 {
 		t.Errorf("expected col=1 after Right, got %d", m.focusedCell.Col)
 	}
 
 	// Up
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyUp})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.focusedCell.Row != 0 {
 		t.Errorf("expected row=0 after Up, got %d", m.focusedCell.Row)
 	}
 
 	// Left
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyLeft})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyLeft})
 	if m.focusedCell.Col != 0 {
 		t.Errorf("expected col=0 after Left, got %d", m.focusedCell.Col)
 	}
@@ -1065,24 +1065,24 @@ func TestNavigation_ArrowKeys(t *testing.T) {
 func TestNavigation_BoundsClamping(t *testing.T) {
 	m := newTestGrid()
 	// Move up past top -> should clamp to header (-1) then not go further
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyUp})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.focusedCell.Row != -1 {
 		t.Errorf("expected row=-1 (header), got %d", m.focusedCell.Row)
 	}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyUp})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.focusedCell.Row != -1 {
 		t.Errorf("expected row=-1 after double up, got %d", m.focusedCell.Row)
 	}
 
 	// Move left past first col -> should clamp
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyLeft})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyLeft})
 	if m.focusedCell.Col != 0 {
 		t.Errorf("expected col=0 after Left at leftmost, got %d", m.focusedCell.Col)
 	}
 
 	// Go to last row, try to go past
 	m.focusedCell = CellPosition{Row: len(m.displayRows) - 1, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.focusedCell.Row != len(m.displayRows)-1 {
 		t.Errorf("expected row clamped to %d, got %d", len(m.displayRows)-1, m.focusedCell.Row)
 	}
@@ -1091,14 +1091,14 @@ func TestNavigation_BoundsClamping(t *testing.T) {
 func TestNavigation_PageUpDown(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyPgDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyPgDown})
 	// Page down should move by vp.visibleLines
 	if m.focusedCell.Row != min(m.vp.visibleLines, len(m.displayRows)-1) {
 		t.Errorf("expected row=%d after PgDown, got %d", min(m.vp.visibleLines, len(m.displayRows)-1), m.focusedCell.Row)
 	}
 
 	m.focusedCell = CellPosition{Row: 4, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyPgUp})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyPgUp})
 	if m.focusedCell.Row != 0 {
 		t.Errorf("expected row=0 after PgUp from 4, got %d", m.focusedCell.Row)
 	}
@@ -1109,13 +1109,13 @@ func TestNavigation_HomeEnd(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 2, Col: 0}
 
 	// Home -> row 0
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyHome})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyHome})
 	if m.focusedCell.Row != 0 {
 		t.Errorf("expected row=0 after Home, got %d", m.focusedCell.Row)
 	}
 
 	// End -> last row
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnd})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnd})
 	if m.focusedCell.Row != len(m.displayRows)-1 {
 		t.Errorf("expected row=%d after End, got %d", len(m.displayRows)-1, m.focusedCell.Row)
 	}
@@ -1124,7 +1124,7 @@ func TestNavigation_HomeEnd(t *testing.T) {
 func TestNavigation_GoToHeader(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 3, Col: 1}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if m.focusedCell.Row != -1 {
 		t.Errorf("expected row=-1 (header) after 'g', got %d", m.focusedCell.Row)
 	}
@@ -1136,7 +1136,7 @@ func TestNavigation_GoToHeader(t *testing.T) {
 func TestNavigation_UnfocusedIgnoresKeys(t *testing.T) {
 	m := newTestGrid(WithFocused[TestRow](false))
 	pos := m.focusedCell
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.focusedCell != pos {
 		t.Error("expected unfocused grid to ignore key input")
 	}
@@ -1152,13 +1152,13 @@ func TestSelection_SpaceToggles(t *testing.T) {
 	rowID := m.displayRows[0].ID
 
 	// Press space to select
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeySpace})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeySpace})
 	if !m.IsRowSelected(rowID) {
 		t.Error("expected row to be selected after space")
 	}
 
 	// Press space again to deselect
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeySpace})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeySpace})
 	if m.IsRowSelected(rowID) {
 		t.Error("expected row to be deselected after second space")
 	}
@@ -1166,7 +1166,7 @@ func TestSelection_SpaceToggles(t *testing.T) {
 
 func TestSelection_CtrlASelectsAll(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlA})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	selected := m.SelectedRows()
 	if len(selected) != len(m.displayRows) {
 		t.Errorf("expected %d selected rows, got %d", len(m.displayRows), len(selected))
@@ -1176,9 +1176,9 @@ func TestSelection_CtrlASelectsAll(t *testing.T) {
 func TestSelection_EscDeselectsAll(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	// Select all first
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlA})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	// Esc should deselect
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.HasSelection() {
 		t.Error("expected selection cleared after Esc")
 	}
@@ -1192,7 +1192,7 @@ func TestSort_EnterOnHeaderTogglesSortAsc(t *testing.T) {
 	m := newTestGrid()
 	// Navigate to header
 	m.focusedCell = CellPosition{Row: -1, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.sortModel.SortOrder) != 1 {
 		t.Fatalf("expected 1 sort criterion, got %d", len(m.sortModel.SortOrder))
 	}
@@ -1206,19 +1206,19 @@ func TestSort_EnterOnHeaderCycles(t *testing.T) {
 	m.focusedCell = CellPosition{Row: -1, Col: 0}
 
 	// First enter -> asc
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.sortModel.SortOrder[0].Direction != data.SortAsc {
 		t.Errorf("expected SortAsc, got %d", m.sortModel.SortOrder[0].Direction)
 	}
 
 	// Second enter -> desc
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.sortModel.SortOrder[0].Direction != data.SortDesc {
 		t.Errorf("expected SortDesc, got %d", m.sortModel.SortOrder[0].Direction)
 	}
 
 	// Third enter -> none
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.sortModel.SortOrder) != 0 {
 		t.Errorf("expected 0 sort criteria after toggle to none, got %d", len(m.sortModel.SortOrder))
 	}
@@ -1228,7 +1228,7 @@ func TestSort_SKeyFromAnyRow(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 2, Col: 0} // data row
 
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 's', Text: "s"})
 	if len(m.sortModel.SortOrder) != 1 {
 		t.Fatalf("expected 1 sort criterion after 's', got %d", len(m.sortModel.SortOrder))
 	}
@@ -1242,10 +1242,10 @@ func TestSort_ShiftSAddsMultiSort(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Sort by Name
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 's', Text: "s"})
 	// Add Department with Shift+S
 	m.focusedCell.Col = 1
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'S', Text: "S"})
 
 	if len(m.sortModel.SortOrder) != 2 {
 		t.Fatalf("expected 2 sort criteria, got %d", len(m.sortModel.SortOrder))
@@ -1259,7 +1259,7 @@ func TestSort_EmitsSortChangedMsg(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if cmd == nil {
 		t.Fatal("expected a command to be emitted")
 	}
@@ -1278,7 +1278,7 @@ func TestSort_UnsortableColumnIgnored(t *testing.T) {
 	cols[0].Sortable = false
 	m := newTestGrid(WithColumns[TestRow](cols))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 's', Text: "s"})
 	if len(m.sortModel.SortOrder) != 0 {
 		t.Error("expected unsortable column to be ignored")
 	}
@@ -1293,7 +1293,7 @@ func TestQuickFilter_SlashActivates(t *testing.T) {
 	if m.quickFilterActive {
 		t.Error("expected quick filter inactive initially")
 	}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	if !m.quickFilterActive {
 		t.Error("expected quick filter active after '/'")
 	}
@@ -1301,9 +1301,9 @@ func TestQuickFilter_SlashActivates(t *testing.T) {
 
 func TestQuickFilter_RunesAddToFilterText(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'l', Text: "l"})
 	if m.quickFilterText != "al" {
 		t.Errorf("expected quickFilterText='al', got %q", m.quickFilterText)
 	}
@@ -1311,9 +1311,9 @@ func TestQuickFilter_RunesAddToFilterText(t *testing.T) {
 
 func TestQuickFilter_EnterConfirms(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.quickFilterActive {
 		t.Error("expected quick filter deactivated after Enter")
 	}
@@ -1324,9 +1324,9 @@ func TestQuickFilter_EnterConfirms(t *testing.T) {
 
 func TestQuickFilter_EscClearsAndCloses(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'x', Text: "x"})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.quickFilterActive {
 		t.Error("expected quick filter deactivated after Esc")
 	}
@@ -1337,10 +1337,10 @@ func TestQuickFilter_EscClearsAndCloses(t *testing.T) {
 
 func TestQuickFilter_FiltersResults(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'e', Text: "e"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'n', Text: "n"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'g', Text: "g"})
 	// "eng" should match Engineering rows: Alice, Carol
 	if len(m.displayRows) != 2 {
 		t.Errorf("expected 2 rows matching 'eng', got %d", len(m.displayRows))
@@ -1352,7 +1352,7 @@ func TestColumnFilter_CtrlFRequiresFilterable(t *testing.T) {
 	// No Filter set on any column
 	m := newTestGrid(WithColumns[TestRow](cols))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	if m.filterEditColIdx != -1 {
 		t.Error("expected column filter not to open without Filter set on column")
 	}
@@ -1363,7 +1363,7 @@ func TestColumnFilter_CtrlFOpensWithFilter(t *testing.T) {
 	cols[0].Filter = filter.NewTextFilter()
 	m := newTestGrid(WithColumns[TestRow](cols))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	if m.filterEditColIdx != 0 {
 		t.Errorf("expected filterEditColIdx=0, got %d", m.filterEditColIdx)
 	}
@@ -1377,7 +1377,7 @@ func TestGrouping_GTogglesGroupColumn(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 1} // Department
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	if len(m.groupModel.GroupColumns) != 1 || m.groupModel.GroupColumns[0] != "Department" {
 		t.Errorf("expected GroupColumns=[Department], got %v", m.groupModel.GroupColumns)
 	}
@@ -1386,7 +1386,7 @@ func TestGrouping_GTogglesGroupColumn(t *testing.T) {
 	}
 
 	// Toggle again to remove
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'G', Text: "G"})
 	if len(m.groupModel.GroupColumns) != 0 {
 		t.Errorf("expected GroupColumns=[], got %v", m.groupModel.GroupColumns)
 	}
@@ -1410,7 +1410,7 @@ func TestGrouping_RightExpands(t *testing.T) {
 	}
 	m.focusedCell = CellPosition{Row: groupIdx, Col: 0}
 	beforeCount := len(m.displayRows)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	m.recomputeDisplayRows()
 	// Expanding should add child rows
 	if len(m.displayRows) <= beforeCount {
@@ -1436,7 +1436,7 @@ func TestGrouping_LeftCollapses(t *testing.T) {
 	}
 	m.focusedCell = CellPosition{Row: groupIdx, Col: 0}
 	beforeCount := len(m.displayRows)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyLeft})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyLeft})
 	m.recomputeDisplayRows()
 	// Collapsing should remove child rows
 	if len(m.displayRows) >= beforeCount {
@@ -1448,7 +1448,7 @@ func TestGrouping_EmitsGroupColumnsChangedMsg(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	if cmd == nil {
 		t.Fatal("expected a command to be emitted")
 	}
@@ -1472,7 +1472,7 @@ func TestEditing_EnterStartsEditing(t *testing.T) {
 		WithEditable[TestRow](true),
 	)
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Error("expected editState to be set after Enter on editable cell")
 	}
@@ -1488,11 +1488,11 @@ func TestEditing_EscCancels(t *testing.T) {
 		WithEditable[TestRow](true),
 	)
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Fatal("expected editing to start")
 	}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.editState != nil {
 		t.Error("expected editState=nil after Esc")
 	}
@@ -1507,7 +1507,7 @@ func TestEditing_NonEditableCellDoesNotStart(t *testing.T) {
 		WithEditable[TestRow](true),
 	)
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState != nil {
 		t.Error("expected no editing on non-editable cell")
 	}
@@ -1522,7 +1522,7 @@ func TestEditing_RequiresWithEditable(t *testing.T) {
 		// WithEditable NOT set (default false)
 	)
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState != nil {
 		t.Error("expected no editing when grid editable=false")
 	}
@@ -1664,7 +1664,7 @@ func TestRender_GroupRowAggregationCustomFunc(t *testing.T) {
 
 func TestRender_QuickFilterBarShownWhenActive(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	output := m.View()
 	if !strings.Contains(output, "Filter:") {
 		t.Error("expected 'Filter:' label in output when quick filter active")
@@ -2433,7 +2433,7 @@ func TestSetWidthHeight_UpdatesDimensions(t *testing.T) {
 
 func TestQuickFilter_DisabledIgnoresSlash(t *testing.T) {
 	m := newTestGrid() // quickFilterEnabled is false by default
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	if m.quickFilterActive {
 		t.Error("expected quick filter not to activate when disabled")
 	}
@@ -2441,13 +2441,13 @@ func TestQuickFilter_DisabledIgnoresSlash(t *testing.T) {
 
 func TestQuickFilter_BackspaceRemovesChar(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'b', Text: "b"})
 	if m.quickFilterText != "ab" {
 		t.Fatalf("expected 'ab', got %q", m.quickFilterText)
 	}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyBackspace})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	if m.quickFilterText != "a" {
 		t.Errorf("expected 'a' after backspace, got %q", m.quickFilterText)
 	}
@@ -2537,12 +2537,12 @@ func TestHorizontalScroll_ColumnsExceedViewport(t *testing.T) {
 	// All columns should be reachable via navigation
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	// Navigate right to column B (index 1)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	if m.focusedCell.Col != 1 {
 		t.Errorf("expected col=1 after Right, got %d", m.focusedCell.Col)
 	}
 	// Navigate right to column C (index 2)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	if m.focusedCell.Col != 2 {
 		t.Errorf("expected col=2 after second Right, got %d", m.focusedCell.Col)
 	}
@@ -2569,7 +2569,7 @@ func TestHorizontalScroll_LeftColUpdatesVisibleCols(t *testing.T) {
 	// Navigate right until leftCol changes
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	for i := 0; i < 3; i++ {
-		m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+		m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	}
 
 	// After scrolling right, visibleCols should still be correct
@@ -2597,7 +2597,7 @@ func TestHorizontalScroll_VaryingWidths(t *testing.T) {
 	// Navigate right past the wide column
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	for i := 0; i < 3; i++ {
-		m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+		m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	}
 
 	// After scrolling past the wide column, more narrow columns should fit
@@ -2676,7 +2676,7 @@ func TestSelectColumn_CKeySelectsColumn(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 0, Col: 1} // Department column
 
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'C', Text: "C"})
 
 	if !m.IsColumnSelected(1) {
 		t.Error("expected column 1 to be selected after 'C' key")
@@ -2732,7 +2732,7 @@ func TestSelectColumn_NoSelectColumnIgnored(t *testing.T) {
 	m := newTestGrid(WithColumns[TestRow](cols), WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 0, Col: 2}
 
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'C', Text: "C"})
 
 	if m.IsColumnSelected(2) {
 		t.Error("expected NoSelect column to NOT be selected after 'C' key")
@@ -2748,7 +2748,7 @@ func TestSelectionBounds_ShiftDownCreatesRect(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 1, Col: 1}
 
 	// Shift+Down should create a rectangular selection from (1,1) to (2,1)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 
 	rLo, rHi, cLo, cHi := m.SelectionBounds()
 	if rLo != 1 || rHi != 2 || cLo != 1 || cHi != 1 {
@@ -2761,14 +2761,14 @@ func TestSelectionBounds_PlainNavClearsRect(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 1, Col: 1}
 
 	// Create rectangle with shift+down
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 	rLo, _, _, _ := m.SelectionBounds()
 	if rLo < 0 {
 		t.Fatal("precondition: expected active rect selection")
 	}
 
 	// Plain navigation should clear the rect
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	rLo, rHi, cLo, cHi := m.SelectionBounds()
 	if rLo != -1 || rHi != -1 || cLo != -1 || cHi != -1 {
 		t.Errorf("expected rect cleared after plain nav, got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
@@ -2791,7 +2791,7 @@ func TestShiftMoveFocus_ShiftDownCreatesSelection(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 
 	if m.focusedCell.Row != 1 {
 		t.Errorf("expected focus row=1 after shift+down, got %d", m.focusedCell.Row)
@@ -2806,7 +2806,7 @@ func TestShiftMoveFocus_ShiftUpExpandsUpward(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 2, Col: 1}
 
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftUp})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift})
 
 	if m.focusedCell.Row != 1 {
 		t.Errorf("expected focus row=1 after shift+up, got %d", m.focusedCell.Row)
@@ -2821,7 +2821,7 @@ func TestShiftMoveFocus_ShiftRightExpandsHorizontally(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModShift})
 
 	if m.focusedCell.Col != 1 {
 		t.Errorf("expected focus col=1 after shift+right, got %d", m.focusedCell.Col)
@@ -2836,7 +2836,7 @@ func TestShiftMoveFocus_ShiftLeftExpandsHorizontally(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 0, Col: 2}
 
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftLeft})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModShift})
 
 	if m.focusedCell.Col != 1 {
 		t.Errorf("expected focus col=1 after shift+left, got %d", m.focusedCell.Col)
@@ -2852,9 +2852,9 @@ func TestShiftMoveFocus_MultipleExtensions(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Extend down twice, right once
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModShift})
 
 	rLo, rHi, cLo, cHi := m.SelectionBounds()
 	if rLo != 0 || rHi != 2 || cLo != 0 || cHi != 1 {
@@ -2867,14 +2867,14 @@ func TestShiftMoveFocus_PlainArrowAfterShiftClearsSelection(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Create a selection
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 	rLo, _, _, _ := m.SelectionBounds()
 	if rLo < 0 {
 		t.Fatal("precondition: expected active rect")
 	}
 
 	// Plain arrow should clear
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	rLo, rHi, cLo, cHi := m.SelectionBounds()
 	if rLo != -1 || rHi != -1 || cLo != -1 || cHi != -1 {
 		t.Errorf("expected rect cleared, got (%d,%d,%d,%d)", rLo, rHi, cLo, cHi)
@@ -2890,7 +2890,7 @@ func TestSelectRow_RKeySelectsRow(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	rowID := m.displayRows[0].ID
 
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'R', Text: "R"})
 
 	if !m.IsRowSelected(rowID) {
 		t.Error("expected row to be selected after 'R' key")
@@ -2901,7 +2901,7 @@ func TestSelectColumn_CKeySelectsCurrentColumn(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 0, Col: 2}
 
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'C', Text: "C"})
 
 	if !m.IsColumnSelected(2) {
 		t.Error("expected column 2 to be selected after 'C' key")
@@ -2914,7 +2914,7 @@ func TestSelect_SpaceTogglesAndClearsAnchors(t *testing.T) {
 	rowID := m.displayRows[0].ID
 
 	// First press selects
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeySpace})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeySpace})
 	if !m.IsRowSelected(rowID) {
 		t.Error("expected row selected after space")
 	}
@@ -2936,13 +2936,13 @@ func TestSelection_MutualExclusivity_RowClearsColumn(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 1}
 
 	// Select column first
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'C', Text: "C"})
 	if !m.IsColumnSelected(1) {
 		t.Fatal("precondition: expected column 1 selected")
 	}
 
 	// Select row — should clear column selection
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'R', Text: "R"})
 	if m.IsColumnSelected(1) {
 		t.Error("expected column selection cleared after row selection")
 	}
@@ -2958,13 +2958,13 @@ func TestSelection_MutualExclusivity_ColumnClearsRow(t *testing.T) {
 	rowID := m.displayRows[0].ID
 
 	// Select row first
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'R', Text: "R"})
 	if !m.IsRowSelected(rowID) {
 		t.Fatal("precondition: expected row selected")
 	}
 
 	// Select column — should clear row selection
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'C', Text: "C"})
 	if m.IsRowSelected(rowID) {
 		t.Error("expected row selection cleared after column selection")
 	}
@@ -2982,7 +2982,7 @@ func TestSelection_MutualExclusivity_ShiftNavClearsRowAndCol(t *testing.T) {
 	m.SetColumnSelection(1)
 
 	// Shift+Down should clear column selection
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 
 	if m.IsRowSelected(rowID) {
 		t.Error("expected row selection cleared after shift+nav")
@@ -3058,7 +3058,7 @@ func TestToggleCurrentGroup_ExpandCollapsed(t *testing.T) {
 	beforeCount := len(m.displayRows)
 
 	// Enter should toggle (expand) the group
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	m.recomputeDisplayRows()
 
 	if len(m.displayRows) <= beforeCount {
@@ -3088,7 +3088,7 @@ func TestToggleCurrentGroup_CollapseExpanded(t *testing.T) {
 	beforeCount := len(m.displayRows)
 
 	// Enter should toggle (collapse) the group
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	m.recomputeDisplayRows()
 
 	if len(m.displayRows) >= beforeCount {
@@ -3116,7 +3116,7 @@ func TestToggleCurrentGroup_EmitsMessages(t *testing.T) {
 
 	m.focusedCell = CellPosition{Row: groupIdx, Col: 0}
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("expected a command to be emitted")
 	}
@@ -3142,7 +3142,7 @@ func TestEditing_TypeAndConfirm(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Start editing
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Fatal("expected editing to start")
 	}
@@ -3151,15 +3151,15 @@ func TestEditing_TypeAndConfirm(t *testing.T) {
 	// The editor is initialized with the formatted value "Alice"
 	// Send backspace to clear, then type "Zara"
 	for i := 0; i < 5; i++ {
-		m = sendKey(m, tea.KeyMsg{Type: tea.KeyBackspace})
+		m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	}
 	for _, r := range "Zara" {
-		m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = sendKey(m, tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
 
 	// Confirm with Enter
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if m.editState != nil {
 		t.Error("expected editState=nil after confirming edit")
@@ -3188,14 +3188,14 @@ func TestEditing_EmitsCellValueChangedMsg(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Start editing
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	// Type a character to change the value
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Z'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'Z', Text: "Z"})
 
 	// Confirm
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if cmd == nil {
 		t.Fatal("expected command batch from confirm")
@@ -3218,14 +3218,14 @@ func TestEditing_EscEmitsCellEditingCancelledMsg(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Start editing
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Fatal("expected editing to start")
 	}
 
 	// Cancel
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if m.editState != nil {
 		t.Error("expected editState=nil after cancel")
@@ -3250,18 +3250,18 @@ func TestFilterEdit_EnterConfirmsFilter(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Open filter editor with ctrl+f
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	if m.filterEditColIdx != 0 {
 		t.Fatalf("expected filterEditColIdx=0, got %d", m.filterEditColIdx)
 	}
 
 	// Type some filter text
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'A'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'A', Text: "A"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'l', Text: "l"})
 
 	// Confirm with Enter
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if m.filterEditColIdx != -1 {
 		t.Errorf("expected filterEditColIdx=-1 after Enter, got %d", m.filterEditColIdx)
@@ -3286,17 +3286,17 @@ func TestFilterEdit_EscCancelsAndClearsFilter(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Open filter editor
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	if m.filterEditColIdx != 0 {
 		t.Fatalf("expected filterEditColIdx=0, got %d", m.filterEditColIdx)
 	}
 
 	// Type some text
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'x', Text: "x"})
 
 	// Cancel with Esc
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if m.filterEditColIdx != -1 {
 		t.Errorf("expected filterEditColIdx=-1 after Esc, got %d", m.filterEditColIdx)
@@ -3321,10 +3321,10 @@ func TestFilterEdit_RoutesToFilter(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Open filter
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 
 	// Send a key that is neither Enter nor Esc — should route to filter
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 't', Text: "t"})
 
 	// Filter edit should still be open
 	if m.filterEditColIdx != 0 {
@@ -3372,7 +3372,7 @@ func TestRender_SelectedColumnHighlighting(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 1}
 
 	// Select column 1
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'C', Text: "C"})
 
 	output := m.View()
 	// The output should contain the data — the styling will apply CellSelected style
@@ -3420,7 +3420,7 @@ func TestRender_FilterEditorShown(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Open filter editor
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 
 	output := m.View()
 	if !strings.Contains(output, "Filter:") {
@@ -3436,8 +3436,8 @@ func TestRender_RectSelectionCellsRendered(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Create rectangular selection
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModShift})
 
 	output := m.View()
 	// Verify the grid still renders with data
@@ -3461,7 +3461,7 @@ func TestRender_EditingCellShowsEditor(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	// Start editing
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Fatal("expected editing to start")
 	}
@@ -3489,7 +3489,7 @@ func TestRender_RowSelection_HighlightedRowRendered(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 1, Col: 0}
 
 	// Select row via 'R' key
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'R', Text: "R"})
 
 	output := m.View()
 	// The selected row's data should still appear
@@ -3507,7 +3507,7 @@ func TestShiftMoveFocus_HeaderRow(t *testing.T) {
 	m.focusedCell = CellPosition{Row: -1, Col: 1} // Header row
 
 	// Shift+Right on header should work
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModShift})
 
 	if m.focusedCell.Col != 2 {
 		t.Errorf("expected col=2 after shift+right on header, got %d", m.focusedCell.Col)
@@ -3519,7 +3519,7 @@ func TestShiftMoveFocus_HeaderRow_ShiftLeft(t *testing.T) {
 	m.focusedCell = CellPosition{Row: -1, Col: 2} // Header row
 
 	// Shift+Left on header should work
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftLeft})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModShift})
 
 	if m.focusedCell.Col != 1 {
 		t.Errorf("expected col=1 after shift+left on header, got %d", m.focusedCell.Col)
@@ -3535,7 +3535,7 @@ func TestSelectRow_RKeyEmitsSelectionChangedMsg(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
 
 	if cmd == nil {
 		t.Fatal("expected a command to be emitted")
@@ -3555,7 +3555,7 @@ func TestSelectColumn_CKeyEmitsSelectionChangedMsg(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 'C', Text: "C"})
 
 	if cmd == nil {
 		t.Fatal("expected a command to be emitted")
@@ -4202,7 +4202,7 @@ func TestRenderHeader_ScrollIndicators(t *testing.T) {
 	// Navigate right to scroll
 	m.focusedCell = CellPosition{Row: 0, Col: 1}
 	for i := 0; i < 3; i++ {
-		m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+		m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	}
 	output := m.View()
 	// Should contain scroll indicator when columns are hidden off-screen
@@ -4573,7 +4573,7 @@ func TestUpdate_NonKeyMsg(t *testing.T) {
 func TestHandleKeyMsg_PageUp(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 4, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyPgUp})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyPgUp})
 	if m.focusedCell.Row != 0 {
 		t.Errorf("expected row=0 after PageUp from 4, got %d", m.focusedCell.Row)
 	}
@@ -4582,7 +4582,7 @@ func TestHandleKeyMsg_PageUp(t *testing.T) {
 func TestHandleKeyMsg_HalfPageUp(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 4, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlU})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	expected := 4 - m.vp.visibleLines/2
 	if expected < 0 {
 		expected = 0
@@ -4595,7 +4595,7 @@ func TestHandleKeyMsg_HalfPageUp(t *testing.T) {
 func TestHandleKeyMsg_HalfPageDown(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlD})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	expected := m.vp.visibleLines / 2
 	if expected >= len(m.displayRows) {
 		expected = len(m.displayRows) - 1
@@ -4608,7 +4608,7 @@ func TestHandleKeyMsg_HalfPageDown(t *testing.T) {
 func TestHandleKeyMsg_LineStart(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 3}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'0'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '0', Text: "0"})
 	if m.focusedCell.Col != 0 {
 		t.Errorf("expected col=0 after LineStart ('0'), got %d", m.focusedCell.Col)
 	}
@@ -4617,7 +4617,7 @@ func TestHandleKeyMsg_LineStart(t *testing.T) {
 func TestHandleKeyMsg_LineEnd(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'$'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '$', Text: "$"})
 	visibleCols := m.visibleCols()
 	expected := visibleCols[len(visibleCols)-1]
 	if m.focusedCell.Col != expected {
@@ -4629,10 +4629,10 @@ func TestHandleKeyMsg_MultiSortColumn(t *testing.T) {
 	m := newTestGrid(WithMultiSort[TestRow](true))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	// Sort by Name first
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 's', Text: "s"})
 	// Multi-sort by Department
 	m.focusedCell.Col = 1
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'S', Text: "S"})
 	if len(m.sortModel.SortOrder) != 2 {
 		t.Errorf("expected 2 sort criteria after MultiSortColumn, got %d", len(m.sortModel.SortOrder))
 	}
@@ -4641,7 +4641,7 @@ func TestHandleKeyMsg_MultiSortColumn(t *testing.T) {
 func TestHandleKeyMsg_ToggleGroupColumn(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 1} // Department
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'G', Text: "G"})
 	if len(m.groupModel.GroupColumns) != 1 || m.groupModel.GroupColumns[0] != "Department" {
 		t.Errorf("expected group by Department, got %v", m.groupModel.GroupColumns)
 	}
@@ -4650,13 +4650,13 @@ func TestHandleKeyMsg_ToggleGroupColumn(t *testing.T) {
 func TestHandleKeyMsg_QuickFilterToggleOnOff(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
 	// Toggle on
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	if !m.quickFilterActive {
 		t.Error("expected quick filter active after '/'")
 	}
 	// Type something and confirm so we leave filter mode with text preserved
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.quickFilterActive {
 		t.Error("expected quick filter inactive after Enter")
 	}
@@ -4665,7 +4665,7 @@ func TestHandleKeyMsg_QuickFilterToggleOnOff(t *testing.T) {
 	}
 
 	// Toggle on again from normal mode (quickFilterActive was false -> true)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	if !m.quickFilterActive {
 		t.Error("expected quick filter re-activated")
 	}
@@ -4676,7 +4676,7 @@ func TestHandleKeyMsg_QuickFilterToggleOnOff(t *testing.T) {
 	// with quickFilterActive=true (bypassing the Update routing).
 	m.quickFilterActive = true
 	m.quickFilterText = "test"
-	m, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: '/', Text: "/"})
 	if m.quickFilterActive {
 		t.Error("expected quick filter deactivated after toggle off")
 	}
@@ -4698,7 +4698,7 @@ func TestHandleKeyMsg_GroupExpandGroup(t *testing.T) {
 		}
 	}
 	// Right arrow on group row should expand
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	m.recomputeDisplayRows()
 	// Verify group is now expanded
 	for _, rn := range m.displayRows {
@@ -4725,7 +4725,7 @@ func TestHandleKeyMsg_GroupCollapseGroup(t *testing.T) {
 	}
 	beforeCount := len(m.displayRows)
 	// Left arrow on expanded group row should collapse
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyLeft})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyLeft})
 	m.recomputeDisplayRows()
 	if len(m.displayRows) >= beforeCount {
 		t.Error("expected fewer rows after collapsing group with Left key")
@@ -4749,21 +4749,21 @@ func TestHandleEditKeyMsg_ValidationFailure(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 2}
 
 	// Start editing
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Fatal("expected editing to start")
 	}
 
 	// Clear existing text and type invalid number
 	for i := 0; i < 10; i++ {
-		m = sendKey(m, tea.KeyMsg{Type: tea.KeyBackspace})
+		m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	}
 	for _, r := range "abc" {
-		m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = sendKey(m, tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
 
 	// Try to confirm - should fail validation and stay in edit mode
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Error("expected editState to persist after validation failure")
 	}
@@ -4776,9 +4776,9 @@ func TestHandleEditKeyMsg_ValidationFailure(t *testing.T) {
 
 func TestQuickFilter_BackspaceWhenEmpty(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	// quickFilterText is empty, send backspace
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyBackspace})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	if m.quickFilterText != "" {
 		t.Errorf("expected empty text after backspace on empty, got %q", m.quickFilterText)
 	}
@@ -4790,9 +4790,9 @@ func TestQuickFilter_BackspaceWhenEmpty(t *testing.T) {
 
 func TestQuickFilter_EnterConfirmsFilter(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 't', Text: "t"})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.quickFilterActive {
 		t.Error("expected quick filter deactivated after Enter")
 	}
@@ -4803,10 +4803,10 @@ func TestQuickFilter_EnterConfirmsFilter(t *testing.T) {
 
 func TestQuickFilter_EscWithEmptyText(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	// Text is empty, Esc should close without emitting filter change
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.quickFilterActive {
 		t.Error("expected quick filter deactivated after Esc")
 	}
@@ -4823,7 +4823,7 @@ func TestHandleFilterEditKeyMsg_ColIdxOutOfRange(t *testing.T) {
 	m := newTestGrid()
 	m.filterEditColIdx = 999 // Out of range
 	// Should not crash
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.filterEditColIdx != -1 {
 		t.Errorf("expected filterEditColIdx=-1 after out-of-range early return, got %d", m.filterEditColIdx)
 	}
@@ -4839,7 +4839,7 @@ func TestStartFilterEdit_NonFilterableColumn(t *testing.T) {
 	cols[0].Filter = filter.NewTextFilter()
 	m := newTestGrid(WithColumns[TestRow](cols))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	if m.filterEditColIdx != -1 {
 		t.Error("expected filter edit not to open for non-filterable column")
 	}
@@ -4861,7 +4861,7 @@ func TestStartFilterEdit_WithColGroups(t *testing.T) {
 		WithHeight[TestRow](20),
 	)
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	if m.filterEditColIdx != 0 {
 		t.Errorf("expected filterEditColIdx=0 with colGroups, got %d", m.filterEditColIdx)
 	}
@@ -4909,7 +4909,7 @@ func TestMoveFocus_ClosestColSearch(t *testing.T) {
 func TestStartEditing_NotEditable(t *testing.T) {
 	m := newTestGrid() // editable is false by default
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState != nil {
 		t.Error("expected no editing when grid is not editable")
 	}
@@ -4923,7 +4923,7 @@ func TestStartEditing_ColNotEditable(t *testing.T) {
 		WithEditable[TestRow](true),
 	)
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState != nil {
 		t.Error("expected no editing when column is not editable")
 	}
@@ -4948,7 +4948,7 @@ func TestStartEditing_GroupRow(t *testing.T) {
 	}
 	// Enter on group row should toggle, not edit
 	beforeState := m.editState
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	// If it was a group row, enter should have toggled the group, not started editing
 	if m.editState != nil && beforeState == nil {
 		t.Error("expected no editing on group row")
@@ -4967,7 +4967,7 @@ func TestStartEditing_ValueFormatter(t *testing.T) {
 		WithEditable[TestRow](true),
 	)
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Fatal("expected editing to start with ValueFormatter")
 	}
@@ -5087,7 +5087,7 @@ func TestShiftMoveFocus_RectAnchorAlreadySet(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 1, Col: 1}
 
 	// First shift+down sets anchor at (1,1), cursor at (2,1)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 	regions := m.Selection()
 	if len(regions) != 1 || regions[0].Kind != SelectionRect {
 		t.Fatal("expected exactly one SelectionRect after shift+down")
@@ -5098,7 +5098,7 @@ func TestShiftMoveFocus_RectAnchorAlreadySet(t *testing.T) {
 	}
 
 	// Second shift+down should keep the same anchor
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 	regions = m.Selection()
 	if len(regions) != 1 || regions[0].Kind != SelectionRect {
 		t.Fatal("expected exactly one SelectionRect after second shift+down")
@@ -5187,7 +5187,7 @@ func TestRender_ScrollIndicatorWithoutPinnedCols(t *testing.T) {
 	// Scroll right
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	for i := 0; i < 2; i++ {
-		m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+		m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	}
 	output := m.View()
 	// The output should be non-empty
@@ -5208,7 +5208,7 @@ func TestHandleKeyMsg_ExpandAllCollapseAll(t *testing.T) {
 	collapsedCount := len(m.displayRows)
 
 	// Ctrl+Shift+Right should expand all (when groups exist)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlShiftRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModCtrl | tea.ModShift})
 	m.recomputeDisplayRows()
 	if len(m.displayRows) <= collapsedCount {
 		t.Error("expected more rows after Ctrl+Shift+Right (ExpandAll)")
@@ -5217,7 +5217,7 @@ func TestHandleKeyMsg_ExpandAllCollapseAll(t *testing.T) {
 	expandedCount := len(m.displayRows)
 
 	// Ctrl+Shift+Left should collapse all (when groups exist)
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlShiftLeft})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModCtrl | tea.ModShift})
 	m.recomputeDisplayRows()
 	if len(m.displayRows) >= expandedCount {
 		t.Error("expected fewer rows after Ctrl+Shift+Left (CollapseAll)")
@@ -5231,11 +5231,11 @@ func TestHandleKeyMsg_ExpandAllCollapseAll(t *testing.T) {
 func TestHeaderRow_LeftRightNavigation(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: -1, Col: 1}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyLeft})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyLeft})
 	if m.focusedCell.Col != 0 {
 		t.Errorf("expected col=0 after Left in header, got %d", m.focusedCell.Col)
 	}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	if m.focusedCell.Col != 1 {
 		t.Errorf("expected col=1 after Right in header, got %d", m.focusedCell.Col)
 	}
@@ -5245,7 +5245,7 @@ func TestHeaderRow_ShiftNavigation(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: -1, Col: 1}
 	// Shift+Right in header should extend selection
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyShiftRight})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModShift})
 	// Rect may or may not activate in header; just check no crash
 	_, _, _, _ = m.SelectionBounds()
 }
@@ -5287,21 +5287,21 @@ func TestEditing_NumberEditor_ValidationFailure(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 2}
 
 	// Start editing
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Fatal("expected editing to start")
 	}
 
 	// Clear and type invalid text
 	for i := 0; i < 20; i++ {
-		m = sendKey(m, tea.KeyMsg{Type: tea.KeyBackspace})
+		m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	}
 	for _, r := range "not-a-number" {
-		m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = sendKey(m, tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
 
 	// Try to confirm - validation should fail
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Error("expected to remain in edit mode after validation failure")
 	}
@@ -5316,7 +5316,7 @@ func TestRender_FilterEditorShownInView(t *testing.T) {
 	cols[0].Filter = filter.NewTextFilter()
 	m := newTestGrid(WithColumns[TestRow](cols))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	output := m.View()
 	if !strings.Contains(output, "Filter:") {
 		t.Error("expected 'Filter:' in output when filter editor is active")
@@ -5354,7 +5354,7 @@ func TestGroupRow_UnhandledKey(t *testing.T) {
 		}
 	}
 	// Send a key that is not handled by group row (e.g., 'x')
-	m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m2, cmd := m.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
 	if cmd != nil {
 		t.Error("expected nil cmd for unhandled key on group row")
 	}
@@ -5369,7 +5369,7 @@ func TestHandleKeyMsg_FocusedRowBeyondTotalRows(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 999, Col: 0}
 	// Send a key that requires row context (e.g., space for selection)
-	m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m2, cmd := m.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
 	if cmd != nil {
 		t.Error("expected nil cmd when focus is beyond total rows")
 	}
@@ -5851,10 +5851,10 @@ func TestMultiSortColumn_UnsortableColumn(t *testing.T) {
 	m := newTestGrid(WithColumns[TestRow](cols), WithMultiSort[TestRow](true))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	// Sort by Name first
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 's', Text: "s"})
 	// Try multi-sort on unsortable Department column
 	m.focusedCell.Col = 1
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'S', Text: "S"})
 	// Should still have only 1 sort criterion
 	if len(m.sortModel.SortOrder) != 1 {
 		t.Errorf("expected 1 sort criterion (unsortable col ignored), got %d", len(m.sortModel.SortOrder))
@@ -5865,7 +5865,7 @@ func TestMultiSortColumn_WithoutMultiSort(t *testing.T) {
 	// MultiSort disabled, so 'S' key should do nothing
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'S', Text: "S"})
 	if len(m.sortModel.SortOrder) != 0 {
 		t.Errorf("expected 0 sort criteria when MultiSort disabled, got %d", len(m.sortModel.SortOrder))
 	}
@@ -5878,7 +5878,7 @@ func TestMultiSortColumn_WithoutMultiSort(t *testing.T) {
 func TestToggleGroupColumn_ColOutOfRange(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: -1}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'G', Text: "G"})
 	if len(m.groupModel.GroupColumns) != 0 {
 		t.Error("expected no group columns when focusedCell.Col is negative")
 	}
@@ -5903,7 +5903,7 @@ func TestQuickFilter_ToggleOffWithTextViaHandleKeyMsg(t *testing.T) {
 	m.quickFilterActive = true
 	m.quickFilterText = "hello"
 	var cmd tea.Cmd
-	m, cmd = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, cmd = m.handleKeyMsg(tea.KeyPressMsg{Code: '/', Text: "/"})
 	if m.quickFilterActive {
 		t.Error("expected quickFilterActive=false after toggle off")
 	}
@@ -5928,7 +5928,7 @@ func TestHeaderRow_ToggleSort(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: -1, Col: 0}
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.sortModel.SortOrder) != 1 {
 		t.Fatalf("expected 1 sort criterion after Enter on header, got %d", len(m.sortModel.SortOrder))
 	}
@@ -5946,7 +5946,7 @@ func TestHeaderRow_ToggleSortUnsortableCol(t *testing.T) {
 	cols[0].Sortable = false
 	m := newTestGrid(WithColumns[TestRow](cols))
 	m.focusedCell = CellPosition{Row: -1, Col: 0}
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.sortModel.SortOrder) != 0 {
 		t.Error("expected 0 sort criteria for unsortable column")
 	}
@@ -5959,10 +5959,10 @@ func TestHeaderRow_ToggleMultiSort(t *testing.T) {
 	m := newTestGrid(WithMultiSort[TestRow](true))
 	m.focusedCell = CellPosition{Row: -1, Col: 0}
 	// First sort
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	// Multi-sort on col 1
 	m.focusedCell.Col = 1
-	shiftEnter := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("shift+enter")}
+	shiftEnter := tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift}
 	m, cmd := m.Update(shiftEnter)
 	if len(m.sortModel.SortOrder) != 2 {
 		t.Errorf("expected 2 sort criteria after Shift+Enter, got %d", len(m.sortModel.SortOrder))
@@ -5982,10 +5982,10 @@ func TestHeaderRow_ToggleMultiSortUnsortable(t *testing.T) {
 	m := newTestGrid(WithColumns[TestRow](cols), WithMultiSort[TestRow](true))
 	m.focusedCell = CellPosition{Row: -1, Col: 0}
 	// Sort col 0
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	// Try multi-sort on unsortable col 1
 	m.focusedCell.Col = 1
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("shift+enter")})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift})
 	if len(m.sortModel.SortOrder) != 1 {
 		t.Errorf("expected 1 sort criterion (unsortable ignored on header), got %d", len(m.sortModel.SortOrder))
 	}
@@ -5994,7 +5994,7 @@ func TestHeaderRow_ToggleMultiSortUnsortable(t *testing.T) {
 func TestHeaderRow_ToggleMultiSortDisabled(t *testing.T) {
 	m := newTestGrid() // MultiSort is false
 	m.focusedCell = CellPosition{Row: -1, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("shift+enter")})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift})
 	if len(m.sortModel.SortOrder) != 0 {
 		t.Error("expected 0 sort criteria when MultiSort disabled on header")
 	}
@@ -6004,7 +6004,7 @@ func TestHeaderRow_FallThroughReturn(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: -1, Col: 0}
 	// Send a key that is not handled in header: e.g., 'x'
-	m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m2, cmd := m.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
 	if cmd != nil {
 		t.Error("expected nil cmd for unhandled key on header row")
 	}
@@ -6029,7 +6029,7 @@ func TestEditKeyMsg_NoValueSetter(t *testing.T) {
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	// Start editing - this also invokes the CellEditingStartedMsg closure (update.go:634)
 	var startCmd tea.Cmd
-	m, startCmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, startCmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState == nil {
 		t.Fatal("expected editing to start")
 	}
@@ -6045,7 +6045,7 @@ func TestEditKeyMsg_NoValueSetter(t *testing.T) {
 		}
 	}
 	// Confirm edit - should not crash even without ValueSetter
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.editState != nil {
 		t.Error("expected editState=nil after confirm")
 	}
@@ -6070,12 +6070,12 @@ func TestEditKeyMsg_NoValueSetter(t *testing.T) {
 
 func TestQuickFilterKeyMsg_EscWithText(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'b', Text: "b"})
 	// Now Esc should clear text and emit QuickFilterChangedMsg
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.quickFilterText != "" {
 		t.Errorf("expected empty text after Esc, got %q", m.quickFilterText)
 	}
@@ -6094,11 +6094,11 @@ func TestQuickFilterKeyMsg_EscWithText(t *testing.T) {
 
 func TestQuickFilterKeyMsg_BackspaceEmitsMsg(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'b', Text: "b"})
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	if m.quickFilterText != "a" {
 		t.Errorf("expected 'a' after backspace, got %q", m.quickFilterText)
 	}
@@ -6117,9 +6117,9 @@ func TestQuickFilterKeyMsg_BackspaceEmitsMsg(t *testing.T) {
 
 func TestQuickFilterKeyMsg_RunesEmitsMsg(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'z'}})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
 	if m.quickFilterText != "z" {
 		t.Errorf("expected 'z', got %q", m.quickFilterText)
 	}
@@ -6138,9 +6138,9 @@ func TestQuickFilterKeyMsg_RunesEmitsMsg(t *testing.T) {
 
 func TestQuickFilterKeyMsg_UnhandledKeyType(t *testing.T) {
 	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	// Send a key type that is not Esc, Backspace, Runes, or Enter (e.g., Tab)
-	m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m2, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	if cmd != nil {
 		t.Error("expected nil cmd for unhandled key in quick filter")
 	}
@@ -6157,7 +6157,7 @@ func TestQuickFilterKeyMsg_UnhandledKeyType(t *testing.T) {
 func TestStartFilterEdit_ColIdxNegative(t *testing.T) {
 	m := newTestGrid()
 	m.focusedCell = CellPosition{Row: 0, Col: -1}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	if m.filterEditColIdx != -1 {
 		t.Error("expected filterEditColIdx=-1 when col is negative")
 	}
@@ -6179,7 +6179,7 @@ func TestStartFilterEdit_SmallHeight(t *testing.T) {
 		WithHeight[TestRow](5), // Very small height
 	)
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = sendKey(m, tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	if m.filterEditColIdx != 0 {
 		t.Errorf("expected filterEditColIdx=0, got %d", m.filterEditColIdx)
 	}
@@ -6269,7 +6269,7 @@ func TestStartEditing_RowNegative(t *testing.T) {
 		WithEditable[TestRow](true),
 	)
 	m.focusedCell = CellPosition{Row: -1, Col: 0} // Header
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	// On header, Enter triggers ToggleSort, not edit. But let's explicitly test
 	// startEditing with negative row.
 	m2, _ := m.startEditing()
@@ -6353,7 +6353,7 @@ func TestShiftMoveFocus_EmitsSelectionChangedMsg(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyShiftDown})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 	if cmd == nil {
 		t.Fatal("expected command from shift+down")
 	}
@@ -6377,7 +6377,7 @@ func TestSelect_SpaceEmitsSelectionChangedMsg(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	if cmd == nil {
 		t.Error("expected SelectionChangedMsg command from space")
 	}
@@ -6395,7 +6395,7 @@ func TestSelectAll_EmitsSelectionChangedMsg(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyCtrlA})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	if cmd == nil {
 		t.Error("expected SelectionChangedMsg command from Ctrl+A")
 	}
@@ -6418,14 +6418,14 @@ func TestMultiSortColumn_SuccessPath(t *testing.T) {
 	m := newTestGrid(WithMultiSort[TestRow](true))
 	m.focusedCell = CellPosition{Row: 0, Col: 0}
 	// First sort by Name
-	m = sendKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = sendKey(m, tea.KeyPressMsg{Code: 's', Text: "s"})
 	if len(m.sortModel.SortOrder) != 1 {
 		t.Fatalf("expected 1 sort after 's', got %d", len(m.sortModel.SortOrder))
 	}
 	// Multi-sort on Department (col 1)
 	m.focusedCell.Col = 1
 	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 'S', Text: "S"})
 	if len(m.sortModel.SortOrder) != 2 {
 		t.Errorf("expected 2 sort criteria after multi-sort 'S', got %d", len(m.sortModel.SortOrder))
 	}

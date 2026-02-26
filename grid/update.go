@@ -3,8 +3,8 @@ package grid
 import (
 	"fmt"
 
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
@@ -17,7 +17,7 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if !m.focused {
 			// no-op
 		} else if m.editState != nil {
@@ -36,7 +36,7 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 }
 
 // handleKeyMsg handles key messages in normal (non-editing) mode.
-func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
+func (m Model[T]) handleKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 	visibleCols := m.visibleCols()
 	totalRows := len(m.displayRows)
 
@@ -296,7 +296,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 }
 
 // handleEditKeyMsg handles key messages while editing a cell.
-func (m Model[T]) handleEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
+func (m Model[T]) handleEditKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.KeyMap.ConfirmEdit):
 		// Validate and confirm
@@ -358,9 +358,9 @@ func (m Model[T]) handleEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 }
 
 // handleQuickFilterKeyMsg handles key messages while the quick filter is active.
-func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
-	switch msg.Type {
-	case tea.KeyEsc:
+func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
+	switch msg.Code {
+	case tea.KeyEscape:
 		m.quickFilterActive = false
 		if m.quickFilterText != "" {
 			m.quickFilterText = ""
@@ -379,8 +379,8 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		}
 		return m, nil
 
-	case tea.KeyRunes:
-		m.quickFilterText += string(msg.Runes)
+	case tea.KeySpace:
+		m.quickFilterText += " "
 		m.dirty = true
 		return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
 
@@ -389,13 +389,20 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
 		m.quickFilterActive = false
 		m.updateViewportSize()
 		return m, nil
+
+	default:
+		if len(msg.Text) > 0 {
+			m.quickFilterText += msg.Text
+			m.dirty = true
+			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
+		}
 	}
 
 	return m, nil
 }
 
 // handleFilterEditKeyMsg handles key messages while the column filter editor is active.
-func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyMsg) (Model[T], tea.Cmd) {
+func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 	colIdx := m.filterEditColIdx
 	if colIdx < 0 || colIdx >= len(m.cols) {
 		m.filterEditColIdx = -1

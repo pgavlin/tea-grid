@@ -6,7 +6,7 @@ package lineedit
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // Model is a single-line text buffer with a cursor.
@@ -80,10 +80,22 @@ func (m *Model) Home() { m.cursor = 0 }
 // End moves the cursor past the last character.
 func (m *Model) End() { m.cursor = len(m.text) }
 
-// HandleKeyMsg dispatches a tea.KeyMsg to the appropriate editing operation.
+// HandleKeyMsg dispatches a tea.KeyPressMsg to the appropriate editing operation.
 // It returns true if the key was handled (i.e. a text mutation or cursor move).
-func (m *Model) HandleKeyMsg(msg tea.KeyMsg) bool {
-	switch msg.Type {
+func (m *Model) HandleKeyMsg(msg tea.KeyPressMsg) bool {
+	// Handle ctrl+key combinations first.
+	if msg.Mod.Contains(tea.ModCtrl) {
+		switch msg.Code {
+		case 'a':
+			m.Home()
+			return true
+		case 'e':
+			m.End()
+			return true
+		}
+	}
+
+	switch msg.Code {
 	case tea.KeyBackspace:
 		return m.Backspace()
 	case tea.KeyDelete:
@@ -94,19 +106,20 @@ func (m *Model) HandleKeyMsg(msg tea.KeyMsg) bool {
 	case tea.KeyRight:
 		m.Right()
 		return true
-	case tea.KeyHome, tea.KeyCtrlA:
+	case tea.KeyHome:
 		m.Home()
 		return true
-	case tea.KeyEnd, tea.KeyCtrlE:
+	case tea.KeyEnd:
 		m.End()
 		return true
 	case tea.KeySpace:
 		m.Insert(" ")
 		return true
-	case tea.KeyRunes:
-		m.Insert(string(msg.Runes))
-		return true
 	default:
+		if len(msg.Text) > 0 {
+			m.Insert(msg.Text)
+			return true
+		}
 		return false
 	}
 }

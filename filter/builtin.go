@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/internal/lineedit"
 )
@@ -78,7 +78,7 @@ func (f *TextFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	case FilterBlurMsg:
 		f.editing = false
 		return f, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if !f.editing {
 			return f, nil
 		}
@@ -224,7 +224,7 @@ func (f *NumberFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	case FilterBlurMsg:
 		f.editing = false
 		return f, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if !f.editing {
 			return f, nil
 		}
@@ -371,7 +371,7 @@ func (f *SetFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	case FilterBlurMsg:
 		f.editing = false
 		return f, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if !f.editing {
 			return f, nil
 		}
@@ -383,8 +383,8 @@ func (f *SetFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	return f, nil
 }
 
-func (f *SetFilter) updateSearchMode(msg tea.KeyMsg) (Filter, tea.Cmd) {
-	switch msg.Type {
+func (f *SetFilter) updateSearchMode(msg tea.KeyPressMsg) (Filter, tea.Cmd) {
+	switch msg.Code {
 	case tea.KeyDown, tea.KeyTab:
 		if len(f.filtered) > 0 {
 			f.inList = true
@@ -397,8 +397,8 @@ func (f *SetFilter) updateSearchMode(msg tea.KeyMsg) (Filter, tea.Cmd) {
 	return f, nil
 }
 
-func (f *SetFilter) updateListMode(msg tea.KeyMsg) (Filter, tea.Cmd) {
-	switch msg.Type {
+func (f *SetFilter) updateListMode(msg tea.KeyPressMsg) (Filter, tea.Cmd) {
+	switch msg.Code {
 	case tea.KeyUp:
 		if f.selectedIdx > 0 {
 			f.selectedIdx--
@@ -416,11 +416,13 @@ func (f *SetFilter) updateListMode(msg tea.KeyMsg) (Filter, tea.Cmd) {
 		}
 	case tea.KeyTab:
 		f.inList = false
-	case tea.KeyRunes:
-		// Switch back to search mode and process the rune
-		f.inList = false
-		f.search.Insert(string(msg.Runes))
-		f.refilter()
+	default:
+		if len(msg.Text) > 0 {
+			// Switch back to search mode and process the text
+			f.inList = false
+			f.search.Insert(msg.Text)
+			f.refilter()
+		}
 	}
 	return f, nil
 }
@@ -536,11 +538,11 @@ func (f *BoolFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	case FilterBlurMsg:
 		f.editing = false
 		return f, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if !f.editing {
 			return f, nil
 		}
-		switch msg.Type {
+		switch msg.Code {
 		case tea.KeySpace, tea.KeyRight:
 			f.state = (f.state + 1) % 3
 		case tea.KeyLeft:
@@ -672,7 +674,7 @@ func (f *TimeFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	case FilterBlurMsg:
 		f.editing = false
 		return f, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if !f.editing {
 			return f, nil
 		}

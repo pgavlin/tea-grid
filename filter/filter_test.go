@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // --- TextFilter ---
@@ -496,12 +496,12 @@ func TestTimeFilterInvalidDate(t *testing.T) {
 
 // --- Helper for creating key messages ---
 
-func runeKeyMsg(r rune) tea.KeyMsg {
-	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}
+func runeKeyMsg(r rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: r, Text: string(r)}
 }
 
-func keyMsg(t tea.KeyType) tea.KeyMsg {
-	return tea.KeyMsg{Type: t}
+func keyMsg(code rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: code}
 }
 
 // ==========================================================================

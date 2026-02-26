@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // --- Text / SetText ---
@@ -255,7 +255,7 @@ func TestHandleKeyMsg_Backspace(t *testing.T) {
 	var m Model
 	m.SetText("hello")
 	m.SetCursor(1)
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeyBackspace})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	if !ok {
 		t.Error("expected handled")
 	}
@@ -268,7 +268,7 @@ func TestHandleKeyMsg_Delete(t *testing.T) {
 	var m Model
 	m.SetText("hello")
 	m.SetCursor(0)
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeyDelete})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: tea.KeyDelete})
 	if !ok {
 		t.Error("expected handled")
 	}
@@ -281,7 +281,7 @@ func TestHandleKeyMsg_Left(t *testing.T) {
 	var m Model
 	m.SetText("hello")
 	m.SetCursor(3)
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeyLeft})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: tea.KeyLeft})
 	if !ok {
 		t.Error("expected handled")
 	}
@@ -294,7 +294,7 @@ func TestHandleKeyMsg_Right(t *testing.T) {
 	var m Model
 	m.SetText("hello")
 	m.SetCursor(2)
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeyRight})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: tea.KeyRight})
 	if !ok {
 		t.Error("expected handled")
 	}
@@ -307,7 +307,7 @@ func TestHandleKeyMsg_Home(t *testing.T) {
 	var m Model
 	m.SetText("hello")
 	m.SetCursor(3)
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeyHome})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: tea.KeyHome})
 	if !ok {
 		t.Error("expected handled")
 	}
@@ -320,7 +320,7 @@ func TestHandleKeyMsg_CtrlA(t *testing.T) {
 	var m Model
 	m.SetText("hello")
 	m.SetCursor(3)
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeyCtrlA})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	if !ok {
 		t.Error("expected handled")
 	}
@@ -333,7 +333,7 @@ func TestHandleKeyMsg_End(t *testing.T) {
 	var m Model
 	m.SetText("hello")
 	m.SetCursor(0)
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeyEnd})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEnd})
 	if !ok {
 		t.Error("expected handled")
 	}
@@ -346,7 +346,7 @@ func TestHandleKeyMsg_CtrlE(t *testing.T) {
 	var m Model
 	m.SetText("hello")
 	m.SetCursor(0)
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeyCtrlE})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 	if !ok {
 		t.Error("expected handled")
 	}
@@ -359,7 +359,7 @@ func TestHandleKeyMsg_Space(t *testing.T) {
 	var m Model
 	m.SetText("ab")
 	m.SetCursor(1)
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeySpace})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: tea.KeySpace})
 	if !ok {
 		t.Error("expected handled")
 	}
@@ -372,7 +372,7 @@ func TestHandleKeyMsg_Runes(t *testing.T) {
 	var m Model
 	m.SetText("hllo")
 	m.SetCursor(1)
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	if !ok {
 		t.Error("expected handled")
 	}
@@ -384,7 +384,7 @@ func TestHandleKeyMsg_Runes(t *testing.T) {
 func TestHandleKeyMsg_Unhandled(t *testing.T) {
 	var m Model
 	m.SetText("hello")
-	ok := m.HandleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
+	ok := m.HandleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if ok {
 		t.Error("expected unhandled key to return false")
 	}
