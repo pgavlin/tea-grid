@@ -6721,3 +6721,69 @@ func TestView_DoesNotMutateModel(t *testing.T) {
 		t.Fatal("consecutive View() calls on the same model produced different output")
 	}
 }
+
+// -----------------------------------------------------------------------
+// WithColumnFilter
+// -----------------------------------------------------------------------
+
+func TestWithColumnFilter_AppliesFilter(t *testing.T) {
+	tf := filter.NewTextFilter()
+	tf.SetText("Engineering")
+
+	m := newTestGrid(
+		WithColumnFilter[TestRow]("Department", tf),
+	)
+	// Only Engineering rows: Alice, Carol
+	if len(m.displayRows) != 2 {
+		t.Errorf("expected 2 rows after WithColumnFilter, got %d", len(m.displayRows))
+	}
+	for _, rn := range m.displayRows {
+		if rn.Data.Department != "Engineering" {
+			t.Errorf("expected Engineering, got %s", rn.Data.Department)
+		}
+	}
+}
+
+func TestWithColumnFilter_BeforeWithColumns(t *testing.T) {
+	tf := filter.NewTextFilter()
+	tf.SetText("Sales")
+
+	// WithColumnFilter specified before WithColumns — should still work
+	m := New[TestRow](
+		WithColumnFilter[TestRow]("Department", tf),
+		WithColumns[TestRow](testCols()),
+		WithRows[TestRow](testData()),
+		WithFocused[TestRow](true),
+		WithWidth[TestRow](80),
+		WithHeight[TestRow](20),
+	)
+	// Only Sales rows: Bob, Eve
+	if len(m.displayRows) != 2 {
+		t.Errorf("expected 2 rows when WithColumnFilter before WithColumns, got %d", len(m.displayRows))
+	}
+	for _, rn := range m.displayRows {
+		if rn.Data.Department != "Sales" {
+			t.Errorf("expected Sales, got %s", rn.Data.Department)
+		}
+	}
+}
+
+func TestWithColumnFilter_MultipleColumns(t *testing.T) {
+	deptFilter := filter.NewTextFilter()
+	deptFilter.SetText("Engineering")
+
+	nameFilter := filter.NewTextFilter()
+	nameFilter.SetText("Carol")
+
+	m := newTestGrid(
+		WithColumnFilter[TestRow]("Department", deptFilter),
+		WithColumnFilter[TestRow]("Name", nameFilter),
+	)
+	// Engineering AND Name contains Carol: only Carol
+	if len(m.displayRows) != 1 {
+		t.Errorf("expected 1 row after multiple WithColumnFilter, got %d", len(m.displayRows))
+	}
+	if len(m.displayRows) > 0 && m.displayRows[0].Data.Name != "Carol" {
+		t.Errorf("expected Carol, got %s", m.displayRows[0].Data.Name)
+	}
+}

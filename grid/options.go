@@ -2,6 +2,7 @@ package grid
 
 import (
 	"github.com/pgavlin/tea-grid/data"
+	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/selection"
 	"github.com/pgavlin/tea-grid/sort"
 )
@@ -91,6 +92,18 @@ func WithEditable[T any](enabled bool) Option[T] {
 func WithQuickFilter[T any](enabled bool) Option[T] {
 	return func(m *Model[T]) {
 		m.quickFilterEnabled = enabled
+	}
+}
+
+// WithColumnFilter sets the filter for the column with the given ID.
+// This can be called multiple times for different columns.
+// Filters are applied after all options, so ordering with WithColumns doesn't matter.
+func WithColumnFilter[T any](colID string, f filter.Filter) Option[T] {
+	return func(m *Model[T]) {
+		if m.pendingColumnFilters == nil {
+			m.pendingColumnFilters = make(map[string]filter.Filter)
+		}
+		m.pendingColumnFilters[colID] = f
 	}
 }
 

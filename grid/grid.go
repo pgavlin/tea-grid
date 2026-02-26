@@ -78,6 +78,9 @@ type Model[T any] struct {
 	// Pending row data (set by WithRows, applied in New after all options)
 	pendingRows []T
 
+	// Pending column filters (set by WithColumnFilter, applied in New after all options)
+	pendingColumnFilters map[string]filter.Filter
+
 	// Pinning functions
 	pinnedTopFunc        func(T) bool
 	pinnedBotFunc        func(T) bool
@@ -126,6 +129,14 @@ func New[T any](opts ...Option[T]) Model[T] {
 		m.setRowData(m.pendingRows)
 		m.pendingRows = nil
 	}
+
+	// Apply deferred column filters (after all options so columns are set)
+	for i := range m.cols {
+		if f, ok := m.pendingColumnFilters[m.cols[i].ColumnID]; ok {
+			m.cols[i].Filter = f
+		}
+	}
+	m.pendingColumnFilters = nil
 
 	// Build static pinned row nodes once (so IDs are stable)
 	m.buildStaticPinnedNodes()
