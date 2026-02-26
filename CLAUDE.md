@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-tea-grid is an AG Grid-inspired data grid component for [Bubble Tea](https://github.com/charmbracelet/bubbletea). It provides sorting, filtering, selection, cell editing, column/row pinning, grouping, virtual scrolling, and extensible cell rendering — all within the Elm Architecture. The core type is `grid.Model[T]` which implements `tea.Model`.
+tea-grid is an AG Grid-inspired data grid component for [Bubble Tea v2](https://charm.land/bubbletea). It provides sorting, filtering, selection, cell editing, column/row pinning, grouping, virtual scrolling, variable row heights, and extensible cell rendering — all within the Elm Architecture. The core type is `grid.Model[T]` which implements `tea.Model`. Uses `charm.land` module paths (Bubble Tea v2, Lipgloss v2, Bubbles v2).
 
 ## Build & Test Commands
 
@@ -28,7 +28,11 @@ go test -race ./...
 go run ./examples/basic/
 ```
 
-No Makefile, linter config, or CI pipeline exists. Standard `go build`/`go test` tooling only.
+### CI & Tooling
+
+- **GitHub Actions** (`.github/workflows/ci.yml`): `test` (go test -race), `lint` (golangci-lint v7), `format` (gofumpt check) — all on Go 1.25
+- **`.golangci.yml`**: govet, errcheck, staticcheck, unused; gofumpt formatter
+- **`.mise.toml`**: Go 1.25.1, golangci-lint 2.9.0, gofumpt 0.9.2
 
 ## Architecture
 
@@ -39,12 +43,13 @@ All state lives in `grid.Model[T]`. Messages flow through `Update` (in `grid/upd
 ### Package Dependency Graph
 
 ```
-grid      →  data, filter, sort, selection, grouping
+grid      →  data, filter, sort, selection, grouping, internal/lineedit
 data      →  filter (Column has Filter field; also defines CellRenderer/CellEditor/RowNode)
 filter    →  (standalone, defines Filter interface)
 sort      →  data (uses SortDirection)
 grouping  →  data (uses RowNode, Column)
-selection →  (standalone)
+selection →  (standalone, rectangular selection model)
+internal/lineedit →  (standalone, line editing widget for filter input)
 ```
 
 `grid/` is the integration package that composes all others. The sub-packages are independently usable and have no dependency on `grid/`.
@@ -54,7 +59,7 @@ selection →  (standalone)
 - **Generics**: `Model[T]` is parameterized on the row data type. `Column[T]` uses `ValueGetter func(T) any` for type-safe data extraction.
 - **Functional options**: `grid.New[T](opts...)` using `Option[T] func(*Model[T])`.
 - **Interface-based extension**: `data.CellRenderer[T]`, `data.CellEditor[T]`, and `filter.Filter` are the main extension points.
-- **Display row pipeline** (`grid.go:recomputeDisplayRows`): raw rows → pin separation → external filter → column filters → quick filter → grouping → sorting → post-sort hook → flat display list. Results are cached; the `dirty` flag triggers recomputation.
+- **Display row pipeline** (`grid.go:recomputeDisplayRows`): raw rows → pin separation → external filter → column filters → quick filter → grouping → sorting → post-sort hook → flat display list. Results are cached; the `dirty` flag triggers recomputation. Public setters eagerly recompute; `Init()` is a no-op.
 
 ### Grid File Responsibilities
 
@@ -75,11 +80,19 @@ In `grid.go:computeColWidths`: fixed-width columns allocated first, then remaini
 
 ### Update Routing
 
-`Update()` dispatches `KeyMsg` based on mode:
+`Update()` dispatches `KeyPressMsg` (Bubble Tea v2) based on mode:
 1. **Editing** → `handleEditKeyMsg` (Enter confirms, Esc cancels, else routes to editor)
 2. **Filter editing** → `handleFilterEditKeyMsg` (Enter applies, Esc clears)
 3. **Quick filter active** → `handleQuickFilterKeyMsg` (runes append, Esc clears)
 4. **Normal** → `handleKeyMsg` (navigation, selection, sort, group, edit start)
+
+### Selection Model
+
+The `selection` package uses a **rectangular selection model**. Key types:
+- `Mode`: `SelectNone`, `SelectSingle`, `SelectMulti`
+- `Kind`: `KindNone`, `KindRect`, `KindFullRow`, `KindFullCol`
+- `Rect`: anchor + cursor positions defining a selection rectangle
+- `Model`: holds a slice of `Rect`s; supports shift+navigation expansion
 
 ### Reflection Usage
 
