@@ -5,7 +5,7 @@
 ### 1. Overview
 
 `tea-grid` is a high-performance, feature-rich data grid component for
-[Bubble Tea](https://github.com/charmbracelet/bubbletea). It brings the power and
+[Bubble Tea v2](https://charm.land/bubbletea). It brings the power and
 flexibility of [AG Grid](https://www.ag-grid.com/) to terminal user interfaces,
 providing sorting, filtering, selection, cell editing, column/row pinning, grouping,
 virtual scrolling, and extensible cell rendering -- all within the Elm Architecture.
@@ -48,7 +48,7 @@ real data grid.
 ```
             ┌─────────────┐
   Msg ────▶ │   Update    │ ────▶ Cmd
-            │  (grid.go)  │
+            │ (update.go) │
             └──────┬──────┘
                    │
                    ▼
@@ -70,37 +70,58 @@ side-channels or shared mutable state.
 #### 3.2 Package Layout
 
 ```
-github.com/charmbracelet/tea-grid/
-├── grid/            # Core grid model, update, view
-│   ├── grid.go      # Model[T], New(), Update(), View()
-│   ├── options.go   # Option functions
-│   ├── render.go    # View rendering pipeline
-│   ├── viewport.go  # Virtual scrolling
-│   ├── keymap.go    # KeyMap and default bindings
-│   └── styles.go    # Styles and DefaultStyles()
-├── column/          # Column definition types
-│   └── column.go    # ColDef[T], ColGroup[T], PinDirection
-├── row/             # Row node types
-│   └── row.go       # RowNode[T], PinPosition
-├── cell/            # Cell rendering and editing
-│   ├── renderer.go  # CellRenderer interface
-│   ├── editor.go    # CellEditor interface
-│   └── builtin.go   # Built-in renderers/editors
-├── filter/          # Filtering subsystem
-│   ├── filter.go    # Filter interface
-│   └── builtin.go   # Text, Number, Set, Bool, Time filters
-├── sort/            # Sorting subsystem
-│   └── sort.go      # SortModel, Comparator
-├── selection/       # Selection subsystem
-│   └── selection.go # SelectionModel, modes
-├── grouping/        # Row grouping subsystem
-│   └── grouping.go  # GroupModel, aggregation
-└── examples/        # Example programs
-    ├── basic/
-    ├── editable/
-    ├── grouping/
-    └── kitchen-sink/
+github.com/pgavlin/tea-grid/
+├── grid/                # Core grid model, update, view
+│   ├── grid.go          # Model[T], New(), data CRUD, display pipeline, column sizing
+│   ├── update.go        # Update() message routing, key handlers
+│   ├── render.go        # View() rendering pipeline
+│   ├── viewport.go      # Virtual scrolling
+│   ├── options.go       # All With* functional options
+│   ├── keymap.go        # KeyMap and default bindings
+│   ├── styles.go        # Styles and DefaultStyles()
+│   └── messages.go      # All tea.Msg types emitted by the grid
+├── data/                # Column, row, and cell types
+│   ├── column.go        # Column[T], ColumnGroup[T], Pin, SortDirection, FromType, FromRows
+│   ├── row.go           # RowNode[T]
+│   ├── cell.go          # CellContext[T], CellRenderer[T], CellEditor[T]
+│   └── cell_builtin.go  # Built-in renderers and editors
+├── filter/              # Filtering subsystem
+│   ├── filter.go        # Filter interface, message types
+│   └── builtin.go       # Text, Number, Set, Bool, Time filters
+├── sort/                # Sorting subsystem
+│   └── sort.go          # Model[T], SortCriterion
+├── selection/           # Selection subsystem
+│   └── selection.go     # Model, Mode, Kind, Rect, Position
+├── grouping/            # Row grouping subsystem
+│   └── grouping.go      # Model[T], BuildGroups, FlattenGroups, Aggregate
+├── internal/
+│   └── lineedit/        # Line editing widget for filter/editor input
+│       └── lineedit.go  # Model with cursor, text editing, key handling
+└── examples/            # Example programs
+    ├── basic/           # Reflection-based columns, quick filter
+    ├── columns/         # Manual column defs, filters, grouping, aggregation
+    ├── csv/             # CSV file viewer with type inference
+    ├── jsonl/           # JSONL file viewer with map[string]any rows
+    ├── hscroll/         # Horizontal scrolling with pinned columns
+    ├── anyrow/          # Heterogeneous row types using []any
+    ├── selection/       # Multi-selection with status bar
+    └── spreadsheet/     # Full spreadsheet with formulas, formatting, file I/O
 ```
+
+#### 3.3 Package Dependency Graph
+
+```
+grid      →  data, filter, sort, selection, grouping, internal/lineedit
+data      →  filter, internal/lineedit
+filter    →  internal/lineedit
+sort      →  data (uses SortDirection)
+grouping  →  data (uses RowNode, Column)
+selection →  (standalone)
+internal/lineedit → (standalone)
+```
+
+`grid/` is the integration package that composes all others. The sub-packages are
+independently usable and have no dependency on `grid/`.
 
 ---
 
@@ -118,26 +139,48 @@ type Model[T any] struct {
     Help     help.Model
 
     // Internal state (unexported)
-    cols        []column.ColDef[T]
-    colGroups   []column.ColGroup[T]
-    rows        []row.RowNode[T]
-    pinnedTop   []row.RowNode[T]
-    pinnedBot   []row.RowNode[T]
+    cols        []data.Column[T]
+    colGroups   []data.ColumnGroup[T]
+    rows        []data.RowNode[T]
+    pinnedTop   []data.RowNode[T]
+    pinnedBot   []data.RowNode[T]
+    rowIDFunc   func(T) string
 
-    viewport    viewport          // virtual scrolling state
-    selection   selection.Model   // selection state
+    displayRows []data.RowNode[T]  // cached display rows
+    dirty       bool               // triggers recomputation
+    colWidths   []int
+
+    vp          viewport           // virtual scrolling state
+    sel         selection.Model    // selection state
     sortModel   sort.Model[T]     // sort state
-    filterModel filter.Model[T]   // filter state
-    groupModel  grouping.Model[T] // grouping state
-    editState   *editState[T]     // nil when not editing
+    groupModel  grouping.Model[T]  // grouping state
+    editState   *editState[T]      // nil when not editing
 
+    // Filtering state (inline, no separate filter model)
+    quickFilterEnabled bool
+    quickFilterText    string
+    quickFilterActive  bool
+    filterEditColIdx   int
+    externalFilter     func(T) bool
+
+    // Pinning
+    pinnedTopFunc   func(T) bool
+    pinnedBotFunc   func(T) bool
+    staticPinnedTop []T
+    staticPinnedBot []T
+
+    // Row height
+    defaultRowHeight int
+    dynamicRowHeight func(T) int
+
+    // Layout
     width       int
     height      int
     focused     bool
-    focusedCell CellPosition      // {Row, Col} of the focused cell
-
+    focusedCell CellPosition
     styles      Styles
-    ready       bool              // true after first WindowSizeMsg
+    editable    bool
+    postSort    func([]data.RowNode[T]) []data.RowNode[T]
 }
 
 type CellPosition struct {
@@ -150,20 +193,20 @@ func New[T any](opts ...Option[T]) Model[T]
 
 #### 4.2 Column Definition
 
-Columns are the heart of the grid's configuration. Each `ColDef` describes how a
+Columns are the heart of the grid's configuration. Each `Column` describes how a
 single column is sourced, displayed, sorted, filtered, and edited.
 
 ```go
-package column
+package data
 
-// ColDef defines a single column in the grid.
-type ColDef[T any] struct {
+// Column defines a single column in the grid.
+type Column[T any] struct {
     // Identity
-    ColID      string  // Unique identifier. Required.
+    ColumnID   string  // Unique identifier. Required.
     HeaderName string  // Display name in the header row.
 
     // Data access
-    ValueGetter func(T) any         // Extracts the cell value from the row data. Required.
+    ValueGetter    func(T) any                    // Extracts the cell value from the row data. Required.
     ValueFormatter func(value any, data T) string // Format the value for display.
 
     // Sizing
@@ -173,18 +216,16 @@ type ColDef[T any] struct {
     Flex     int  // Flex weight for distributing remaining space. 0 = no flex.
 
     // Sorting
-    Sortable   bool                                      // Default: true.
-    Comparator func(a, b any, nodeA, nodeB *RowNode[T], isDesc bool) int // Custom sort.
-    SortIndex  int  // Initial sort priority (0 = primary). -1 = not sorted.
-    SortDir    SortDirection // Asc, Desc, or None.
+    Sortable   bool                // Default: true.
+    Comparator func(a, b any) int // Custom comparator.
 
     // Filtering
-    Filterable bool             // Default: true.
-    Filter     filter.Filter    // Column filter (Text, Number, Set, or custom).
+    Filterable bool          // Default: true.
+    Filter     filter.Filter // Column filter (Text, Number, Set, Bool, Time, or custom).
 
     // Pinning
-    Pinned PinDirection // Left, Right, or None.
-    LockPinned bool     // Prevent user from changing pin state.
+    Pinned     Pin  // PinLeft, PinRight, or PinNone.
+    LockPinned bool // Prevent user from changing pin state.
 
     // Cell rendering
     CellRenderer         CellRenderer[T]            // Custom renderer.
@@ -192,39 +233,31 @@ type ColDef[T any] struct {
     CellStyle            func(value any, data T) lipgloss.Style // Per-cell styling.
 
     // Cell editing
-    Editable   bool                       // Default: false.
-    CellEditor CellEditor[T]              // Custom editor.
-    ValueSetter func(data *T, value any)  // Write the edited value back.
+    Editable    bool                      // Default: false.
+    CellEditor  CellEditor[T]            // Custom editor.
+    ValueSetter func(data *T, value any) // Write the edited value back.
 
     // Column spanning
-    ColSpan func(data T) int // Number of columns this cell spans. Default: 1.
+    ColumnSpan func(data T) int // Number of columns this cell spans. Default: 1.
 
-    // Grouping
-    RowGroup    bool   // If true, rows are grouped by this column's values.
-    AggFunc     string // Aggregation function name: "sum", "avg", "count", "min", "max".
+    // Aggregation
+    AggFunc       string                 // "sum", "avg", "count", "min", "max".
     AggFuncCustom func(values []any) any // Custom aggregation.
 
     // Visibility
-    Hide bool // If true, column is not rendered.
+    Hide     bool // If true, column is not rendered.
+    NoSelect bool // If true, column is skipped during selection navigation.
 }
 
-// Columns returns a []ColDef[T] derived from T's exported struct fields.
-// For each exported field, it produces a ColDef with:
-//   - ColID and HeaderName set to the field name
-//   - ValueGetter set to a function that retrieves the field's value from T
-// This is a convenience for the common case where the column list mirrors the
-// struct layout. Callers can modify the returned slice to customize individual
-// columns (e.g., override HeaderName, set Width, attach a Filter, etc.).
-//
-// Panics if T is not a struct type.
-func Columns[T any]() []ColDef[T]
-
-type PinDirection int
+// Pin is used for both column pinning (Left/Right) and row pinning (Top/Bottom).
+type Pin int
 
 const (
-    PinNone  PinDirection = iota
-    PinLeft
-    PinRight
+    PinNone   Pin = iota
+    PinLeft        // Column: pinned to left edge.
+    PinRight       // Column: pinned to right edge.
+    PinTop         // Row: pinned to top.
+    PinBottom      // Row: pinned to bottom.
 )
 
 type SortDirection int
@@ -236,15 +269,32 @@ const (
 )
 ```
 
+**Column Inference**
+
+The `data` package provides two convenience functions for deriving columns
+automatically:
+
+```go
+// FromType derives columns from T's exported struct fields via reflection.
+// Each field becomes a Column with ColumnID and HeaderName set to the field name,
+// and a pre-built ValueGetter closure.
+func FromType[T any]() []Column[T]
+
+// FromRows infers columns from sample data. Supports map[string]any, []any,
+// and struct types. Automatically assigns appropriate filters (TextFilter,
+// NumberFilter, BoolFilter) based on inferred value types.
+func FromRows[T any](rows []T) []Column[T]
+```
+
 **Column Groups**
 
 Column groups produce a single level of grouped headers. Each group spans its
 child columns with a shared header label:
 
 ```go
-type ColGroup[T any] struct {
+type ColumnGroup[T any] struct {
     HeaderName string
-    Children   []ColDef[T]   // Leaf columns in this group.
+    Columns    []Column[T]   // Leaf columns in this group.
 }
 ```
 
@@ -253,33 +303,25 @@ type ColGroup[T any] struct {
 Each row of user data is wrapped in a `RowNode` that carries runtime metadata:
 
 ```go
-package row
+package data
 
 type RowNode[T any] struct {
     // Data is the user-supplied row value.
     Data T
 
     // Runtime state (managed by the grid)
-    ID         string       // Unique row ID. Auto-generated if not set via RowID option.
-    RowIndex   int          // Current display index (post sort/filter/group).
-    Selected   bool
-    Expanded   bool         // For group rows.
-    RowHeight  int          // In terminal lines. Default: 1.
-    Pinned     PinPosition  // Top, Bottom, or None.
-    IsGroup    bool         // True if this is a synthetic group row.
-    GroupKey   string       // The value this group represents.
-    GroupLevel int          // Nesting depth (0 = top).
+    ID         string          // Unique row ID. Auto-generated if not set via RowID option.
+    RowIndex   int             // Current display index (post sort/filter/group).
+    Expanded   bool            // For group rows.
+    RowHeight  int             // In terminal lines. Default: 1.
+    Pinned     Pin             // PinTop, PinBottom, or PinNone.
+    IsGroup    bool            // True if this is a synthetic group row.
+    GroupKey   string          // The value this group represents.
+    GroupLevel int             // Nesting depth (0 = top).
     Children   []*RowNode[T]
     Parent     *RowNode[T]
+    AggValues  map[string]any  // Computed aggregate values (for group rows).
 }
-
-type PinPosition int
-
-const (
-    PinNone   PinPosition = iota
-    PinTop
-    PinBottom
-)
 ```
 
 ---
@@ -289,40 +331,46 @@ const (
 #### 5.1 Virtual Scrolling
 
 The grid virtualizes both rows and columns. Only cells within the visible viewport
-(plus a configurable buffer) are rendered. This is critical for large data sets.
+are rendered. This is critical for large data sets.
 
 ```go
 type viewport struct {
     topRow      int // Index of the first visible row.
     leftCol     int // Index of the first visible (unpinned) column.
-    visibleRows int // Number of rows that fit in the viewport height.
-    visibleCols int // Number of columns that fit in the viewport width.
-    rowBuffer   int // Extra rows to render above/below viewport (default: 5).
+    visibleLines int // Number of terminal lines in the viewport.
+    visibleCols int  // Number of columns that fit in the viewport width.
 }
 ```
 
 **Rendering pipeline:**
 
 1. Compute the sorted, filtered, grouped row list (the "display rows").
-2. Slice display rows to `[topRow - rowBuffer, topRow + visibleRows + rowBuffer]`.
+2. Slice display rows to `[topRow, topRow + visibleLines]`, accounting for variable
+   row heights.
 3. For each visible row, render only columns in the visible column range (accounting
    for pinned columns which are always rendered).
 4. Assemble the final output string by joining pinned-left columns, viewport columns,
    and pinned-right columns with border separators.
 
-Scrolling is triggered by cursor movement, page up/down, and mouse wheel events.
+Scrolling is triggered by cursor movement, page up/down, and half-page (Ctrl+U/D)
+navigation. The viewport supports variable row heights, walking rows to determine
+visibility.
 
 #### 5.2 Column Sizing
 
 Columns are sized in a multi-pass algorithm inspired by CSS flexbox:
 
-1. **Fixed columns**: Columns with an explicit `Width` are allocated exactly that many
+1. **Hidden columns**: Columns with `Hide: true` get width 0.
+2. **Border accounting**: If `BorderColumn` is enabled, `n-1` separator characters
+   are subtracted from available width.
+3. **Fixed columns**: Columns with an explicit `Width` are allocated exactly that many
    terminal columns.
-2. **Minimum pass**: All remaining columns are allocated at least `MinWidth` columns.
-3. **Flex pass**: Remaining space is distributed proportionally to each column's `Flex`
-   weight. Columns without a `Flex` value receive `Flex = 1` by default.
-4. **Max clamp**: Any column exceeding `MaxWidth` is clamped, and the freed space is
-   redistributed to columns that can still grow.
+4. **Minimum pass**: All remaining (flex) columns are allocated at least `MinWidth`
+   columns (default: 4).
+5. **Flex pass**: Remaining space is distributed proportionally to each column's `Flex`
+   weight. Columns without a `Flex` value receive `Flex = 1` by default. A cumulative
+   division algorithm prevents pixel loss from integer rounding.
+6. **Max clamp**: Any column exceeding `MaxWidth` is clamped.
 
 When the terminal is resized (`tea.WindowSizeMsg`), the entire sizing pass is re-run.
 
@@ -337,12 +385,23 @@ package sort
 
 type Model[T any] struct {
     SortOrder []SortCriterion // Ordered list of active sorts.
+    MultiSort bool            // Whether multi-column sort is enabled.
 }
 
 type SortCriterion struct {
-    ColID     string
-    Direction SortDirection // Asc or Desc.
+    ColumnID  string
+    Direction data.SortDirection // Asc or Desc.
 }
+```
+
+**Methods:**
+
+```go
+func (m *Model[T]) ToggleSort(colID string)                    // Cycles asc -> desc -> none.
+func (m *Model[T]) AddSort(colID string)                       // Adds to multi-sort or toggles if present.
+func (m *Model[T]) Clear()                                     // Removes all sort criteria.
+func (m *Model[T]) DirectionFor(colID string) data.SortDirection
+func (m *Model[T]) IndexFor(colID string) int                  // Returns 0-based sort index or -1.
 ```
 
 **Behavior:**
@@ -351,24 +410,24 @@ type SortCriterion struct {
 |------------------------|--------------------------------------------------|
 | Enter on header cell   | Toggle sort on that column (asc -> desc -> none) |
 | Shift+Enter on header  | Add column to multi-sort                         |
+| `s` from any row       | Sort by current column                           |
+| `S` from any row       | Add current column to multi-sort                 |
 | Programmatic API       | `SetSort([]SortCriterion)`                       |
 
-**Cycle order** is configurable per column:
+**Custom comparators** receive two values to compare:
 
 ```go
-SortingOrder []SortDirection // e.g., {SortAsc, SortDesc} to skip "none"
+Comparator func(a, b any) int
 ```
 
-**Custom comparators** receive the full row node for context:
-
-```go
-Comparator func(a, b any, nodeA, nodeB *RowNode[T], isDesc bool) int
-```
+The built-in `defaultCompare` handles `string`, `int`, `int64`, `float64`, `bool`,
+and `time.Time` with type-specific fast paths, falling back to `fmt.Sprintf`
+comparison.
 
 **Post-sort hook** allows reordering after the grid's sort completes:
 
 ```go
-WithPostSort(func(rows []RowNode[T]) []RowNode[T])
+WithPostSort(func(rows []data.RowNode[T]) []data.RowNode[T])
 ```
 
 After any sort change, the display row list is recomputed and the viewport is
@@ -392,7 +451,6 @@ type Filter interface {
     Matches(value any) bool
 
     // View renders the filter's UI (e.g., a text input in the header).
-    // Returns empty string if the filter has no inline UI.
     View() string
 
     // Update processes messages for the filter's UI.
@@ -400,7 +458,20 @@ type Filter interface {
 
     // Active returns true if the filter is currently constraining results.
     Active() bool
+
+    // Clear resets the filter to its default (non-active) state.
+    Clear()
 }
+```
+
+**Message types for filter focus management:**
+
+```go
+type FilterFocusMsg struct {
+    Width    int
+    MaxLines int
+}
+type FilterBlurMsg struct{}
 ```
 
 Built-in filters:
@@ -409,9 +480,9 @@ Built-in filters:
 |------------------|----------------------------------------------------------------------|-----------------|
 | `TextFilter`     | Substring / regex match on string values.                            | Text input      |
 | `NumberFilter`   | Comparison operators (=, !=, <, >, <=, >=) or range (e.g. `10..50`).| Text input      |
-| `SetFilter`      | Include/exclude from a set of distinct values.                       | Checkbox list   |
-| `BoolFilter`     | True / false / any.                                                  | Toggle          |
-| `TimeFilter`     | Date/time range filter. Accepts a start..end range as text input. Parses dates in common human-readable formats (e.g. `2024-01-01`, `Jan 2 2024`) as well as RFC1123Z. Either bound may be omitted for an open-ended range (e.g. `2024-01-01..` or `..2024-06-30`). | Text input |
+| `SetFilter`      | Include/exclude from a set of distinct values. Interactive checkbox list with search. | Checkbox list |
+| `BoolFilter`     | Cycles through any / true-only / false-only.                         | Toggle          |
+| `TimeFilter`     | Date/time range filter. Supports `start..end` or single date. Parses common formats. | Text input |
 
 **5.4.2 Quick Filter**
 
@@ -419,11 +490,11 @@ A single text input that searches across all columns:
 
 ```go
 WithQuickFilter(enabled bool)
+WithQuickFilterText(text string) // Set initial filter text.
 ```
 
 When active, the quick filter renders above the grid. Each word in the input is
-matched independently (all words must match somewhere in the row). Matching cells
-are highlighted.
+matched independently (all words must match somewhere in the row, case-insensitive).
 
 **5.4.3 External Filter**
 
@@ -435,7 +506,10 @@ WithExternalFilter(func(data T) bool)
 
 This is useful for filters driven by external UI elements outside the grid.
 
-#### 5.5 Row Selection
+#### 5.5 Selection
+
+The selection model uses a **rectangular selection** approach, supporting cell ranges,
+full rows, and full columns.
 
 ```go
 package selection
@@ -444,53 +518,58 @@ type Mode int
 
 const (
     SelectNone   Mode = iota // No selection.
-    SelectSingle             // At most one row selected.
-    SelectMulti              // Multiple rows via Space, Shift+arrows, Ctrl+A.
+    SelectSingle             // At most one selection rect.
+    SelectMulti              // Multiple selection rects.
 )
 
-type Model struct {
-    Mode     Mode
-    selected map[string]bool // RowNode.ID -> selected
-    anchor   int             // For shift-selection range
+type Kind int
+
+const (
+    KindNone    Kind = iota
+    KindRect         // Arbitrary rectangular selection (Shift+nav).
+    KindFullRow      // Full-row selection.
+    KindFullCol      // Full-column selection.
+)
+
+type Position struct {
+    Row, Col int
 }
+
+type Rect struct {
+    Kind   Kind
+    Anchor Position // Starting corner of selection.
+    Cursor Position // Current corner of selection.
+}
+
+type Model struct {
+    Mode  Mode
+    Rects []Rect
+}
+```
+
+**Methods:**
+
+```go
+func New(mode Mode) Model
+func (m *Model) Active() bool
+func (m *Model) Clear()
+func (m *Model) Replace(r Rect)
+func (m *Model) ToggleFullRow(row int)
+func (m *Model) ContainsCell(row, col int) bool
+func (m *Model) FullRowRanges() [][2]int
+func (m *Model) BoundingRect() (rowLo, rowHi, colLo, colHi int)
 ```
 
 **Key bindings:**
 
-| Key             | SelectSingle          | SelectMulti                     |
-|-----------------|-----------------------|---------------------------------|
-| Space           | Toggle current row    | Toggle current row              |
-| Shift+Up/Down   | --                    | Extend selection range          |
-| Ctrl+A          | --                    | Select all (visible) rows       |
-| Escape          | Deselect              | Deselect all                    |
-
-**Checkbox column**: When `SelectMulti` is enabled, an optional checkbox column can
-be prepended automatically:
-
-```go
-WithSelectionColumn(enabled bool)
-```
-
-**API:**
-
-```go
-func (m Model[T]) SelectedRows() []T
-func (m Model[T]) SelectedRowNodes() []*RowNode[T]
-func (m Model[T]) IsSelected(id string) bool
-```
-
-**Messages emitted:**
-
-```go
-type RowSelectedMsg[T any] struct {
-    Row   RowNode[T]
-    Selected bool
-}
-
-type SelectionChangedMsg[T any] struct {
-    Selected []RowNode[T]
-}
-```
+| Key             | Action                                    |
+|-----------------|-------------------------------------------|
+| Space           | Toggle current row (full-row selection)   |
+| `R`             | Select full row                           |
+| `C`             | Select full column                        |
+| Shift+arrows    | Extend rectangular selection              |
+| Ctrl+A          | Select all rows                           |
+| Escape          | Deselect all                              |
 
 #### 5.6 Cell Rendering
 
@@ -512,21 +591,21 @@ CellStyle(value, data) -> final style applied
 **CellRenderer interface:**
 
 ```go
-package cell
+package data
 
 // CellContext provides all information a renderer needs.
 type CellContext[T any] struct {
-    Value          any            // The raw cell value.
-    FormattedValue string         // After ValueFormatter.
-    Data           T              // The full row data.
-    RowNode        *row.RowNode[T]
-    ColDef         *column.ColDef[T]
-    ColIndex       int
+    Value          any              // The raw cell value.
+    FormattedValue string           // After ValueFormatter.
+    Data           T                // The full row data.
+    RowNode        *RowNode[T]
+    Column         *Column[T]
+    ColumnIndex    int
     RowIndex       int
     IsSelected     bool
     IsFocused      bool
-    Width          int            // Available width in terminal columns.
-    Height         int            // Available height in terminal lines.
+    Width          int              // Available width in terminal columns.
+    Height         int              // Available height in terminal lines.
 }
 
 // CellRenderer renders a cell's content.
@@ -547,12 +626,12 @@ func (f CellRendererFunc[T]) Render(ctx CellContext[T]) string {
 | Renderer              | Description                                                      |
 |-----------------------|------------------------------------------------------------------|
 | `TextRenderer`        | Default. Truncates/pads text to fit width.                       |
-| `NumberRenderer`      | Right-aligned, optional thousands separator.                     |
-| `TimeRenderer`        | Renders `time.Time` values. Configurable format string (default: `2006-01-02 15:04`). Supports relative display (e.g. "2h ago") via an optional `Relative bool` flag. |
-| `BarRenderer`         | Renders a horizontal bar proportional to value.                  |
-| `SparklineRenderer`   | Inline sparkline for numeric series.                             |
-| `BoolRenderer`        | Renders `✓` / `✗` or custom true/false glyphs.                  |
-| `ProgressRenderer`    | Mini progress bar within the cell.                               |
+| `NumberRenderer`      | Right-aligned, optional thousands separator (`ThousandsSep`).    |
+| `TimeRenderer`        | Renders `time.Time` values. Configurable `Format` string (default: `2006-01-02 15:04`). Supports `Relative` display (e.g. "2h ago"). |
+| `BarRenderer`         | Horizontal bar proportional to `MaxValue`.                       |
+| `SparklineRenderer`   | Inline sparkline for `[]float64` series using block characters.  |
+| `BoolRenderer`        | Renders `✓` / `✗` or custom `TrueGlyph`/`FalseGlyph`.          |
+| `ProgressRenderer`    | Mini progress bar within the cell (`FilledChar`/`EmptyChar`).    |
 
 #### 5.7 Cell Editing
 
@@ -560,7 +639,7 @@ When a cell is editable, the user can enter edit mode. The grid transitions the
 focused cell from display mode to edit mode, swapping the renderer for an editor.
 
 ```go
-package cell
+package data
 
 // CellEditor handles inline editing of a cell value.
 type CellEditor[T any] interface {
@@ -583,13 +662,13 @@ type CellEditor[T any] interface {
 
 **Built-in editors:**
 
-| Editor            | Description                                          |
-|-------------------|------------------------------------------------------|
-| `TextEditor`      | Single-line text input (wraps `textinput.Model`).    |
-| `NumberEditor`    | Numeric input with optional min/max/step.            |
-| `SelectEditor`    | Cycle through a list of options.                     |
-| `BoolEditor`      | Toggle true/false.                                   |
-| `TimeEditor`      | Text input for `time.Time` values. Accepts human-readable formats (e.g. `Jan 2 2024 3:04pm`, `2024-01-02 15:04`) and RFC1123Z (`Mon, 02 Jan 2006 15:04:05 -0700`). Validates on confirm and displays a parse error if the input is not recognized. |
+| Editor            | Constructor                          | Description                              |
+|-------------------|--------------------------------------|------------------------------------------|
+| `TextEditor`      | `NewTextEditor[T]()`                 | Single-line text input.                  |
+| `NumberEditor`    | `NewNumberEditor[T]()`               | Numeric input with `WithMin`/`WithMax`/`WithStep` builder methods. |
+| `SelectEditor`    | `NewSelectEditor[T](options []string)` | Cycle through a list of options.       |
+| `BoolEditor`      | `NewBoolEditor[T]()`                 | Toggle true/false.                       |
+| `TimeEditor`      | `NewTimeEditor[T]()`                 | Text input for `time.Time`. Accepts multiple human-readable formats. |
 
 **Editing lifecycle:**
 
@@ -601,20 +680,6 @@ type CellEditor[T any] interface {
    to the row data and `CellValueChangedMsg` is emitted. If invalid, the editor
    remains active with the validation error displayed.
 6. On cancel: `CellEditingCancelledMsg` is emitted, original value restored.
-
-**Messages:**
-
-```go
-type CellEditingStartedMsg struct { Position CellPosition }
-type CellEditingStoppedMsg struct { Position CellPosition }
-type CellValueChangedMsg[T any] struct {
-    Position CellPosition
-    OldValue any
-    NewValue any
-    Data     T
-}
-type CellEditingCancelledMsg struct { Position CellPosition }
-```
 
 #### 5.8 Column Pinning
 
@@ -636,12 +701,20 @@ horizontally between them.
 2. Center viewport columns (scrollable).
 3. Pinned-right columns (fixed, always visible).
 
-These are joined horizontally using `lipgloss.JoinHorizontal`. A vertical border
-separator distinguishes pinned regions from the scrollable center.
+Scroll indicators (left/right arrows) are shown when columns are off-screen.
 
-**Constraint**: Combined pinned column width must not exceed `gridWidth - 10` to
-ensure the center viewport remains usable. If it does, an error message is displayed
-or columns are auto-unpinned.
+Column pinning can be set declaratively at construction time:
+
+```go
+WithColumnPin[T](colID string, dir data.Pin)
+```
+
+Or programmatically at runtime:
+
+```go
+func (m *Model[T]) PinColumn(colID string, dir data.Pin)
+func (m *Model[T]) UnpinColumn(colID string)
+```
 
 #### 5.9 Row Pinning
 
@@ -649,10 +722,11 @@ Rows can be pinned to the top or bottom of the grid. Pinned rows are always visi
 regardless of scroll position.
 
 ```go
+// Dynamic pinning via predicate:
 WithPinnedTopRows(func(data T) bool)
 WithPinnedBottomRows(func(data T) bool)
 
-// Or supply static pinned data:
+// Static pinned data:
 WithStaticPinnedTop(rows []T)
 WithStaticPinnedBottom(rows []T)
 ```
@@ -672,37 +746,55 @@ WithStaticPinnedBottom(rows []T)
 ```
 
 Pinned rows participate in column alignment and styling but are excluded from sorting
-and scrolling. Selection of pinned rows is optional (`WithPinnedRowSelection(bool)`).
+and scrolling.
+
+Runtime pinning API:
+
+```go
+func (m *Model[T]) PinRow(id string, pos data.Pin)
+func (m *Model[T]) UnpinRow(id string)
+```
 
 #### 5.10 Row Grouping
 
-When one or more columns have `RowGroup: true`, the grid organizes rows into a
-tree of groups.
+Grouping is configured via the `WithGrouping` option, specifying column IDs to group
+by:
 
 ```go
 package grouping
 
 type Model[T any] struct {
-    GroupColumns []string // ColIDs of columns being grouped, in order.
-    Expanded     map[string]bool // GroupKey -> expanded state.
-    DefaultExpanded int // Number of levels expanded by default. -1 = all.
+    GroupColumns    []string        // ColumnIDs of columns being grouped, in order.
+    Expanded        map[string]bool // GroupKey -> expanded state.
+    DefaultExpanded int             // Number of levels expanded by default. -1 = all.
 }
+```
+
+**Methods:**
+
+```go
+func New[T any](groupCols []string, defaultExpanded int) Model[T]
+func (m *Model[T]) IsExpanded(groupKey string) bool
+func (m *Model[T]) SetExpanded(groupKey string, expanded bool)
+func (m *Model[T]) ExpandAll(groups []*data.RowNode[T])
+func (m *Model[T]) CollapseAll(groups []*data.RowNode[T])
+func (m *Model[T]) ToggleGroupColumn(colID string)
+```
+
+**Package-level functions:**
+
+```go
+func BuildGroups[T any](rows []data.RowNode[T], cols []data.Column[T], groupCols []string,
+    expanded map[string]bool, defaultExpanded int) []*data.RowNode[T]
+func FlattenGroups[T any](groups []*data.RowNode[T]) []data.RowNode[T]
+func Aggregate(values []any, funcName string) any
 ```
 
 **Display**: Group rows are synthetic rows inserted into the display list. They show
 the group value and aggregated data. Child rows are indented and only visible when
 the group is expanded.
 
-```
-▶ Country: United States (3)    $1,200,000    142
-  ├─ Alice Johnson               $450,000      52
-  ├─ Bob Smith                   $380,000      45
-  └─ Carol Davis                 $370,000      45
-▼ Country: United Kingdom (2)    $820,000      89
-  ├─ ...
-```
-
-**Aggregation**: Group rows display aggregated values for numeric columns. Built-in
+**Aggregation**: Group rows display aggregated values for columns. Built-in
 aggregation functions:
 
 | Function | Description                   |
@@ -715,34 +807,23 @@ aggregation functions:
 | `first`  | First child's value.          |
 | `last`   | Last child's value.           |
 
-Custom aggregation functions can be registered via `ColDef.AggFuncCustom`.
+Custom aggregation functions can be registered via `Column.AggFuncCustom`.
 
 **Interaction:**
 
-| Key         | Action                                    |
-|-------------|-------------------------------------------|
-| Enter/Right | Expand focused group                      |
-| Left        | Collapse focused group                    |
-| Shift+Right | Expand all groups at the current level    |
-| Shift+Left  | Collapse all groups at the current level  |
+| Key                  | Action                                    |
+|----------------------|-------------------------------------------|
+| Enter on group row   | Toggle group expansion                    |
+| Right on group row   | Expand focused group                      |
+| Left on group row    | Collapse focused group                    |
+| Ctrl+Shift+Right     | Expand all groups                         |
+| Ctrl+Shift+Left      | Collapse all groups                       |
+| `G`                  | Toggle group-by for current column        |
 
 #### 5.11 Column Spanning
 
-A column can declare `ColSpan func(data T) int` to allow its cells to span multiple
+A column can declare `ColumnSpan func(data T) int` to allow its cells to span multiple
 columns. This is useful for "full-width" detail rows or report-style layouts.
-
-```go
-ColDef[T]{
-    Field:      "name",
-    HeaderName: "Name",
-    ColSpan: func(data T) int {
-        if data.IsHeader {
-            return 5 // Span across 5 columns
-        }
-        return 1
-    },
-}
-```
 
 When a cell spans multiple columns, the spanned columns are skipped in rendering.
 Column spanning is confined to within a single pin region (left, center, or right).
@@ -754,52 +835,80 @@ Navigation follows AG Grid's model adapted for TUI conventions:
 ```go
 type KeyMap struct {
     // Cell navigation
-    Up           key.Binding // ↑ or k
-    Down         key.Binding // ↓ or j
-    Left         key.Binding // ← or h
-    Right        key.Binding // → or l
-    PageUp       key.Binding
-    PageDown     key.Binding
-    HalfPageUp   key.Binding // Ctrl+U
-    HalfPageDown key.Binding // Ctrl+D
-    Home         key.Binding // Go to first row
-    End          key.Binding // Go to last row
-    LineStart    key.Binding // Go to first column
-    LineEnd      key.Binding // Go to last column
-
-    // Header navigation
-    GoToHeader   key.Binding // g then h (chord)
+    Up, Down, Left, Right       key.Binding
+    PageUp, PageDown            key.Binding
+    HalfPageUp, HalfPageDown    key.Binding
+    Home, End                   key.Binding
+    LineStart, LineEnd          key.Binding
+    GoToHeader                  key.Binding
 
     // Selection
-    Select       key.Binding // Space
-    SelectRange  key.Binding // Shift+Up / Shift+Down
-    SelectAll    key.Binding // Ctrl+A
+    Select, SelectAll, DeselectAll key.Binding
+    SelectRow, SelectColumn        key.Binding
+    ShiftUp, ShiftDown, ShiftLeft, ShiftRight key.Binding
 
-    // Sorting (when header is focused)
-    ToggleSort      key.Binding // Enter
-    ToggleMultiSort key.Binding // Shift+Enter
+    // Sorting
+    ToggleSort, ToggleMultiSort key.Binding
+    SortColumn, MultiSortColumn key.Binding
 
     // Editing
-    StartEdit    key.Binding // Enter or F2
-    ConfirmEdit  key.Binding // Enter
-    CancelEdit   key.Binding // Escape
+    StartEdit, ConfirmEdit, CancelEdit key.Binding
 
     // Filtering
-    OpenFilter      key.Binding // / (slash)
-    CloseFilter     key.Binding // Escape
-    QuickFilter     key.Binding // Ctrl+F
+    QuickFilter, ColumnFilter key.Binding
 
     // Grouping
-    ExpandGroup     key.Binding // Enter or →
-    CollapseGroup   key.Binding // ← or Backspace
-    ExpandAll       key.Binding // Shift+→
-    CollapseAll     key.Binding // Shift+←
+    ToggleGroupColumn, ToggleGroup key.Binding
+    ExpandGroup, CollapseGroup     key.Binding
+    ExpandAll, CollapseAll         key.Binding
 
     // General
-    Quit         key.Binding // q (if enabled)
-    Help         key.Binding // ?
+    Help key.Binding
 }
 ```
+
+**Default key bindings:**
+
+| Action           | Keys                  |
+|------------------|-----------------------|
+| Up               | `↑`, `k`              |
+| Down             | `↓`, `j`              |
+| Left             | `←`, `h`              |
+| Right            | `→`, `l`              |
+| PageUp           | `PgUp`                |
+| PageDown         | `PgDn`                |
+| HalfPageUp       | `Ctrl+U`              |
+| HalfPageDown     | `Ctrl+D`              |
+| Home             | `Home`                |
+| End              | `End`                 |
+| LineStart        | `0`                   |
+| LineEnd          | `$`                   |
+| GoToHeader       | `g`                   |
+| Select           | `Space`               |
+| SelectAll        | `Ctrl+A`              |
+| DeselectAll      | `Esc`                 |
+| SelectRow        | `R`                   |
+| SelectColumn     | `C`                   |
+| ShiftUp          | `Shift+↑`, `K`        |
+| ShiftDown        | `Shift+↓`, `J`        |
+| ShiftLeft        | `Shift+←`, `H`        |
+| ShiftRight       | `Shift+→`, `L`        |
+| ToggleSort       | `Enter` (on header)   |
+| ToggleMultiSort  | `Shift+Enter` (header)|
+| SortColumn       | `s` (from any row)    |
+| MultiSortColumn  | `S` (from any row)    |
+| StartEdit        | `Enter`, `F2`         |
+| ConfirmEdit      | `Enter`               |
+| CancelEdit       | `Esc`                 |
+| QuickFilter      | `/`                   |
+| ColumnFilter     | `Ctrl+F`              |
+| ToggleGroupColumn| `G`                   |
+| ToggleGroup      | `Enter` (on group)    |
+| ExpandGroup      | `→` (on group row)    |
+| CollapseGroup    | `←` (on group row)    |
+| ExpandAll        | `Ctrl+Shift+→`        |
+| CollapseAll      | `Ctrl+Shift+←`        |
+| Help             | `?`                   |
 
 **Focus model**: The grid has a "focused cell" (`CellPosition{Row, Col}`) that acts
 as a cursor. Arrow keys move the focus. The focused cell is visually highlighted.
@@ -809,6 +918,16 @@ visible.
 **Header mode**: When the cursor is moved above the first row (Up from row 0), focus
 shifts to the header row. In header mode, Left/Right navigates between column
 headers, and Enter toggles sort.
+
+**Update routing**: `Update()` dispatches `tea.KeyPressMsg` based on mode:
+
+1. **Not focused**: No-op.
+2. **Editing** (`editState != nil`): Enter confirms (validates, applies via
+   ValueSetter), Esc cancels, else routes to editor's `Update`.
+3. **Filter editing** (`filterEditColIdx >= 0`): Enter applies filter and closes,
+   Esc clears filter and closes, else routes to filter's `Update`.
+4. **Quick filter active**: Esc clears, Backspace/Space/Enter/runes modify text.
+5. **Normal**: Full navigation, sorting, selection, editing, filtering, grouping.
 
 ---
 
@@ -830,15 +949,17 @@ type Styles struct {
     // Cells
     Cell         lipgloss.Style // Default cell style.
     CellFocused  lipgloss.Style // Focused cell highlight.
-    CellSelected lipgloss.Style // Selected row highlight.
+    CellSelected lipgloss.Style // Selected cell/row highlight.
     CellEvenRow  lipgloss.Style // Base cell style for even-indexed rows.
     CellOddRow   lipgloss.Style // Base cell style for odd-indexed rows.
     CellPinned   lipgloss.Style // Base cell style for pinned rows.
 
     // Pinning
-    PinnedLeft   lipgloss.Style // Pinned-left region.
-    PinnedRight  lipgloss.Style // Pinned-right region.
-    PinSeparator string         // Vertical separator between pinned and scrollable.
+    PinnedLeft    lipgloss.Style // Pinned-left region.
+    PinnedRight   lipgloss.Style // Pinned-right region.
+    PinSeparator  string         // Vertical separator between pinned and scrollable (default: "|").
+    ScrollLeft    string         // Left scroll indicator (default: "◀").
+    ScrollRight   string         // Right scroll indicator (default: "▶").
 
     // Grouping
     GroupRow       lipgloss.Style
@@ -848,21 +969,18 @@ type Styles struct {
 
     // Borders
     Border       lipgloss.Border // Border style (e.g., lipgloss.RoundedBorder()).
-    BorderHeader bool            // Show border below header.
+    BorderHeader bool            // Show border below header (default: true).
     BorderRow    bool            // Show border between rows.
     BorderColumn bool            // Show border between columns.
 
     // Filtering
-    FilterInput lipgloss.Style  // Quick filter input.
-    FilterMatch lipgloss.Style  // Highlighted matching text.
+    FilterInput  lipgloss.Style // Filter editor input.
+    FilterMatch  lipgloss.Style // Highlighted matching text.
+    FilterActive string         // Filter-active indicator in header.
 
     // Editing
-    EditorInput lipgloss.Style  // Cell editor input.
-    EditorError lipgloss.Style  // Validation error.
-
-    // Scrollbar
-    Scrollbar         lipgloss.Style
-    ScrollbarThumb    lipgloss.Style
+    EditorInput lipgloss.Style // Cell editor input.
+    EditorError lipgloss.Style // Validation error.
 
     // Per-cell styling callback (overrides the above for fine-grained control)
     StyleFunc func(row, col int, data any) lipgloss.Style
@@ -886,8 +1004,8 @@ also be changed at runtime via setter methods on the model.
 func New[T any](opts ...Option[T]) Model[T]
 
 // Core options
-func WithColumns[T any](cols []ColDef[T]) Option[T]
-func WithColumnGroups[T any](groups []ColGroup[T]) Option[T]
+func WithColumns[T any](cols []data.Column[T]) Option[T]
+func WithColumnGroups[T any](groups []data.ColumnGroup[T]) Option[T]
 func WithRows[T any](rows []T) Option[T]
 func WithRowID[T any](fn func(T) string) Option[T]
 func WithWidth[T any](w int) Option[T]
@@ -895,22 +1013,27 @@ func WithHeight[T any](h int) Option[T]
 func WithStyles[T any](s Styles) Option[T]
 func WithKeyMap[T any](km KeyMap) Option[T]
 func WithFocused[T any](f bool) Option[T]
+func WithFocusedCell[T any](pos CellPosition) Option[T]
 
 // Feature toggles
-func WithSelection[T any](mode SelectionMode) Option[T]
-func WithSelectionColumn[T any](enabled bool) Option[T]
+func WithSelection[T any](mode selection.Mode) Option[T]
 func WithEditable[T any](enabled bool) Option[T]
 func WithQuickFilter[T any](enabled bool) Option[T]
+func WithQuickFilterText[T any](text string) Option[T]
 func WithExternalFilter[T any](fn func(T) bool) Option[T]
+func WithColumnFilter[T any](colID string, f filter.Filter) Option[T]
+
+// Sorting
+func WithDefaultSort[T any](criteria []sort.SortCriterion) Option[T]
+func WithMultiSort[T any](enabled bool) Option[T]
+func WithPostSort[T any](fn func([]data.RowNode[T]) []data.RowNode[T]) Option[T]
+
+// Grouping
 func WithGrouping[T any](cols ...string) Option[T]
 func WithGroupDefaultExpanded[T any](levels int) Option[T]
 
-// Sorting
-func WithDefaultSort[T any](criteria []SortCriterion) Option[T]
-func WithMultiSort[T any](enabled bool) Option[T]
-func WithPostSort[T any](fn func([]RowNode[T]) []RowNode[T]) Option[T]
-
 // Pinning
+func WithColumnPin[T any](colID string, dir data.Pin) Option[T]
 func WithPinnedTopRows[T any](fn func(T) bool) Option[T]
 func WithPinnedBottomRows[T any](fn func(T) bool) Option[T]
 func WithStaticPinnedTop[T any](rows []T) Option[T]
@@ -919,15 +1042,11 @@ func WithStaticPinnedBottom[T any](rows []T) Option[T]
 // Row configuration
 func WithRowHeight[T any](height int) Option[T]
 func WithDynamicRowHeight[T any](fn func(T) int) Option[T]
-
-// Scrolling
-func WithRowBuffer[T any](n int) Option[T]
-
-// Callbacks
-func WithOnSelectionChanged[T any](fn func([]T)) Option[T]
-func WithOnCellValueChanged[T any](fn func(CellValueChangedMsg[T])) Option[T]
-func WithOnSortChanged[T any](fn func([]SortCriterion)) Option[T]
 ```
+
+Note: `WithRows` and `WithColumnFilter` are deferred -- rows are set and filters
+applied after all other options, so column definitions and settings are available
+when rows are processed.
 
 ---
 
@@ -943,34 +1062,47 @@ type FocusChangedMsg struct {
 }
 
 // Selection
-type RowSelectedMsg[T any]       struct { Row RowNode[T]; Selected bool }
-type SelectionChangedMsg[T any]  struct { Selected []RowNode[T] }
+type SelectionChangedMsg[T any] struct {
+    Regions  []SelectionRegion
+    Selected []data.RowNode[T]
+}
+
+type SelectionRegion struct {
+    Kind   SelectionKind        // SelectionNone, SelectionRect, SelectionFullRow, SelectionFullCol
+    Anchor CellPosition
+    Cursor CellPosition
+}
 
 // Sorting
-type SortChangedMsg struct { SortOrder []SortCriterion }
+type SortChangedMsg struct {
+    SortOrder []sort.SortCriterion
+}
 
 // Filtering
-type FilterChangedMsg struct { ColID string; Active bool }
-type QuickFilterChangedMsg struct { Text string }
+type FilterChangedMsg struct {
+    ColumnID string
+    Active   bool
+}
+
+type QuickFilterChangedMsg struct {
+    Text string
+}
 
 // Editing
-type CellEditingStartedMsg    struct { Position CellPosition }
-type CellEditingStoppedMsg    struct { Position CellPosition }
+type CellEditingStartedMsg   struct { Position CellPosition }
+type CellEditingConfirmedMsg struct { Position CellPosition }
 type CellValueChangedMsg[T any] struct {
     Position CellPosition
     OldValue any
     NewValue any
     Data     T
 }
-type CellEditingCancelledMsg  struct { Position CellPosition }
+type CellEditingCancelledMsg struct { Position CellPosition }
 
 // Grouping
 type GroupExpandedMsg  struct { GroupKey string; Level int }
 type GroupCollapsedMsg struct { GroupKey string; Level int }
-
-// Data
-type RowsSetMsg[T any]    struct { Rows []T }
-type ColumnsSetMsg[T any] struct { Cols []ColDef[T] }
+type GroupColumnsChangedMsg struct { GroupColumns []string }
 ```
 
 ---
@@ -978,13 +1110,18 @@ type ColumnsSetMsg[T any] struct { Cols []ColDef[T] }
 ### 9. Public API (Methods on Model)
 
 ```go
+// --- Elm Architecture ---
+func (m Model[T]) Init() tea.Cmd
+func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd)
+func (m Model[T]) View() string
+
 // --- Data ---
 func (m *Model[T]) SetRows(rows []T)
 func (m Model[T]) Rows() []T
-func (m *Model[T]) SetColumns(cols []ColDef[T])
-func (m Model[T]) Columns() []ColDef[T]
-func (m *Model[T]) UpdateRow(id string, data T)
-func (m *Model[T]) InsertRow(index int, data T)
+func (m *Model[T]) SetColumns(cols []data.Column[T])
+func (m Model[T]) Columns() []data.Column[T]
+func (m *Model[T]) UpdateRow(id string, d T)
+func (m *Model[T]) InsertRow(index int, d T)
 func (m *Model[T]) RemoveRow(id string)
 
 // --- Dimensions ---
@@ -999,23 +1136,32 @@ func (m *Model[T]) Blur()
 func (m Model[T]) Focused() bool
 func (m *Model[T]) SetFocusedCell(pos CellPosition)
 func (m Model[T]) FocusedCell() CellPosition
+func (m Model[T]) FocusedRowData() (T, bool)
+func (m Model[T]) Filtering() bool
 
 // --- Selection ---
+func (m *Model[T]) SetRowSelection(id string)
+func (m *Model[T]) ToggleRowSelection(id string)
+func (m *Model[T]) SetColumnSelection(colIdx int)
+func (m *Model[T]) SetRectSelection(anchor, cursor CellPosition)
+func (m *Model[T]) SelectAllRows()
+func (m *Model[T]) ClearSelection()
+func (m Model[T]) Selection() []SelectionRegion
+func (m Model[T]) HasSelection() bool
+func (m Model[T]) IsCellSelected(row, col int) bool
+func (m Model[T]) IsRowSelected(id string) bool
+func (m Model[T]) IsColumnSelected(colIdx int) bool
 func (m Model[T]) SelectedRows() []T
-func (m Model[T]) SelectedRowNodes() []*RowNode[T]
-func (m *Model[T]) SelectRow(id string)
-func (m *Model[T]) DeselectRow(id string)
-func (m *Model[T]) SelectAll()
-func (m *Model[T]) DeselectAll()
-func (m Model[T]) IsSelected(id string) bool
+func (m Model[T]) SelectedRowNodes() []*data.RowNode[T]
+func (m Model[T]) SelectionBounds() (rowLo, rowHi, colLo, colHi int)
 
 // --- Sorting ---
-func (m *Model[T]) SetSort(criteria []SortCriterion)
-func (m Model[T]) SortOrder() []SortCriterion
+func (m *Model[T]) SetSort(criteria []sort.SortCriterion)
+func (m Model[T]) SortOrder() []sort.SortCriterion
 
 // --- Filtering ---
 func (m *Model[T]) SetQuickFilter(text string)
-func (m *Model[T]) SetColumnFilter(colID string, filter filter.Filter)
+func (m *Model[T]) SetColumnFilter(colID string, f filter.Filter)
 func (m *Model[T]) ClearFilters()
 
 // --- Grouping ---
@@ -1026,20 +1172,20 @@ func (m *Model[T]) CollapseAll()
 
 // --- Scrolling ---
 func (m *Model[T]) ScrollToRow(index int)
+func (m *Model[T]) ScrollToRowByID(id string) bool
 func (m *Model[T]) ScrollToTop()
 func (m *Model[T]) ScrollToBottom()
 
 // --- Pinning ---
-func (m *Model[T]) PinColumn(colID string, dir PinDirection)
+func (m *Model[T]) PinColumn(colID string, dir data.Pin)
 func (m *Model[T]) UnpinColumn(colID string)
-func (m *Model[T]) PinRow(id string, pos PinPosition)
+func (m *Model[T]) PinRow(id string, pos data.Pin)
 func (m *Model[T]) UnpinRow(id string)
 
-// --- Bubble Tea interface ---
-func (m Model[T]) Init() tea.Cmd
-func (m Model[T]) Update(msg tea.Msg) (tea.Model, tea.Cmd)
-func (m Model[T]) View() string
+// --- Help ---
 func (m Model[T]) HelpView() string
+func (m Model[T]) ShortHelp() []key.Binding
+func (m Model[T]) FullHelp() [][]key.Binding
 ```
 
 ---
@@ -1049,99 +1195,105 @@ func (m Model[T]) HelpView() string
 The `View()` method follows this pipeline:
 
 ```
-1. Compute column widths (flex layout)
+ 1. Quick filter bar (if active)
          │
          ▼
-2. Partition columns: [pinned-left] [center] [pinned-right]
+ 2. Column filter editor (if active)
          │
          ▼
-3. Render header row(s)
-   ├─ Group headers (if ColGroups defined)
-   └─ Column headers with sort indicators
+ 3. Column group headers (if ColumnGroups defined)
          │
          ▼
-4. Render pinned-top rows
+ 4. Column headers with sort indicators and filter-active indicators
          │
          ▼
-5. Render visible body rows (from virtual scroll window)
-   For each row:
-   ├─ If group row: render group row with indent + expand indicator
-   └─ If data row:
-      For each visible column:
-      ├─ Get value: ValueGetter(data)
-      ├─ Format: ValueFormatter
-      ├─ Render: CellRenderer or default TextRenderer
-      ├─ Apply style: CellStyle, then Styles.Cell/Selected/Focused
-      └─ Pad/truncate to column width
+ 5. Header border (if BorderHeader enabled)
          │
          ▼
-6. Render pinned-bottom rows
+ 6. Pinned top rows
          │
          ▼
-7. Render scrollbar (vertical, and horizontal if needed)
+ 7. Separator
          │
          ▼
-8. Render quick filter bar (if active)
+ 8. Visible body rows (from virtual scroll window)
+    For each row:
+    ├─ If group row: render group row with indent + expand indicator + agg values
+    └─ If data row:
+       For each visible column:
+       ├─ Get value: ValueGetter(data)
+       ├─ Format: ValueFormatter
+       ├─ Render: CellRenderer or default TextRenderer
+       ├─ Apply style: CellStyle, then Styles.Cell/Selected/Focused/Even/Odd
+       └─ Pad/truncate to column width
          │
          ▼
-9. Assemble:
-   lipgloss.JoinVertical(
-       quickFilterBar,
-       headerRow,
-       pinnedTopRows,
-       lipgloss.JoinHorizontal(pinnedLeft, centerViewport, pinnedRight),
-       pinnedBottomRows,
-       statusBar,
-   )
+ 9. Separator
+         │
+         ▼
+10. Pinned bottom rows
+         │
+         ▼
+11. Pad or truncate to grid dimensions
+         │
+         ▼
+12. Apply table-level style
 ```
 
-Each cell is rendered as a fixed-width string. Lipgloss styles are applied to
-individual cells, then cells are joined with column separators. Borders are drawn
-using the configured `lipgloss.Border` style.
+Each row is assembled from three column regions: pinned-left, center viewport, and
+pinned-right, joined with pin separators. Scroll indicators appear when columns are
+off-screen.
 
 ---
 
-### 11. Data Flow for Complex Operations
-
-#### Sort + Filter + Group Interaction
+### 11. Data Flow: Display Row Pipeline
 
 When any of sorting, filtering, or grouping state changes, the display row list is
-recomputed in this order:
+recomputed via `recomputeDisplayRows()`:
 
 ```
-Source rows ([]T)
+Source rows ([]RowNode[T])
     │
     ▼
-[1] External filter: WithExternalFilter(fn)
+[1] Pin separation: extract rows with Pinned == PinTop/PinBottom
+    │                (dynamic predicates or per-row Pinned field)
     │
     ▼
-[2] Column filters: each active Filter.Matches()
+[2] External filter: WithExternalFilter(fn)
     │
     ▼
-[3] Quick filter: substring match across all columns
+[3] Column filters: each active Filter.Matches()
+    │                (skips column being actively edited)
     │
     ▼
-Filtered rows
+[4] Quick filter: all words must appear in concatenated column values (case-insensitive)
     │
     ▼
-[4] Grouping: build group tree from GroupColumns
+[5] Append static pinned rows (WithStaticPinnedTop/Bottom)
     │
     ▼
-[5] Aggregation: compute aggregate values for each group node
+[6] Grouping (if GroupColumns non-empty):
+    │  BuildGroups() → sort within groups → FlattenGroups()
     │
     ▼
-[6] Sorting: sort within each group (or globally if ungrouped)
+[7] Sorting (if no grouping): sort using SortOrder + column comparators
     │
     ▼
-[7] Flatten: expand group tree to a flat display list
-    │  (respecting collapsed state)
+[8] Post-sort hook (if set)
+    │
+    ▼
+[9] Update RowIndex on each display row
+    │
+    ▼
+[10] Compute AggValues for group nodes
     │
     ▼
 Display rows (used by viewport and rendering)
 ```
 
 This pipeline is executed lazily: the result is cached and only recomputed when the
-underlying data, filter state, sort state, or group state changes.
+`dirty` flag is set (by data changes, filter state, sort state, or group state
+changes). Public setters eagerly recompute; `Init()` is a no-op.
 
 ---
 
@@ -1154,10 +1306,11 @@ import (
     "fmt"
     "os"
 
-    tea "github.com/charmbracelet/bubbletea"
-    "github.com/charmbracelet/tea-grid/column"
-    "github.com/charmbracelet/tea-grid/grid"
-    "github.com/charmbracelet/tea-grid/filter"
+    tea "charm.land/bubbletea/v2"
+    "github.com/pgavlin/tea-grid/data"
+    "github.com/pgavlin/tea-grid/filter"
+    "github.com/pgavlin/tea-grid/grid"
+    "github.com/pgavlin/tea-grid/selection"
 )
 
 type Employee struct {
@@ -1168,48 +1321,48 @@ type Employee struct {
 }
 
 func main() {
-    cols := []column.ColDef[Employee]{
+    cols := []data.Column[Employee]{
         {
-            ColID:       "name",
+            ColumnID:    "name",
             HeaderName:  "Employee Name",
             ValueGetter: func(e Employee) any { return e.Name },
-            Pinned:      column.PinLeft,
+            Pinned:      data.PinLeft,
             MinWidth:    20,
             Flex:        2,
             Filterable:  true,
             Filter:      filter.NewTextFilter(),
         },
         {
-            ColID:       "department",
+            ColumnID:    "department",
             HeaderName:  "Dept",
             ValueGetter: func(e Employee) any { return e.Department },
             Width:       15,
             Sortable:    true,
-            RowGroup:    true,
             Filter:      filter.NewSetFilter(),
         },
         {
-            ColID:       "salary",
+            ColumnID:    "salary",
             HeaderName:  "Salary",
             ValueGetter: func(e Employee) any { return e.Salary },
             Width:       12,
             Sortable:    true,
             ValueFormatter: func(v any, _ Employee) string {
-                return fmt.Sprintf("$%,.0f", v.(float64))
+                return fmt.Sprintf("$%.0f", v.(float64))
             },
             AggFunc: "sum",
         },
         {
-            ColID:       "active",
+            ColumnID:    "active",
             HeaderName:  "Active",
             ValueGetter: func(e Employee) any { return e.Active },
             Width:       8,
-            CellRenderer: cell.BoolRenderer[Employee]{
+            CellRenderer: data.BoolRenderer[Employee]{
                 TrueGlyph:  "✓",
                 FalseGlyph: "✗",
             },
-            Editable:   true,
-            CellEditor:  cell.NewBoolEditor[Employee](),
+            Editable:    true,
+            CellEditor:  data.NewBoolEditor[Employee](),
+            ValueSetter: func(e *Employee, v any) { e.Active = v.(bool) },
         },
     }
 
@@ -1226,9 +1379,8 @@ func main() {
         grid.WithRows(rows),
         grid.WithRowID(func(e Employee) string { return e.Name }),
         grid.WithSelection[Employee](selection.SelectMulti),
-        grid.WithSelectionColumn[Employee](true),
         grid.WithQuickFilter[Employee](true),
-        grid.WithGrouping[Employee]("Department"),
+        grid.WithGrouping[Employee]("department"),
         grid.WithGroupDefaultExpanded[Employee](-1),
         grid.WithFocused[Employee](true),
     )
@@ -1247,12 +1399,13 @@ func main() {
 
 | Concern | Approach |
 |---------|----------|
-| Large datasets (10k+ rows) | Virtual scrolling; only render visible rows + buffer. |
-| Sort/filter on large data | Performed on the Go side; O(n log n) sort, O(n) filter. Cache results. |
+| Large datasets (10k+ rows) | Virtual scrolling; only render visible rows. |
+| Sort/filter on large data | Performed on the Go side; O(n log n) sort, O(n) filter. Cache results via `dirty` flag. |
 | Frequent re-renders | Minimize string allocations in `View()`. Pre-compute column widths. Use `strings.Builder`. |
 | Wide tables (many columns) | Column virtualization: only render columns in the visible horizontal range. |
-| Grouping overhead | Build group tree once; update incrementally on data change. |
-| Resize events | Debounce `WindowSizeMsg` handling; re-layout only after a brief pause. |
+| Grouping overhead | Build group tree on recompute; flatten to display list. |
+| Resize events | Re-layout column widths on `tea.WindowSizeMsg`. |
+| Reflection | `data.FromType[T]()` uses reflection once at init to generate `ValueGetter` closures. No reflection in hot paths. |
 
 ---
 
@@ -1262,7 +1415,6 @@ func main() {
 - Renders correctly in 80-column terminals (graceful truncation).
 - Supports `NO_COLOR` via lipgloss's color profile detection.
 - Works with screen readers via sequential, meaningful text rendering in `View()`.
-- Tested against: iTerm2, Terminal.app, Alacritty, Windows Terminal, tmux, screen.
 
 ---
 
@@ -1277,9 +1429,6 @@ These features are explicitly deferred but the architecture accommodates them:
 - **Column reordering**: Via keyboard commands (move column left/right).
 - **Copy/export**: Copy selected rows to clipboard as TSV; export as CSV.
 - **Undo/redo**: Transaction log for cell edits with Ctrl+Z / Ctrl+Y.
-- **Formula cells**: Computed columns with simple expression evaluation.
-- **Frozen rows** (row spanning): A single row whose cells span the full width for
-  section headers.
 
 ---
 
@@ -1290,18 +1439,37 @@ These features are explicitly deferred but the architecture accommodates them:
    flexible for users whose row types contain slices, maps, or other non-comparable
    fields.
 
-2. **No reflection for data access**: The `Field` string path has been dropped.
-   `ValueGetter` is required on every `ColDef`. The convenience function
-   `Columns[T]()` uses reflection once at init time to generate a default column list
-   with pre-built `ValueGetter` functions, so users who want the simple struct-mirroring
-   behavior get it without per-access reflection cost.
+2. **No reflection for data access**: `ValueGetter` is required on every `Column`.
+   The convenience functions `FromType[T]()` and `FromRows[T](rows)` use reflection
+   once at init time to generate column lists with pre-built `ValueGetter` closures,
+   so users who want the simple struct-mirroring behavior get it without per-access
+   reflection cost.
 
-3. **Single-level column groups**: For v1, `ColGroup` supports only one level of
+3. **Unified Pin type**: A single `Pin` enum (`PinNone`, `PinLeft`, `PinRight`,
+   `PinTop`, `PinBottom`) is used for both column pinning and row pinning, simplifying
+   the type hierarchy.
+
+4. **Rectangular selection model**: Rather than a simple row-based selection, the
+   selection package uses rectangular regions (`Rect` with `Anchor` and `Cursor`
+   positions). This enables cell-range selection, full-row selection, and full-column
+   selection through a unified model.
+
+5. **Single-level column groups**: For v1, `ColumnGroup` supports only one level of
    grouping (a group header spanning its child columns). Nested column groups are
    deferred to a future version. This simplifies header rendering and keyboard
    navigation in the header region.
 
-4. **Custom border rendering**: The grid implements its own border rendering rather
+6. **Custom border rendering**: The grid implements its own border rendering rather
    than delegating to `lipgloss/table`. This avoids the overhead of reconstructing a
    `lipgloss/table.Table` on every frame and gives full control over border drawing
    in the presence of pinned regions, column spanning, and virtual scrolling.
+
+7. **Consolidated data package**: Column definitions, row nodes, cell contexts, cell
+   renderers, and cell editors all live in the `data` package rather than separate
+   `column/`, `row/`, and `cell/` packages. This reduces import boilerplate and
+   reflects their tight coupling.
+
+8. **Bubble Tea v2**: The grid targets Bubble Tea v2 (`charm.land/bubbletea/v2`) and
+   Lipgloss v2 (`charm.land/lipgloss/v2`), using the `charm.land` module paths.
+   `Update()` returns `(Model[T], tea.Cmd)` (concrete type) rather than
+   `(tea.Model, tea.Cmd)`.
