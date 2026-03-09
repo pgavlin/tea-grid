@@ -861,6 +861,31 @@ func TestSetFilterUpdateListToggle(t *testing.T) {
 	}
 }
 
+func TestSetFilterUpdateListCtrlSpaceSelectsOnly(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Update(FilterFocusMsg{Width: 30, MaxLines: 5})
+
+	// Enter list mode and move to "b"
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(keyMsg(tea.KeyDown))
+
+	// Press Ctrl+Space to select only "b"
+	f.Update(tea.KeyPressMsg{Code: tea.KeySpace, Mod: tea.ModCtrl})
+
+	if f.values["a"] {
+		t.Error("'a' should be excluded after Ctrl+Space select-only")
+	}
+	if !f.values["b"] {
+		t.Error("'b' should be included after Ctrl+Space select-only")
+	}
+	if f.values["c"] {
+		t.Error("'c' should be excluded after Ctrl+Space select-only")
+	}
+	if !f.Active() {
+		t.Error("filter should be active after select-only")
+	}
+}
+
 func TestSetFilterUpdateListTabReturnsToSearch(t *testing.T) {
 	f := NewSetFilter("a", "b", "c")
 	f.Update(FilterFocusMsg{Width: 30, MaxLines: 5})

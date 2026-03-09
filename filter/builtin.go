@@ -412,7 +412,15 @@ func (f *SetFilter) updateListMode(msg tea.KeyPressMsg) (Filter, tea.Cmd) {
 	case tea.KeySpace:
 		if f.selectedIdx >= 0 && f.selectedIdx < len(f.filtered) {
 			val := f.filtered[f.selectedIdx]
-			f.values[val] = !f.values[val]
+			if msg.Mod.Contains(tea.ModCtrl) {
+				// Ctrl+Space: select only the highlighted item (exclude all others).
+				for k := range f.values {
+					f.values[k] = false
+				}
+				f.values[val] = true
+			} else {
+				f.values[val] = !f.values[val]
+			}
 		}
 	case tea.KeyTab:
 		f.inList = false
