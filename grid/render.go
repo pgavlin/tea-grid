@@ -394,7 +394,54 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 		cells = append(cells, style.Width(w).MaxWidth(w).Render(cellContent))
 	}
 
-	return strings.Join(cells, m.colSeparator())
+	return m.joinCellLines(cells, colIndices)
+}
+
+// joinCellLines joins rendered cells with column separators, handling
+// multi-line cells by aligning each line across all columns. For multi-line
+// cells, each line gets its own separator and shorter cells are padded to
+// match the tallest cell.
+func (m Model[T]) joinCellLines(cells []string, colIndices []int) string {
+	sep := m.colSeparator()
+
+	// Fast path: if no cell contains a newline, join directly.
+	multiLine := false
+	for _, c := range cells {
+		if strings.Contains(c, "\n") {
+			multiLine = true
+			break
+		}
+	}
+	if !multiLine {
+		return strings.Join(cells, sep)
+	}
+
+	// Split each cell into lines and find the max line count.
+	cellLines := make([][]string, len(cells))
+	maxLines := 0
+	for i, c := range cells {
+		cellLines[i] = strings.Split(c, "\n")
+		if len(cellLines[i]) > maxLines {
+			maxLines = len(cellLines[i])
+		}
+	}
+
+	// Join corresponding lines across all cells.
+	result := make([]string, maxLines)
+	for lineIdx := 0; lineIdx < maxLines; lineIdx++ {
+		parts := make([]string, len(cells))
+		for cellIdx := range cells {
+			if lineIdx < len(cellLines[cellIdx]) {
+				parts[cellIdx] = cellLines[cellIdx][lineIdx]
+			} else {
+				// Pad with spaces to the column width.
+				w := m.colWidths[colIndices[cellIdx]]
+				parts[cellIdx] = strings.Repeat(" ", w)
+			}
+		}
+		result[lineIdx] = strings.Join(parts, sep)
+	}
+	return strings.Join(result, "\n")
 }
 
 // renderGroupRow renders a synthetic group row spanning all columns,
