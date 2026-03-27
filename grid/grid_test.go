@@ -6917,3 +6917,406 @@ func TestWithFocusedCell_WithFocused(t *testing.T) {
 		t.Errorf("expected focused cell (3,2), got (%d,%d)", m.focusedCell.Row, m.focusedCell.Col)
 	}
 }
+
+// -----------------------------------------------------------------------
+// joinCellLines: multi-line cell rendering with column border separators
+// -----------------------------------------------------------------------
+
+// helper to build a minimal Model with colWidths and BorderColumn set.
+func newJoinCellModel(widths []int, borderColumn bool) Model[TestRow] {
+	var m Model[TestRow]
+	m.colWidths = widths
+	m.styles.BorderColumn = borderColumn
+	return m
+}
+
+func TestJoinCellLines_SingleLineCells_NoBorder(t *testing.T) {
+	m := newJoinCellModel([]int{5, 5}, false)
+	result := m.joinCellLines([]string{"hello", "world"}, []int{0, 1})
+	expected := "helloworld"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestJoinCellLines_SingleLineCells_WithBorder(t *testing.T) {
+	m := newJoinCellModel([]int{5, 5}, true)
+	result := m.joinCellLines([]string{"hello", "world"}, []int{0, 1})
+	expected := "hello│world"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestJoinCellLines_MultiLineSameHeight_WithBorder(t *testing.T) {
+	m := newJoinCellModel([]int{5, 5}, true)
+	cells := []string{"line1\nline2", "col_1\ncol_2"}
+	result := m.joinCellLines(cells, []int{0, 1})
+	expected := "line1│col_1\nline2│col_2"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestJoinCellLines_MultiLineSameHeight_NoBorder(t *testing.T) {
+	m := newJoinCellModel([]int{5, 5}, false)
+	cells := []string{"line1\nline2", "col_1\ncol_2"}
+	result := m.joinCellLines(cells, []int{0, 1})
+	expected := "line1col_1\nline2col_2"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestJoinCellLines_DifferentHeights_TallerFirst(t *testing.T) {
+	m := newJoinCellModel([]int{5, 5}, true)
+	// First cell has 3 lines, second has 1 line
+	cells := []string{"aaa  \nbbb  \nccc  ", "xxxxx"}
+	result := m.joinCellLines(cells, []int{0, 1})
+	lines := strings.Split(result, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 output lines, got %d: %q", len(lines), result)
+	}
+	// Line 0: both cells have content
+	if lines[0] != "aaa  │xxxxx" {
+		t.Errorf("line 0: expected %q, got %q", "aaa  │xxxxx", lines[0])
+	}
+	// Lines 1-2: second cell should be padded to width 5
+	if lines[1] != "bbb  │     " {
+		t.Errorf("line 1: expected %q, got %q", "bbb  │     ", lines[1])
+	}
+	if lines[2] != "ccc  │     " {
+		t.Errorf("line 2: expected %q, got %q", "ccc  │     ", lines[2])
+	}
+}
+
+func TestJoinCellLines_DifferentHeights_TallerSecond(t *testing.T) {
+	m := newJoinCellModel([]int{4, 6}, true)
+	// First cell has 1 line, second has 3 lines
+	cells := []string{"aaaa", "bbb   \nccc   \nddd   "}
+	result := m.joinCellLines(cells, []int{0, 1})
+	lines := strings.Split(result, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 output lines, got %d: %q", len(lines), result)
+	}
+	if lines[0] != "aaaa│bbb   " {
+		t.Errorf("line 0: expected %q, got %q", "aaaa│bbb   ", lines[0])
+	}
+	// Lines 1-2: first cell padded to width 4
+	if lines[1] != "    │ccc   " {
+		t.Errorf("line 1: expected %q, got %q", "    │ccc   ", lines[1])
+	}
+	if lines[2] != "    │ddd   " {
+		t.Errorf("line 2: expected %q, got %q", "    │ddd   ", lines[2])
+	}
+}
+
+func TestJoinCellLines_ThreeColumns_MixedHeights(t *testing.T) {
+	m := newJoinCellModel([]int{3, 3, 3}, true)
+	// col0: 1 line, col1: 3 lines, col2: 2 lines
+	cells := []string{"aaa", "bbb\nccc\nddd", "eee\nfff"}
+	result := m.joinCellLines(cells, []int{0, 1, 2})
+	lines := strings.Split(result, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 output lines, got %d: %q", len(lines), result)
+	}
+	if lines[0] != "aaa│bbb│eee" {
+		t.Errorf("line 0: expected %q, got %q", "aaa│bbb│eee", lines[0])
+	}
+	if lines[1] != "   │ccc│fff" {
+		t.Errorf("line 1: expected %q, got %q", "   │ccc│fff", lines[1])
+	}
+	if lines[2] != "   │ddd│   " {
+		t.Errorf("line 2: expected %q, got %q", "   │ddd│   ", lines[2])
+	}
+}
+
+func TestJoinCellLines_ThreeColumns_NoBorder_MixedHeights(t *testing.T) {
+	m := newJoinCellModel([]int{3, 3, 3}, false)
+	cells := []string{"aaa", "bbb\nccc\nddd", "eee\nfff"}
+	result := m.joinCellLines(cells, []int{0, 1, 2})
+	lines := strings.Split(result, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 output lines, got %d: %q", len(lines), result)
+	}
+	if lines[0] != "aaabbbeee" {
+		t.Errorf("line 0: expected %q, got %q", "aaabbbeee", lines[0])
+	}
+	if lines[1] != "   cccfff" {
+		t.Errorf("line 1: expected %q, got %q", "   cccfff", lines[1])
+	}
+	if lines[2] != "   ddd   " {
+		t.Errorf("line 2: expected %q, got %q", "   ddd   ", lines[2])
+	}
+}
+
+func TestJoinCellLines_SingleCell_MultiLine(t *testing.T) {
+	m := newJoinCellModel([]int{5}, true)
+	cells := []string{"hello\nworld"}
+	result := m.joinCellLines(cells, []int{0})
+	expected := "hello\nworld"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestJoinCellLines_EmptyCells(t *testing.T) {
+	m := newJoinCellModel([]int{3, 3}, true)
+	cells := []string{"", ""}
+	result := m.joinCellLines(cells, []int{0, 1})
+	expected := "│"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestJoinCellLines_OneEmptyOneMultiLine(t *testing.T) {
+	m := newJoinCellModel([]int{3, 3}, true)
+	cells := []string{"", "abc\ndef"}
+	result := m.joinCellLines(cells, []int{0, 1})
+	lines := strings.Split(result, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 output lines, got %d: %q", len(lines), result)
+	}
+	if lines[0] != "│abc" {
+		t.Errorf("line 0: expected %q, got %q", "│abc", lines[0])
+	}
+	if lines[1] != "   │def" {
+		t.Errorf("line 1: expected %q, got %q", "   │def", lines[1])
+	}
+}
+
+func TestJoinCellLines_NonContiguousColIndices(t *testing.T) {
+	// colWidths has entries for cols 0,1,2,3 but we only use cols 1 and 3
+	m := newJoinCellModel([]int{2, 4, 2, 6}, true)
+	cells := []string{"aaaa", "bbbbbb\ncccccc"}
+	result := m.joinCellLines(cells, []int{1, 3})
+	lines := strings.Split(result, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 output lines, got %d: %q", len(lines), result)
+	}
+	if lines[0] != "aaaa│bbbbbb" {
+		t.Errorf("line 0: expected %q, got %q", "aaaa│bbbbbb", lines[0])
+	}
+	// First cell padded to width of colWidths[1]=4
+	if lines[1] != "    │cccccc" {
+		t.Errorf("line 1: expected %q, got %q", "    │cccccc", lines[1])
+	}
+}
+
+func TestJoinCellLines_DifferentWidthPadding(t *testing.T) {
+	m := newJoinCellModel([]int{3, 7}, true)
+	cells := []string{"abc\ndef\nghi", "1234567"}
+	result := m.joinCellLines(cells, []int{0, 1})
+	lines := strings.Split(result, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 output lines, got %d: %q", len(lines), result)
+	}
+	if lines[0] != "abc│1234567" {
+		t.Errorf("line 0: expected %q, got %q", "abc│1234567", lines[0])
+	}
+	// Second cell padded to width 7
+	if lines[1] != "def│       " {
+		t.Errorf("line 1: expected %q, got %q", "def│       ", lines[1])
+	}
+	if lines[2] != "ghi│       " {
+		t.Errorf("line 2: expected %q, got %q", "ghi│       ", lines[2])
+	}
+}
+
+func TestJoinCellLines_ZeroWidthColumn(t *testing.T) {
+	m := newJoinCellModel([]int{5, 0}, true)
+	cells := []string{"hello\nworld", ""}
+	result := m.joinCellLines(cells, []int{0, 1})
+	lines := strings.Split(result, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 output lines, got %d: %q", len(lines), result)
+	}
+	// Second cell is zero-width, so padding is empty string
+	if lines[0] != "hello│" {
+		t.Errorf("line 0: expected %q, got %q", "hello│", lines[0])
+	}
+	if lines[1] != "world│" {
+		t.Errorf("line 1: expected %q, got %q", "world│", lines[1])
+	}
+}
+
+func TestJoinCellLines_AllMultiLine_SameHeight(t *testing.T) {
+	m := newJoinCellModel([]int{2, 2, 2}, true)
+	cells := []string{"a1\na2", "b1\nb2", "c1\nc2"}
+	result := m.joinCellLines(cells, []int{0, 1, 2})
+	lines := strings.Split(result, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 output lines, got %d: %q", len(lines), result)
+	}
+	if lines[0] != "a1│b1│c1" {
+		t.Errorf("line 0: expected %q, got %q", "a1│b1│c1", lines[0])
+	}
+	if lines[1] != "a2│b2│c2" {
+		t.Errorf("line 1: expected %q, got %q", "a2│b2│c2", lines[1])
+	}
+}
+
+func TestJoinCellLines_FastPath_NoNewlines(t *testing.T) {
+	m := newJoinCellModel([]int{5, 5, 5}, true)
+	cells := []string{"aaaaa", "bbbbb", "ccccc"}
+	result := m.joinCellLines(cells, []int{0, 1, 2})
+	expected := "aaaaa│bbbbb│ccccc"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+	// Verify no newlines in output (fast path)
+	if strings.Contains(result, "\n") {
+		t.Error("expected no newlines in fast path output")
+	}
+}
+
+// Integration test: multi-line CellRenderer with View() output
+func TestRender_MultiLineCellRenderer_WithBorder(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{
+			ColumnID:   "Name",
+			HeaderName: "Name",
+			ValueGetter: func(r TestRow) any { return r.Name },
+			Width:      10,
+			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
+				return fmt.Sprintf("%s\n(%s)", ctx.Value, "info")
+			}),
+		},
+		{
+			ColumnID:    "Dept",
+			HeaderName:  "Dept",
+			ValueGetter: func(r TestRow) any { return r.Department },
+			Width:       10,
+		},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = true
+	m := New[TestRow](
+		WithColumns[TestRow](cols),
+		WithRows[TestRow](testData()),
+		WithWidth[TestRow](21), // 10 + 1 (separator) + 10
+		WithHeight[TestRow](20),
+		WithRowHeight[TestRow](2),
+		WithFocused[TestRow](true),
+	)
+	output := m.View()
+	if output == "" {
+		t.Fatal("expected non-empty output")
+	}
+	lines := strings.Split(output, "\n")
+	// Multi-line cells should produce at least 2 lines per data row (5 rows * 2 = 10 data lines)
+	// plus header and separator line = at least 12 lines with content
+	nonEmptyLines := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			nonEmptyLines++
+		}
+	}
+	// 5 rows * 2 lines each + 1 header + 1 separator = 12 minimum
+	if nonEmptyLines < 12 {
+		t.Errorf("expected at least 12 non-empty lines for 5 rows with 2-line cells, got %d\noutput:\n%s", nonEmptyLines, output)
+	}
+}
+
+// Integration test: multi-line CellRenderer with no border
+func TestRender_MultiLineCellRenderer_NoBorder(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{
+			ColumnID:   "Name",
+			HeaderName: "Name",
+			ValueGetter: func(r TestRow) any { return r.Name },
+			Width:      10,
+			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
+				return fmt.Sprintf("%s\nline2", ctx.Value)
+			}),
+		},
+		{
+			ColumnID:    "Dept",
+			HeaderName:  "Dept",
+			ValueGetter: func(r TestRow) any { return r.Department },
+			Width:       10,
+		},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New[TestRow](
+		WithColumns[TestRow](cols),
+		WithRows[TestRow](testData()[:1]), // Just Alice
+		WithWidth[TestRow](20),
+		WithHeight[TestRow](10),
+		WithRowHeight[TestRow](2),
+		WithFocused[TestRow](true),
+	)
+	output := m.View()
+	// Should render without panicking
+	if output == "" {
+		t.Error("expected non-empty output")
+	}
+}
+
+// Integration test: multi-line cells with pinned columns
+func TestRender_MultiLineCellRenderer_PinnedColumns(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{
+			ColumnID:   "Name",
+			HeaderName: "Name",
+			ValueGetter: func(r TestRow) any { return r.Name },
+			Width:      10,
+			Pinned:     data.PinLeft,
+			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
+				return fmt.Sprintf("%s\ndetail", ctx.Value)
+			}),
+		},
+		{
+			ColumnID:    "Dept",
+			HeaderName:  "Dept",
+			ValueGetter: func(r TestRow) any { return r.Department },
+			Width:       10,
+		},
+		{
+			ColumnID:    "Active",
+			HeaderName:  "Active",
+			ValueGetter: func(r TestRow) any { return r.Active },
+			Width:       10,
+			Pinned:      data.PinRight,
+		},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = true
+	m := New[TestRow](
+		WithColumns[TestRow](cols),
+		WithRows[TestRow](testData()[:2]),
+		WithWidth[TestRow](32),
+		WithHeight[TestRow](10),
+		WithRowHeight[TestRow](2),
+		WithFocused[TestRow](true),
+	)
+	output := m.View()
+	if output == "" {
+		t.Error("expected non-empty output")
+	}
+	// Should have separators in multi-line output
+	if !strings.Contains(output, "│") {
+		t.Error("expected │ separators in pinned column multi-line output")
+	}
+}
+
+func TestJoinCellLines_FourColumns_OnlyOneMultiLine(t *testing.T) {
+	m := newJoinCellModel([]int{3, 3, 3, 3}, true)
+	cells := []string{"aaa", "bbb", "cc1\ncc2\ncc3", "ddd"}
+	result := m.joinCellLines(cells, []int{0, 1, 2, 3})
+	lines := strings.Split(result, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 output lines, got %d: %q", len(lines), result)
+	}
+	if lines[0] != "aaa│bbb│cc1│ddd" {
+		t.Errorf("line 0: expected %q, got %q", "aaa│bbb│cc1│ddd", lines[0])
+	}
+	if lines[1] != "   │   │cc2│   " {
+		t.Errorf("line 1: expected %q, got %q", "   │   │cc2│   ", lines[1])
+	}
+	if lines[2] != "   │   │cc3│   " {
+		t.Errorf("line 2: expected %q, got %q", "   │   │cc3│   ", lines[2])
+	}
+}
