@@ -277,6 +277,11 @@ func (m Model[T]) renderRow(rn *data.RowNode[T], displayIndex int, isPinned bool
 func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayIndex int, isPinned bool) string {
 	var cells []string
 
+	rowHeight := rn.RowHeight
+	if rowHeight < 1 {
+		rowHeight = 1
+	}
+
 	skipUntil := -1
 	for _, idx := range colIndices {
 		if idx < skipUntil {
@@ -320,7 +325,7 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 		// Check if this cell is being edited
 		if m.editState != nil && m.editState.position.Row == displayIndex && m.editState.position.Col == idx {
 			editorView := m.editState.editor.View()
-			cells = append(cells, m.styles.EditorInput.Width(w).MaxWidth(w).Render(editorView))
+			cells = append(cells, m.styles.EditorInput.Width(w).MaxWidth(w).Height(rowHeight).Render(editorView))
 			continue
 		}
 
@@ -360,10 +365,6 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 
 		// Use custom renderer if available, otherwise default to formatted text
 		cellContent := formatted
-		rowHeight := rn.RowHeight
-		if rowHeight < 1 {
-			rowHeight = 1
-		}
 		ctx := data.CellContext[T]{
 			Value:          val,
 			FormattedValue: formatted,
@@ -391,7 +392,7 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 			cellContent = ansi.Truncate(cellContent, contentWidth, "…")
 		}
 
-		cells = append(cells, style.Width(w).MaxWidth(w).Render(cellContent))
+		cells = append(cells, style.Width(w).MaxWidth(w).Height(rowHeight).Render(cellContent))
 	}
 
 	return m.joinCellLines(cells, colIndices)
