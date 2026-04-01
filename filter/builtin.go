@@ -247,8 +247,9 @@ func (f *NumberFilter) Clear() {
 
 // SetFilter includes/excludes from a set of distinct values.
 type SetFilter struct {
-	values    map[string]bool // value -> included
-	allValues []string
+	values        map[string]bool // value -> included
+	excludedCount int
+	allValues     []string
 
 	// Editing state
 	editing     bool
@@ -280,15 +281,22 @@ func (f *SetFilter) SetValues(values []string) {
 	for _, v := range values {
 		f.values[v] = true
 	}
+	f.excludedCount = 0
 }
 
 // Include marks a value as included in the filter.
 func (f *SetFilter) Include(value string) {
+	if !f.values[value] {
+		f.excludedCount--
+	}
 	f.values[value] = true
 }
 
 // Exclude marks a value as excluded from the filter.
 func (f *SetFilter) Exclude(value string) {
+	if f.values[value] {
+		f.excludedCount++
+	}
 	f.values[value] = false
 }
 
@@ -297,6 +305,7 @@ func (f *SetFilter) IncludeAll() {
 	for k := range f.values {
 		f.values[k] = true
 	}
+	f.excludedCount = 0
 }
 
 func (f *SetFilter) Matches(value any) bool {
@@ -418,7 +427,13 @@ func (f *SetFilter) updateListMode(msg tea.KeyPressMsg) (Filter, tea.Cmd) {
 					f.values[k] = false
 				}
 				f.values[val] = true
+				f.excludedCount = len(f.values) - 1
 			} else {
+				if f.values[val] {
+					f.excludedCount++
+				} else {
+					f.excludedCount--
+				}
 				f.values[val] = !f.values[val]
 			}
 		}
@@ -466,12 +481,7 @@ func (f *SetFilter) ensureVisible() {
 }
 
 func (f *SetFilter) Active() bool {
-	for _, included := range f.values {
-		if !included {
-			return true
-		}
-	}
-	return false
+	return f.excludedCount > 0
 }
 
 func (f *SetFilter) Clear() {

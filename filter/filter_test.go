@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -1474,5 +1475,418 @@ func TestBoolFilterViewEditingFalseState(t *testing.T) {
 	}
 	if !strings.Contains(v, "( ) True") {
 		t.Errorf("True radio should be empty in editing view, got %q", v)
+	}
+}
+
+// --- SetFilter excludedCount tracking ---
+
+func TestSetFilterExcludedCount_NewFilterStartsAtZero(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	if f.excludedCount != 0 {
+		t.Errorf("new filter excludedCount = %d, want 0", f.excludedCount)
+	}
+	if f.Active() {
+		t.Error("new filter should not be active")
+	}
+}
+
+func TestSetFilterExcludedCount_EmptyFilter(t *testing.T) {
+	f := NewSetFilter()
+	if f.excludedCount != 0 {
+		t.Errorf("empty filter excludedCount = %d, want 0", f.excludedCount)
+	}
+	if f.Active() {
+		t.Error("empty filter should not be active")
+	}
+}
+
+func TestSetFilterExcludedCount_SingleValue(t *testing.T) {
+	f := NewSetFilter("only")
+	f.Exclude("only")
+	if f.excludedCount != 1 {
+		t.Errorf("excludedCount = %d, want 1", f.excludedCount)
+	}
+	if !f.Active() {
+		t.Error("should be active with one excluded")
+	}
+	f.Include("only")
+	if f.excludedCount != 0 {
+		t.Errorf("excludedCount = %d, want 0", f.excludedCount)
+	}
+	if f.Active() {
+		t.Error("should not be active after re-including")
+	}
+}
+
+func TestSetFilterExcludedCount_ExcludeAll(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Exclude("a")
+	f.Exclude("b")
+	f.Exclude("c")
+	if f.excludedCount != 3 {
+		t.Errorf("excludedCount = %d, want 3", f.excludedCount)
+	}
+	if !f.Active() {
+		t.Error("should be active when all excluded")
+	}
+}
+
+func TestSetFilterExcludedCount_ExcludeIdempotent(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Exclude("a")
+	f.Exclude("a") // already excluded
+	f.Exclude("a") // still excluded
+	if f.excludedCount != 1 {
+		t.Errorf("repeated Exclude should not double-count: excludedCount = %d, want 1", f.excludedCount)
+	}
+}
+
+func TestSetFilterExcludedCount_IncludeIdempotent(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Include("a") // already included
+	f.Include("a") // still included
+	if f.excludedCount != 0 {
+		t.Errorf("repeated Include on included value should keep count at 0: excludedCount = %d, want 0", f.excludedCount)
+	}
+}
+
+func TestSetFilterExcludedCount_IncludeAlreadyIncluded(t *testing.T) {
+	f := NewSetFilter("a", "b")
+	f.Exclude("a")
+	// Include "b" which is already included
+	f.Include("b")
+	if f.excludedCount != 1 {
+		t.Errorf("excludedCount = %d, want 1 (only 'a' excluded)", f.excludedCount)
+	}
+	if !f.Active() {
+		t.Error("should still be active")
+	}
+}
+
+func TestSetFilterExcludedCount_ExcludeAlreadyExcluded(t *testing.T) {
+	f := NewSetFilter("a", "b")
+	f.Exclude("a")
+	f.Exclude("a") // already excluded
+	if f.excludedCount != 1 {
+		t.Errorf("excludedCount = %d, want 1", f.excludedCount)
+	}
+}
+
+func TestSetFilterExcludedCount_IncludeAll(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Exclude("a")
+	f.Exclude("b")
+	f.Exclude("c")
+	if f.excludedCount != 3 {
+		t.Errorf("before IncludeAll: excludedCount = %d, want 3", f.excludedCount)
+	}
+	f.IncludeAll()
+	if f.excludedCount != 0 {
+		t.Errorf("after IncludeAll: excludedCount = %d, want 0", f.excludedCount)
+	}
+	if f.Active() {
+		t.Error("should not be active after IncludeAll")
+	}
+}
+
+func TestSetFilterExcludedCount_IncludeAllWhenAlreadyAllIncluded(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.IncludeAll()
+	if f.excludedCount != 0 {
+		t.Errorf("excludedCount = %d, want 0", f.excludedCount)
+	}
+}
+
+func TestSetFilterExcludedCount_Clear(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Exclude("a")
+	f.Exclude("b")
+	f.Clear()
+	if f.excludedCount != 0 {
+		t.Errorf("after Clear: excludedCount = %d, want 0", f.excludedCount)
+	}
+	if f.Active() {
+		t.Error("should not be active after Clear")
+	}
+}
+
+func TestSetFilterExcludedCount_SetValuesResetsCount(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Exclude("a")
+	f.Exclude("b")
+	if f.excludedCount != 2 {
+		t.Errorf("before SetValues: excludedCount = %d, want 2", f.excludedCount)
+	}
+	f.SetValues([]string{"x", "y", "z"})
+	if f.excludedCount != 0 {
+		t.Errorf("after SetValues: excludedCount = %d, want 0", f.excludedCount)
+	}
+	if f.Active() {
+		t.Error("should not be active after SetValues")
+	}
+}
+
+func TestSetFilterExcludedCount_SetValuesThenExclude(t *testing.T) {
+	f := NewSetFilter("a", "b")
+	f.SetValues([]string{"x", "y", "z"})
+	f.Exclude("x")
+	if f.excludedCount != 1 {
+		t.Errorf("excludedCount = %d, want 1", f.excludedCount)
+	}
+	if !f.Active() {
+		t.Error("should be active")
+	}
+}
+
+func TestSetFilterExcludedCount_ExcludeThenIncludeSequence(t *testing.T) {
+	f := NewSetFilter("a", "b", "c", "d")
+
+	f.Exclude("a")
+	if f.excludedCount != 1 {
+		t.Fatalf("step 1: excludedCount = %d, want 1", f.excludedCount)
+	}
+	f.Exclude("b")
+	if f.excludedCount != 2 {
+		t.Fatalf("step 2: excludedCount = %d, want 2", f.excludedCount)
+	}
+	f.Include("a")
+	if f.excludedCount != 1 {
+		t.Fatalf("step 3: excludedCount = %d, want 1", f.excludedCount)
+	}
+	f.Exclude("c")
+	if f.excludedCount != 2 {
+		t.Fatalf("step 4: excludedCount = %d, want 2", f.excludedCount)
+	}
+	f.Include("b")
+	if f.excludedCount != 1 {
+		t.Fatalf("step 5: excludedCount = %d, want 1", f.excludedCount)
+	}
+	f.Include("c")
+	if f.excludedCount != 0 {
+		t.Fatalf("step 6: excludedCount = %d, want 0", f.excludedCount)
+	}
+	if f.Active() {
+		t.Error("should not be active when all included")
+	}
+}
+
+func TestSetFilterExcludedCount_ActiveConsistentWithMatches(t *testing.T) {
+	// Verify Active() and Matches() agree across many operations.
+	f := NewSetFilter("a", "b", "c")
+	assertConsistent := func(label string) {
+		t.Helper()
+		anyExcluded := !f.Matches("a") || !f.Matches("b") || !f.Matches("c")
+		if f.Active() != anyExcluded {
+			t.Errorf("%s: Active()=%v but anyExcluded=%v (excludedCount=%d)",
+				label, f.Active(), anyExcluded, f.excludedCount)
+		}
+	}
+
+	assertConsistent("initial")
+	f.Exclude("a")
+	assertConsistent("after exclude a")
+	f.Exclude("b")
+	assertConsistent("after exclude b")
+	f.Include("a")
+	assertConsistent("after include a")
+	f.IncludeAll()
+	assertConsistent("after IncludeAll")
+	f.Exclude("c")
+	assertConsistent("after exclude c")
+	f.Clear()
+	assertConsistent("after Clear")
+}
+
+func TestSetFilterExcludedCount_SpaceToggleInUpdate(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Update(FilterFocusMsg{Width: 30, MaxLines: 5})
+
+	// Enter list mode
+	f.Update(keyMsg(tea.KeyDown))
+
+	// Toggle "a" off
+	f.Update(keyMsg(tea.KeySpace))
+	if f.excludedCount != 1 {
+		t.Errorf("after toggling off: excludedCount = %d, want 1", f.excludedCount)
+	}
+	if !f.Active() {
+		t.Error("should be active after toggling off")
+	}
+
+	// Toggle "a" back on
+	f.Update(keyMsg(tea.KeySpace))
+	if f.excludedCount != 0 {
+		t.Errorf("after toggling back on: excludedCount = %d, want 0", f.excludedCount)
+	}
+	if f.Active() {
+		t.Error("should not be active after toggling back on")
+	}
+}
+
+func TestSetFilterExcludedCount_SpaceToggleMultipleItems(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Update(FilterFocusMsg{Width: 30, MaxLines: 5})
+
+	// Enter list mode, toggle "a" off
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(keyMsg(tea.KeySpace))
+
+	// Move to "b", toggle off
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(keyMsg(tea.KeySpace))
+
+	if f.excludedCount != 2 {
+		t.Errorf("after toggling two off: excludedCount = %d, want 2", f.excludedCount)
+	}
+
+	// Toggle "b" back on
+	f.Update(keyMsg(tea.KeySpace))
+	if f.excludedCount != 1 {
+		t.Errorf("after toggling one back on: excludedCount = %d, want 1", f.excludedCount)
+	}
+}
+
+func TestSetFilterExcludedCount_CtrlSpaceInUpdate(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Update(FilterFocusMsg{Width: 30, MaxLines: 5})
+
+	// Enter list mode, move to "b"
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(keyMsg(tea.KeyDown))
+
+	// Ctrl+Space selects only "b"
+	f.Update(tea.KeyPressMsg{Code: tea.KeySpace, Mod: tea.ModCtrl})
+
+	if f.excludedCount != 2 {
+		t.Errorf("after Ctrl+Space: excludedCount = %d, want 2", f.excludedCount)
+	}
+	if !f.Active() {
+		t.Error("should be active after Ctrl+Space")
+	}
+}
+
+func TestSetFilterExcludedCount_CtrlSpaceThenToggle(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Update(FilterFocusMsg{Width: 30, MaxLines: 5})
+
+	// Enter list mode, Ctrl+Space on "a" (first item)
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(tea.KeyPressMsg{Code: tea.KeySpace, Mod: tea.ModCtrl})
+	if f.excludedCount != 2 {
+		t.Fatalf("after Ctrl+Space: excludedCount = %d, want 2", f.excludedCount)
+	}
+
+	// Move to "b", toggle it on
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(keyMsg(tea.KeySpace))
+	if f.excludedCount != 1 {
+		t.Errorf("after toggling 'b' on: excludedCount = %d, want 1", f.excludedCount)
+	}
+
+	// Move to "c", toggle it on
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(keyMsg(tea.KeySpace))
+	if f.excludedCount != 0 {
+		t.Errorf("after toggling 'c' on: excludedCount = %d, want 0", f.excludedCount)
+	}
+	if f.Active() {
+		t.Error("should not be active when all included")
+	}
+}
+
+func TestSetFilterExcludedCount_CtrlSpaceOnSingleValueFilter(t *testing.T) {
+	f := NewSetFilter("only")
+	f.Update(FilterFocusMsg{Width: 30, MaxLines: 5})
+
+	// Enter list mode, Ctrl+Space on "only"
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(tea.KeyPressMsg{Code: tea.KeySpace, Mod: tea.ModCtrl})
+
+	// With only one value, selecting only it means excludedCount = 0
+	if f.excludedCount != 0 {
+		t.Errorf("Ctrl+Space on single-value filter: excludedCount = %d, want 0", f.excludedCount)
+	}
+	if f.Active() {
+		t.Error("should not be active when only value is selected")
+	}
+}
+
+func TestSetFilterExcludedCount_CtrlSpaceRepeated(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Update(FilterFocusMsg{Width: 30, MaxLines: 5})
+
+	// Enter list mode
+	f.Update(keyMsg(tea.KeyDown))
+
+	// Ctrl+Space on "a"
+	f.Update(tea.KeyPressMsg{Code: tea.KeySpace, Mod: tea.ModCtrl})
+	if f.excludedCount != 2 {
+		t.Fatalf("first Ctrl+Space: excludedCount = %d, want 2", f.excludedCount)
+	}
+
+	// Move to "b", Ctrl+Space again
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(tea.KeyPressMsg{Code: tea.KeySpace, Mod: tea.ModCtrl})
+	if f.excludedCount != 2 {
+		t.Errorf("second Ctrl+Space: excludedCount = %d, want 2", f.excludedCount)
+	}
+
+	// Move to "c", Ctrl+Space again
+	f.Update(keyMsg(tea.KeyDown))
+	f.Update(tea.KeyPressMsg{Code: tea.KeySpace, Mod: tea.ModCtrl})
+	if f.excludedCount != 2 {
+		t.Errorf("third Ctrl+Space: excludedCount = %d, want 2", f.excludedCount)
+	}
+}
+
+func TestSetFilterExcludedCount_ExcludeThenSetValues(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	f.Exclude("a")
+	f.Exclude("b")
+	f.Exclude("c")
+	if f.excludedCount != 3 {
+		t.Fatalf("before SetValues: excludedCount = %d, want 3", f.excludedCount)
+	}
+
+	// SetValues with different count of values
+	f.SetValues([]string{"x", "y"})
+	if f.excludedCount != 0 {
+		t.Errorf("after SetValues: excludedCount = %d, want 0", f.excludedCount)
+	}
+
+	// Now exclude from new values
+	f.Exclude("x")
+	if f.excludedCount != 1 {
+		t.Errorf("after excluding from new values: excludedCount = %d, want 1", f.excludedCount)
+	}
+}
+
+func TestSetFilterExcludedCount_LargeValueSet(t *testing.T) {
+	values := make([]string, 100)
+	for i := range values {
+		values[i] = fmt.Sprintf("val%d", i)
+	}
+	f := NewSetFilter(values...)
+
+	// Exclude all
+	for _, v := range values {
+		f.Exclude(v)
+	}
+	if f.excludedCount != 100 {
+		t.Errorf("after excluding all 100: excludedCount = %d, want 100", f.excludedCount)
+	}
+
+	// Include half
+	for _, v := range values[:50] {
+		f.Include(v)
+	}
+	if f.excludedCount != 50 {
+		t.Errorf("after including 50: excludedCount = %d, want 50", f.excludedCount)
+	}
+
+	// IncludeAll
+	f.IncludeAll()
+	if f.excludedCount != 0 {
+		t.Errorf("after IncludeAll: excludedCount = %d, want 0", f.excludedCount)
 	}
 }
