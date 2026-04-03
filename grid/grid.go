@@ -62,11 +62,12 @@ type Model[T any] struct {
 	postSort  func([]data.RowNode[T]) []data.RowNode[T]
 
 	// Filtering
-	quickFilterEnabled bool
-	quickFilterText    string
-	quickFilterActive  bool
-	filterEditColIdx   int // -1 = no filter editor active
-	externalFilter     func(T) bool
+	quickFilterEnabled  bool
+	quickFilterText     string
+	quickFilterActive   bool
+	quickFilterBuilder  strings.Builder // reused across rows in passesQuickFilter
+	filterEditColIdx    int             // -1 = no filter editor active
+	externalFilter      func(T) bool
 	// Cached list of column indices with active filters (rebuilt at start of each recompute)
 	activeFilters []int
 
@@ -809,6 +810,12 @@ func (m *Model[T]) recomputeDisplayRows() {
 
 	m.rebuildActiveFilters()
 
+	// Pre-compute quick filter words once per recompute pass (not per row).
+	var quickFilterWords []string
+	if m.quickFilterText != "" {
+		quickFilterWords = strings.Fields(strings.ToLower(m.quickFilterText))
+	}
+
 	// Start with all rows
 	filtered := make([]data.RowNode[T], 0, len(m.rows))
 
@@ -852,7 +859,7 @@ func (m *Model[T]) recomputeDisplayRows() {
 		}
 
 		// Apply quick filter
-		if m.quickFilterText != "" && !m.passesQuickFilter(rn.Data) {
+		if len(quickFilterWords) > 0 && !m.passesQuickFilter(rn.Data, quickFilterWords) {
 			continue
 		}
 
@@ -943,22 +950,16 @@ func (m *Model[T]) passesColumnFilters(data T) bool {
 	return true
 }
 
-func (m *Model[T]) passesQuickFilter(data T) bool {
-	words := strings.Fields(strings.ToLower(m.quickFilterText))
-	if len(words) == 0 {
-		return true
-	}
-
-	// Build a string of all column values
-	var rowText strings.Builder
+func (m *Model[T]) passesQuickFilter(data T, words []string) bool {
+	m.quickFilterBuilder.Reset()
 	for _, col := range m.cols {
 		if col.ValueGetter == nil {
 			continue
 		}
 		val := col.ValueGetter(data)
-		fmt.Fprintf(&rowText, " %v", val)
+		fmt.Fprintf(&m.quickFilterBuilder, " %v", val)
 	}
-	lower := strings.ToLower(rowText.String())
+	lower := strings.ToLower(m.quickFilterBuilder.String())
 
 	for _, word := range words {
 		if !strings.Contains(lower, word) {
