@@ -828,7 +828,8 @@ func (m *Model[T]) recomputeDisplayRows() {
 
 	if !m.filterDirty && m.cachedFiltered != nil && m.filterEditColIdx == m.cachedFilterEditColIdx {
 		// Filter state unchanged — reuse cached results.
-		filtered = m.cachedFiltered
+		// Copy the slice to avoid sortRows mutating the cache in-place.
+		filtered = append([]*data.RowNode[T](nil), m.cachedFiltered...)
 		// Rebuild pinned rows from source since pin state may have changed.
 		m.pinnedTop = nil
 		m.pinnedBot = nil
