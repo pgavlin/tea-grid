@@ -13,8 +13,6 @@ import (
 
 // Update handles messages and returns the updated model.
 func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
-	m.recomputeDisplayRows()
-
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
