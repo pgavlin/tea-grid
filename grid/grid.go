@@ -67,6 +67,8 @@ type Model[T any] struct {
 	quickFilterActive  bool
 	filterEditColIdx   int // -1 = no filter editor active
 	externalFilter     func(T) bool
+	// Cached list of column indices with active filters (rebuilt at start of each recompute)
+	activeFilters []int
 
 	// Grouping
 	groupModel grouping.Model[T]
@@ -805,6 +807,8 @@ func (m *Model[T]) recomputeDisplayRows() {
 		return
 	}
 
+	m.rebuildActiveFilters()
+
 	// Start with all rows
 	filtered := make([]data.RowNode[T], 0, len(m.rows))
 
@@ -915,14 +919,22 @@ func (m *Model[T]) precomputeAggValues() {
 	}
 }
 
-func (m *Model[T]) passesColumnFilters(data T) bool {
+// rebuildActiveFilters updates the cached list of column indices with active filters.
+func (m *Model[T]) rebuildActiveFilters() {
+	m.activeFilters = m.activeFilters[:0]
 	for i, col := range m.cols {
 		if i == m.filterEditColIdx {
-			continue // skip the column being edited
-		}
-		if col.Filter == nil || !col.Filter.Active() {
 			continue
 		}
+		if col.Filter != nil && col.Filter.Active() {
+			m.activeFilters = append(m.activeFilters, i)
+		}
+	}
+}
+
+func (m *Model[T]) passesColumnFilters(data T) bool {
+	for _, i := range m.activeFilters {
+		col := m.cols[i]
 		val := col.ValueGetter(data)
 		if !col.Filter.Matches(val) {
 			return false
