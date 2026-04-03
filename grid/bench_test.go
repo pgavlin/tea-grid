@@ -8,6 +8,7 @@ import (
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
+	"github.com/pgavlin/tea-grid/selection"
 	gridsort "github.com/pgavlin/tea-grid/sort"
 )
 
@@ -397,6 +398,174 @@ func BenchmarkRecomputeDisplayRows_ColumnFilters_AllActive(b *testing.B) {
 			for range b.N {
 				m.dirty = true
 				m.recomputeDisplayRows()
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// View() rendering
+//
+// Benchmarks the rendering hot path. The viewport is fixed (120×40,
+// ≈38 visible rows); total row count affects only recompute, not render.
+// ---------------------------------------------------------------------------
+
+func BenchmarkView_Plain(b *testing.B) {
+	rows := makeBenchRows(10_000)
+	m := newBenchGrid(rows)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for range b.N {
+		_ = m.View()
+	}
+}
+
+func BenchmarkView_WithSort(b *testing.B) {
+	rows := makeBenchRows(10_000)
+	m := newBenchGrid(rows,
+		WithDefaultSort[benchRow]([]gridsort.SortCriterion{
+			{ColumnID: "Salary", Direction: data.SortAsc},
+		}),
+	)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for range b.N {
+		_ = m.View()
+	}
+}
+
+func BenchmarkView_WithGrouping(b *testing.B) {
+	rows := makeBenchRows(10_000)
+	m := newBenchGrid(rows,
+		WithGrouping[benchRow]("Department"),
+	)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for range b.N {
+		_ = m.View()
+	}
+}
+
+func BenchmarkView_WithSelection(b *testing.B) {
+	rows := makeBenchRows(10_000)
+	m := newBenchGrid(rows,
+		WithSelection[benchRow](selection.SelectMulti),
+	)
+	m.SelectAllRows()
+	b.ResetTimer()
+	b.ReportAllocs()
+	for range b.N {
+		_ = m.View()
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Filter cold path — re-evaluation without cache
+//
+// Complements the existing filter benchmarks (which hit the cache after
+// iteration 1) by forcing filterDirty=true each iteration to measure the
+// actual cost of running filters across all rows.
+// ---------------------------------------------------------------------------
+
+func BenchmarkRecomputeDisplayRows_ColumnFilter_Cold(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			tf := filter.NewTextFilter()
+			tf.SetText("eng")
+			m := newBenchGrid(rows,
+				WithColumnFilter[benchRow]("Department", tf),
+			)
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				m.dirty = true
+				m.filterDirty = true
+				m.recomputeDisplayRows()
+			}
+		})
+	}
+}
+
+func BenchmarkRecomputeDisplayRows_QuickFilter_Cold(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			m := newBenchGrid(rows,
+				WithQuickFilterText[benchRow]("engineering"),
+			)
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				m.dirty = true
+				m.filterDirty = true
+				m.recomputeDisplayRows()
+			}
+		})
+	}
+}
+
+func BenchmarkRecomputeDisplayRows_Full_Cold(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			tf := filter.NewTextFilter()
+			tf.SetText("eng")
+			m := newBenchGrid(rows,
+				WithColumnFilter[benchRow]("Department", tf),
+				WithQuickFilterText[benchRow]("person"),
+				WithDefaultSort[benchRow]([]gridsort.SortCriterion{
+					{ColumnID: "Salary", Direction: data.SortAsc},
+				}),
+				WithGrouping[benchRow]("City"),
+			)
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				m.dirty = true
+				m.filterDirty = true
+				m.recomputeDisplayRows()
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SelectedRows / SelectedRowNodes — selection materialization
+//
+// Benchmarks the cost of iterating displayRows and building the result slice,
+// with a full (100%) selection to exercise the worst-case allocation path.
+// ---------------------------------------------------------------------------
+
+func BenchmarkSelectedRows(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			m := newBenchGrid(rows,
+				WithSelection[benchRow](selection.SelectMulti),
+			)
+			m.SelectAllRows()
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				_ = m.SelectedRows()
+			}
+		})
+	}
+}
+
+func BenchmarkSelectedRowNodes(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			m := newBenchGrid(rows,
+				WithSelection[benchRow](selection.SelectMulti),
+			)
+			m.SelectAllRows()
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				_ = m.SelectedRowNodes()
 			}
 		})
 	}
