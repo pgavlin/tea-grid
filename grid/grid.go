@@ -70,6 +70,10 @@ type Model[T any] struct {
 	externalFilter      func(T) bool
 	// Cached list of column indices with active filters (rebuilt at start of each recompute)
 	activeFilters []int
+	// Filter result cache
+	filterDirty           bool
+	cachedFiltered        []*data.RowNode[T]
+	cachedFilterEditColIdx int // filterEditColIdx when cachedFiltered was built
 
 	// Grouping
 	groupModel grouping.Model[T]
@@ -114,16 +118,18 @@ type Model[T any] struct {
 // New creates a new grid model with the given options.
 func New[T any](opts ...Option[T]) Model[T] {
 	m := Model[T]{
-		KeyMap:           DefaultKeyMap(),
-		Help:             help.New(),
-		styles:           DefaultStyles(),
-		vp:               newViewport(),
-		sel:              selection.New(selection.SelectNone),
-		groupModel:       grouping.Model[T]{Expanded: make(map[string]bool), DefaultExpanded: -1},
-		defaultRowHeight: 1,
-		dirty:            true,
-		focusedCell:      CellPosition{Row: 0, Col: 0},
-		filterEditColIdx: -1,
+		KeyMap:                 DefaultKeyMap(),
+		Help:                   help.New(),
+		styles:                 DefaultStyles(),
+		vp:                     newViewport(),
+		sel:                    selection.New(selection.SelectNone),
+		groupModel:             grouping.Model[T]{Expanded: make(map[string]bool), DefaultExpanded: -1},
+		defaultRowHeight:       1,
+		dirty:                  true,
+		filterDirty:            true,
+		focusedCell:            CellPosition{Row: 0, Col: 0},
+		filterEditColIdx:       -1,
+		cachedFilterEditColIdx: -1,
 	}
 
 	for _, opt := range opts {
@@ -192,6 +198,7 @@ func (m Model[T]) Rows() []T {
 func (m *Model[T]) SetColumns(cols []data.Column[T]) {
 	m.cols = cols
 	m.dirty = true
+	m.filterDirty = true
 	m.recomputeDisplayRows()
 	m.computeColWidths()
 }
@@ -207,6 +214,7 @@ func (m *Model[T]) UpdateRow(id string, d T) {
 		if m.rows[i].ID == id {
 			m.rows[i].Data = d
 			m.dirty = true
+			m.filterDirty = true
 			m.recomputeDisplayRows()
 			return
 		}
@@ -223,6 +231,7 @@ func (m *Model[T]) InsertRow(index int, d T) {
 		m.rows[index] = rn
 	}
 	m.dirty = true
+	m.filterDirty = true
 	m.recomputeDisplayRows()
 }
 
@@ -233,6 +242,7 @@ func (m *Model[T]) RemoveRow(id string) {
 			m.rows = append(m.rows[:i], m.rows[i+1:]...)
 			m.sel.Clear()
 			m.dirty = true
+			m.filterDirty = true
 			m.recomputeDisplayRows()
 			return
 		}
@@ -485,6 +495,7 @@ func (m Model[T]) SortOrder() []gridsort.SortCriterion {
 func (m *Model[T]) SetQuickFilter(text string) {
 	m.quickFilterText = text
 	m.dirty = true
+	m.filterDirty = true
 	m.recomputeDisplayRows()
 }
 
@@ -494,6 +505,7 @@ func (m *Model[T]) SetColumnFilter(colID string, f filter.Filter) {
 		if m.cols[i].ColumnID == colID {
 			m.cols[i].Filter = f
 			m.dirty = true
+			m.filterDirty = true
 			m.recomputeDisplayRows()
 			return
 		}
@@ -507,6 +519,7 @@ func (m *Model[T]) ClearFilters() {
 		m.cols[i].Filter = nil
 	}
 	m.dirty = true
+	m.filterDirty = true
 	m.recomputeDisplayRows()
 }
 
@@ -620,6 +633,7 @@ func (m *Model[T]) PinRow(id string, pos data.Pin) {
 		if m.rows[i].ID == id {
 			m.rows[i].Pinned = pos
 			m.dirty = true
+			m.filterDirty = true
 			m.recomputeDisplayRows()
 			return
 		}
@@ -693,6 +707,7 @@ func (m *Model[T]) setRowData(rows []T) {
 		m.rows[i] = rn
 	}
 	m.dirty = true
+	m.filterDirty = true
 }
 
 func (m *Model[T]) pruneSelection() {
@@ -809,93 +824,93 @@ func (m *Model[T]) recomputeDisplayRows() {
 
 	m.rebuildActiveFilters()
 
-	// Pre-compute quick filter words once per recompute pass (not per row).
-	var quickFilterWords []string
-	if m.quickFilterText != "" {
-		quickFilterWords = strings.Fields(strings.ToLower(m.quickFilterText))
+	var filtered []*data.RowNode[T]
+
+	if !m.filterDirty && m.cachedFiltered != nil && m.filterEditColIdx == m.cachedFilterEditColIdx {
+		// Filter state unchanged — reuse cached results.
+		filtered = m.cachedFiltered
+		// Rebuild pinned rows from source since pin state may have changed.
+		m.pinnedTop = nil
+		m.pinnedBot = nil
+		for _, rn := range m.rows {
+			if rn.Pinned == data.PinTop {
+				m.pinnedTop = append(m.pinnedTop, rn)
+			} else if rn.Pinned == data.PinBottom {
+				m.pinnedBot = append(m.pinnedBot, rn)
+			}
+		}
+		m.pinnedTop = append(m.pinnedTop, m.staticPinnedTopNodes...)
+		m.pinnedBot = append(m.pinnedBot, m.staticPinnedBotNodes...)
+	} else {
+		// Full filter pass.
+		var quickFilterWords []string
+		if m.quickFilterText != "" {
+			quickFilterWords = strings.Fields(strings.ToLower(m.quickFilterText))
+		}
+
+		filtered = make([]*data.RowNode[T], 0, len(m.rows))
+		m.pinnedTop = nil
+		m.pinnedBot = nil
+
+		for _, rn := range m.rows {
+			if rn.Pinned == data.PinTop {
+				m.pinnedTop = append(m.pinnedTop, rn)
+				continue
+			}
+			if rn.Pinned == data.PinBottom {
+				m.pinnedBot = append(m.pinnedBot, rn)
+				continue
+			}
+			if m.pinnedTopFunc != nil && m.pinnedTopFunc(rn.Data) {
+				rn.Pinned = data.PinTop
+				m.pinnedTop = append(m.pinnedTop, rn)
+				continue
+			}
+			if m.pinnedBotFunc != nil && m.pinnedBotFunc(rn.Data) {
+				rn.Pinned = data.PinBottom
+				m.pinnedBot = append(m.pinnedBot, rn)
+				continue
+			}
+			if m.externalFilter != nil && !m.externalFilter(rn.Data) {
+				continue
+			}
+			if !m.passesColumnFilters(rn.Data) {
+				continue
+			}
+			if len(quickFilterWords) > 0 && !m.passesQuickFilter(rn.Data, quickFilterWords) {
+				continue
+			}
+			filtered = append(filtered, rn)
+		}
+
+		m.pinnedTop = append(m.pinnedTop, m.staticPinnedTopNodes...)
+		m.pinnedBot = append(m.pinnedBot, m.staticPinnedBotNodes...)
+
+		m.cachedFiltered = filtered
+		m.cachedFilterEditColIdx = m.filterEditColIdx
+		m.filterDirty = false
 	}
 
-	// Start with all rows
-	filtered := make([]*data.RowNode[T], 0, len(m.rows))
-
-	// Separate pinned rows
-	m.pinnedTop = nil
-	m.pinnedBot = nil
-
-	for _, rn := range m.rows {
-		// Check static pinning
-		if rn.Pinned == data.PinTop {
-			m.pinnedTop = append(m.pinnedTop, rn)
-			continue
-		}
-		if rn.Pinned == data.PinBottom {
-			m.pinnedBot = append(m.pinnedBot, rn)
-			continue
-		}
-
-		// Check dynamic pinning
-		if m.pinnedTopFunc != nil && m.pinnedTopFunc(rn.Data) {
-			rn.Pinned = data.PinTop
-			m.pinnedTop = append(m.pinnedTop, rn)
-			continue
-		}
-		if m.pinnedBotFunc != nil && m.pinnedBotFunc(rn.Data) {
-			rn.Pinned = data.PinBottom
-			m.pinnedBot = append(m.pinnedBot, rn)
-			continue
-		}
-
-		// Apply external filter
-		if m.externalFilter != nil && !m.externalFilter(rn.Data) {
-			continue
-		}
-
-		// Apply column filters
-		if !m.passesColumnFilters(rn.Data) {
-			continue
-		}
-
-		// Apply quick filter
-		if len(quickFilterWords) > 0 && !m.passesQuickFilter(rn.Data, quickFilterWords) {
-			continue
-		}
-
-		filtered = append(filtered, rn)
-	}
-
-	// Add static pinned rows (using cached nodes for stable IDs)
-	m.pinnedTop = append(m.pinnedTop, m.staticPinnedTopNodes...)
-	m.pinnedBot = append(m.pinnedBot, m.staticPinnedBotNodes...)
-
-	// Grouping
+	// Group / sort / flatten (always runs when dirty)
 	if len(m.groupModel.GroupColumns) > 0 {
 		groups := grouping.BuildGroups(filtered, m.cols, m.groupModel.GroupColumns,
 			m.groupModel.Expanded, m.groupModel.DefaultExpanded)
-
-		// Sort within groups
 		m.sortGroups(groups)
-
-		// Flatten
 		m.displayRows = grouping.FlattenGroups(groups)
 	} else {
-		// Sort
 		m.sortRows(filtered)
 		m.displayRows = filtered
 	}
 
-	// Apply post-sort hook
 	if m.postSort != nil {
 		m.displayRows = m.postSort(m.displayRows)
 	}
 
-	// Update row indices
 	for i := range m.displayRows {
 		m.displayRows[i].RowIndex = i
 	}
 
-	// Pre-compute aggregation values for group nodes
 	m.precomputeAggValues()
-
 	m.dirty = false
 	m.updateViewportSize()
 }

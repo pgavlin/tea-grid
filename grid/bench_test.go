@@ -228,6 +228,32 @@ func BenchmarkRecomputeDisplayRows_Full(b *testing.B) {
 	}
 }
 
+// BenchmarkRecomputeDisplayRows_SortChangeOnly measures the cost of recompute
+// when only sort state changes (filter results should be cached).
+func BenchmarkRecomputeDisplayRows_SortChangeOnly(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			tf := filter.NewTextFilter()
+			tf.SetText("eng")
+			m := newBenchGrid(rows,
+				WithColumnFilter[benchRow]("Department", tf),
+				WithQuickFilterText[benchRow]("person"),
+				WithDefaultSort[benchRow]([]gridsort.SortCriterion{
+					{ColumnID: "Salary", Direction: data.SortAsc},
+				}),
+			)
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				// Simulate sort-only change: dirty=true but filterDirty=false.
+				m.dirty = true
+				m.recomputeDisplayRows()
+			}
+		})
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Issue #8: passesQuickFilter() allocates strings.Builder per row
 //

@@ -141,6 +141,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 				if m.quickFilterText != "" {
 					m.quickFilterText = ""
 					m.dirty = true
+					m.filterDirty = true
 					m.updateViewportSize()
 					return m, func() tea.Msg { return QuickFilterChangedMsg{Text: ""} }
 				}
@@ -324,6 +325,7 @@ func (m Model[T]) handleEditKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 
 		m.editState = nil
 		m.dirty = true
+		m.filterDirty = true
 		data := m.displayRows[pos.Row].Data
 
 		return m, tea.Batch(
@@ -363,6 +365,7 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cm
 		if m.quickFilterText != "" {
 			m.quickFilterText = ""
 			m.dirty = true
+			m.filterDirty = true
 			m.updateViewportSize()
 			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: ""} }
 		}
@@ -373,6 +376,7 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cm
 		if len(m.quickFilterText) > 0 {
 			m.quickFilterText = m.quickFilterText[:len(m.quickFilterText)-1]
 			m.dirty = true
+			m.filterDirty = true
 			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
 		}
 		return m, nil
@@ -380,6 +384,7 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cm
 	case tea.KeySpace:
 		m.quickFilterText += " "
 		m.dirty = true
+		m.filterDirty = true
 		return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
 
 	case tea.KeyEnter:
@@ -392,6 +397,7 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cm
 		if len(msg.Text) > 0 {
 			m.quickFilterText += msg.Text
 			m.dirty = true
+			m.filterDirty = true
 			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
 		}
 	}
@@ -415,6 +421,7 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd
 		m.cols[colIdx] = col
 		m.filterEditColIdx = -1
 		m.dirty = true
+		m.filterDirty = true
 		m.updateViewportSize()
 		return m, func() tea.Msg {
 			return FilterChangedMsg{ColumnID: col.ColumnID, Active: col.Filter.Active()}
@@ -427,6 +434,7 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd
 		m.cols[colIdx] = col
 		m.filterEditColIdx = -1
 		m.dirty = true
+		m.filterDirty = true
 		m.updateViewportSize()
 		return m, func() tea.Msg {
 			return FilterChangedMsg{ColumnID: col.ColumnID, Active: false}
@@ -478,6 +486,7 @@ func (m Model[T]) startFilterEdit() (Model[T], tea.Cmd) {
 	})
 	m.cols[colIdx].Filter = newFilter
 	m.filterEditColIdx = colIdx
+	m.filterDirty = true
 	m.updateViewportSize()
 
 	return m, cmd
