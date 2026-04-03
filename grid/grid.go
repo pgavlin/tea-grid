@@ -65,7 +65,7 @@ type Model[T any] struct {
 	quickFilterEnabled  bool
 	quickFilterText     string
 	quickFilterActive   bool
-	quickFilterBuilder  strings.Builder // reused across rows in passesQuickFilter
+	quickFilterScratch  []byte // scratch buffer reused across rows in passesQuickFilter
 	filterEditColIdx    int             // -1 = no filter editor active
 	externalFilter      func(T) bool
 	// Cached list of column indices with active filters (rebuilt at start of each recompute)
@@ -951,15 +951,15 @@ func (m *Model[T]) passesColumnFilters(data T) bool {
 }
 
 func (m *Model[T]) passesQuickFilter(data T, words []string) bool {
-	m.quickFilterBuilder.Reset()
+	m.quickFilterScratch = m.quickFilterScratch[:0]
 	for _, col := range m.cols {
 		if col.ValueGetter == nil {
 			continue
 		}
 		val := col.ValueGetter(data)
-		fmt.Fprintf(&m.quickFilterBuilder, " %v", val)
+		m.quickFilterScratch = fmt.Appendf(m.quickFilterScratch, " %v", val)
 	}
-	lower := strings.ToLower(m.quickFilterBuilder.String())
+	lower := strings.ToLower(string(m.quickFilterScratch))
 
 	for _, word := range words {
 		if !strings.Contains(lower, word) {
