@@ -1,7 +1,6 @@
 package grid
 
 import (
-	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/selection"
 	"github.com/pgavlin/tea-grid/sort"
 )
@@ -54,9 +53,9 @@ type FocusChangedMsg struct {
 }
 
 // SelectionChangedMsg is emitted when the selection set changes.
+// Use m.SelectedRows() or m.SelectedRowNodes() in the handler to materialize selected row data.
 type SelectionChangedMsg[T any] struct {
-	Regions  []SelectionRegion   // All current selection regions.
-	Selected []*data.RowNode[T]  // Rows covered by any selection (convenience).
+	Regions []SelectionRegion // All current selection regions.
 }
 
 // SortChangedMsg is emitted when the sort order changes.

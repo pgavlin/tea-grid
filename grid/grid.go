@@ -436,24 +436,11 @@ func (m Model[T]) SelectedRows() []T {
 // SelectedRowNodes returns the row nodes for all rows covered by the current selection.
 // For KindFullRow and KindRect, rows in the row range are included.
 // For KindFullCol, no rows are returned.
+//
+// The returned pointers reference live grid-internal state; fields like RowIndex, Pinned,
+// Parent, and AggValues are rewritten on every recompute. Do not retain these pointers
+// across Update calls. Use SelectedRows() instead if you only need the row data.
 func (m Model[T]) SelectedRowNodes() []*data.RowNode[T] {
-	if !m.sel.Active() {
-		return nil
-	}
-	var result []*data.RowNode[T]
-	for _, rn := range m.displayRows {
-		if rn.IsGroup {
-			continue
-		}
-		if m.isRowInSelection(rn.RowIndex) {
-			result = append(result, rn)
-		}
-	}
-	return result
-}
-
-// selectedRowNodes returns row nodes for all selected rows (used for emitting SelectionChangedMsg).
-func (m Model[T]) selectedRowNodes() []*data.RowNode[T] {
 	if !m.sel.Active() {
 		return nil
 	}

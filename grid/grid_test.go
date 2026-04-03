@@ -2993,7 +2993,7 @@ func TestSelection_MutualExclusivity_ShiftNavClearsRowAndCol(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// 5. selectedRowNodes (internal helper)
+// 5. SelectedRowNodes
 // -----------------------------------------------------------------------
 
 func TestSelectedRowNodes_Internal(t *testing.T) {
@@ -3010,7 +3010,7 @@ func TestSelectedRowNodes_Internal(t *testing.T) {
 	m.ToggleRowSelection("Bob")
 	m.ToggleRowSelection("Eve")
 
-	nodes := m.selectedRowNodes()
+	nodes := m.SelectedRowNodes()
 	if len(nodes) != 2 {
 		t.Fatalf("expected 2 selected row nodes, got %d", len(nodes))
 	}
@@ -3026,7 +3026,7 @@ func TestSelectedRowNodes_Internal(t *testing.T) {
 
 func TestSelectedRowNodes_EmptyWhenNoneSelected(t *testing.T) {
 	m := newTestGrid(WithSelection[TestRow](selection.SelectMulti))
-	nodes := m.selectedRowNodes()
+	nodes := m.SelectedRowNodes()
 	if len(nodes) != 0 {
 		t.Errorf("expected 0 selected row nodes, got %d", len(nodes))
 	}
@@ -3541,12 +3541,12 @@ func TestSelectRow_RKeyEmitsSelectionChangedMsg(t *testing.T) {
 		t.Fatal("expected a command to be emitted")
 	}
 	msg := cmd()
-	sc, ok := msg.(SelectionChangedMsg[TestRow])
+	_, ok := msg.(SelectionChangedMsg[TestRow])
 	if !ok {
 		t.Fatalf("expected SelectionChangedMsg, got %T", msg)
 	}
-	if len(sc.Selected) != 1 {
-		t.Errorf("expected 1 selected row in message, got %d", len(sc.Selected))
+	if len(m.SelectedRows()) != 1 {
+		t.Errorf("expected 1 selected row, got %d", len(m.SelectedRows()))
 	}
 }
 
@@ -3561,13 +3561,13 @@ func TestSelectColumn_CKeyEmitsSelectionChangedMsg(t *testing.T) {
 		t.Fatal("expected a command to be emitted")
 	}
 	msg := cmd()
-	sc, ok := msg.(SelectionChangedMsg[TestRow])
+	_, ok := msg.(SelectionChangedMsg[TestRow])
 	if !ok {
 		t.Fatalf("expected SelectionChangedMsg, got %T", msg)
 	}
-	// Column selection emits nil Selected since no rows are selected
-	if sc.Selected != nil {
-		t.Errorf("expected nil Selected for column selection, got %v", sc.Selected)
+	// Column selections cover no data rows.
+	if len(m.SelectedRows()) != 0 {
+		t.Errorf("expected 0 selected rows for column selection, got %d", len(m.SelectedRows()))
 	}
 }
 
@@ -6400,12 +6400,11 @@ func TestSelectAll_EmitsSelectionChangedMsg(t *testing.T) {
 		t.Error("expected SelectionChangedMsg command from Ctrl+A")
 	}
 	msg := cmd()
-	sc, ok := msg.(SelectionChangedMsg[TestRow])
-	if !ok {
+	if _, ok := msg.(SelectionChangedMsg[TestRow]); !ok {
 		t.Fatalf("expected SelectionChangedMsg, got %T", msg)
 	}
-	if len(sc.Selected) != 5 {
-		t.Errorf("expected 5 selected in message, got %d", len(sc.Selected))
+	if len(m.SelectedRows()) != 5 {
+		t.Errorf("expected 5 selected rows, got %d", len(m.SelectedRows()))
 	}
 }
 

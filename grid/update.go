@@ -158,7 +158,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 	case key.Matches(msg, m.KeyMap.SelectAll):
 		m.SelectAllRows()
 		return m, func() tea.Msg {
-			return SelectionChangedMsg[T]{Regions: m.Selection(), Selected: m.selectedRowNodes()}
+			return SelectionChangedMsg[T]{Regions: m.Selection()}
 		}
 
 	case key.Matches(msg, m.KeyMap.DeselectAll):
@@ -263,7 +263,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 			Cursor: selection.Position{Row: m.focusedCell.Row, Col: 0},
 		})
 		return m, func() tea.Msg {
-			return SelectionChangedMsg[T]{Regions: m.Selection(), Selected: m.selectedRowNodes()}
+			return SelectionChangedMsg[T]{Regions: m.Selection()}
 		}
 
 	case key.Matches(msg, m.KeyMap.SelectColumn):
@@ -275,7 +275,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 				Cursor: selection.Position{Row: len(m.displayRows) - 1, Col: colIdx},
 			})
 			return m, func() tea.Msg {
-				return SelectionChangedMsg[T]{Regions: m.Selection(), Selected: nil}
+				return SelectionChangedMsg[T]{Regions: m.Selection()}
 			}
 		}
 		return m, nil
@@ -283,7 +283,7 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 	case key.Matches(msg, m.KeyMap.Select):
 		m.sel.ToggleFullRow(m.focusedCell.Row)
 		return m, func() tea.Msg {
-			return SelectionChangedMsg[T]{Regions: m.Selection(), Selected: m.selectedRowNodes()}
+			return SelectionChangedMsg[T]{Regions: m.Selection()}
 		}
 
 	// Editing
@@ -709,6 +709,6 @@ func (m Model[T]) shiftMoveFocus(newRow, newCol int) (Model[T], tea.Cmd) {
 	})
 
 	return m, tea.Batch(cmd, func() tea.Msg {
-		return SelectionChangedMsg[T]{Regions: m.Selection(), Selected: m.selectedRowNodes()}
+		return SelectionChangedMsg[T]{Regions: m.Selection()}
 	})
 }
