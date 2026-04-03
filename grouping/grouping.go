@@ -69,7 +69,7 @@ func (m *Model[T]) CollapseAll(groups []*data.RowNode[T]) {
 // BuildGroups organizes rows into a group tree based on GroupColumns.
 // Returns the top-level group nodes.
 func BuildGroups[T any](
-	rows []data.RowNode[T],
+	rows []*data.RowNode[T],
 	cols []data.Column[T],
 	groupCols []string,
 	expanded map[string]bool,
@@ -77,9 +77,7 @@ func BuildGroups[T any](
 ) []*data.RowNode[T] {
 	if len(groupCols) == 0 {
 		result := make([]*data.RowNode[T], len(rows))
-		for i := range rows {
-			result[i] = &rows[i]
-		}
+		copy(result, rows)
 		return result
 	}
 
@@ -93,22 +91,20 @@ func BuildGroups[T any](
 	}
 	if groupCol == nil {
 		result := make([]*data.RowNode[T], len(rows))
-		for i := range rows {
-			result[i] = &rows[i]
-		}
+		copy(result, rows)
 		return result
 	}
 
 	// Group rows by the column value
 	groupMap := make(map[string][]*data.RowNode[T])
 	var groupOrder []string
-	for i := range rows {
-		val := groupCol.ValueGetter(rows[i].Data)
+	for _, row := range rows {
+		val := groupCol.ValueGetter(row.Data)
 		key := fmt.Sprintf("%v", val)
 		if _, exists := groupMap[key]; !exists {
 			groupOrder = append(groupOrder, key)
 		}
-		groupMap[key] = append(groupMap[key], &rows[i])
+		groupMap[key] = append(groupMap[key], row)
 	}
 
 	// Create group nodes
@@ -136,11 +132,7 @@ func BuildGroups[T any](
 
 		// Recursively group children if there are more group columns
 		if len(groupCols) > 1 {
-			childRows := make([]data.RowNode[T], len(children))
-			for i, c := range children {
-				childRows[i] = *c
-			}
-			subGroups := BuildGroups(childRows, cols, groupCols[1:], expanded, defaultExpanded-1)
+			subGroups := BuildGroups(children, cols, groupCols[1:], expanded, defaultExpanded-1)
 			groupNode.Children = subGroups
 			for _, sg := range subGroups {
 				sg.Parent = groupNode
@@ -155,16 +147,12 @@ func BuildGroups[T any](
 }
 
 // FlattenGroups flattens the group tree into a display list, respecting expanded state.
-func FlattenGroups[T any](groups []*data.RowNode[T]) []data.RowNode[T] {
-	var result []data.RowNode[T]
+func FlattenGroups[T any](groups []*data.RowNode[T]) []*data.RowNode[T] {
+	var result []*data.RowNode[T]
 	for _, g := range groups {
-		if g.IsGroup {
-			result = append(result, *g)
-			if g.Expanded {
-				result = append(result, FlattenGroups(g.Children)...)
-			}
-		} else {
-			result = append(result, *g)
+		result = append(result, g)
+		if g.IsGroup && g.Expanded {
+			result = append(result, FlattenGroups(g.Children)...)
 		}
 	}
 	return result

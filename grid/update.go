@@ -311,12 +311,12 @@ func (m Model[T]) handleEditKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 		// Apply value
 		col := m.cols[pos.Col]
 		if col.ValueSetter != nil {
-			rn := &m.displayRows[pos.Row]
+			rn := m.displayRows[pos.Row]
 			col.ValueSetter(&rn.Data, newValue)
 			// Also update in the source rows
-			for i := range m.rows {
-				if m.rows[i].ID == rn.ID {
-					col.ValueSetter(&m.rows[i].Data, newValue)
+			for _, srcRn := range m.rows {
+				if srcRn.ID == rn.ID {
+					col.ValueSetter(&srcRn.Data, newValue)
 					break
 				}
 			}
@@ -601,7 +601,7 @@ func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 		Value:          val,
 		FormattedValue: formatted,
 		Data:           rn.Data,
-		RowNode:        &rn,
+		RowNode:        rn,
 		Column:         &col,
 		ColumnIndex:    pos.Col,
 		RowIndex:       pos.Row,

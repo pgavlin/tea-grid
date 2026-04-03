@@ -234,7 +234,7 @@ func TestWithExternalFilter(t *testing.T) {
 
 func TestWithPostSort(t *testing.T) {
 	called := false
-	fn := func(rows []data.RowNode[TestRow]) []data.RowNode[TestRow] {
+	fn := func(rows []*data.RowNode[TestRow]) []*data.RowNode[TestRow] {
 		called = true
 		return rows
 	}
@@ -925,9 +925,9 @@ func TestDisplayRows_SortDescending(t *testing.T) {
 func TestDisplayRows_PostSortHook(t *testing.T) {
 	// Reverse the rows via post-sort
 	m := newTestGrid(
-		WithPostSort[TestRow](func(rows []data.RowNode[TestRow]) []data.RowNode[TestRow] {
+		WithPostSort[TestRow](func(rows []*data.RowNode[TestRow]) []*data.RowNode[TestRow] {
 			n := len(rows)
-			reversed := make([]data.RowNode[TestRow], n)
+			reversed := make([]*data.RowNode[TestRow], n)
 			for i, rn := range rows {
 				reversed[n-1-i] = rn
 			}
@@ -2232,9 +2232,9 @@ func TestInitLifecycle_PresetNumberFilter(t *testing.T) {
 
 func TestInitLifecycle_PresetPostSort(t *testing.T) {
 	m := newTestGrid(
-		WithPostSort[TestRow](func(rows []data.RowNode[TestRow]) []data.RowNode[TestRow] {
+		WithPostSort[TestRow](func(rows []*data.RowNode[TestRow]) []*data.RowNode[TestRow] {
 			n := len(rows)
-			reversed := make([]data.RowNode[TestRow], n)
+			reversed := make([]*data.RowNode[TestRow], n)
 			for i, rn := range rows {
 				reversed[n-1-i] = rn
 			}
@@ -6529,9 +6529,9 @@ func TestSortGroupsAtLevel_NonGroupInGroups(t *testing.T) {
 	}
 	// Build a groups slice with a non-group entry
 	groups := []*data.RowNode[TestRow]{&leaf}
-	for i, rn := range m.displayRows {
+	for _, rn := range m.displayRows {
 		if rn.IsGroup {
-			groups = append(groups, &m.displayRows[i])
+			groups = append(groups, rn)
 			break
 		}
 	}

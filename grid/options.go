@@ -143,7 +143,7 @@ func WithMultiSort[T any](enabled bool) Option[T] {
 }
 
 // WithPostSort sets a post-sort transformation function.
-func WithPostSort[T any](fn func([]data.RowNode[T]) []data.RowNode[T]) Option[T] {
+func WithPostSort[T any](fn func([]*data.RowNode[T]) []*data.RowNode[T]) Option[T] {
 	return func(m *Model[T]) {
 		m.postSort = fn
 	}

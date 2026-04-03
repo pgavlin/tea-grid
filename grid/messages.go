@@ -55,8 +55,8 @@ type FocusChangedMsg struct {
 
 // SelectionChangedMsg is emitted when the selection set changes.
 type SelectionChangedMsg[T any] struct {
-	Regions  []SelectionRegion // All current selection regions.
-	Selected []data.RowNode[T] // Rows covered by any selection (convenience).
+	Regions  []SelectionRegion   // All current selection regions.
+	Selected []*data.RowNode[T]  // Rows covered by any selection (convenience).
 }
 
 // SortChangedMsg is emitted when the sort order changes.

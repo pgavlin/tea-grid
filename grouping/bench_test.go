@@ -17,10 +17,10 @@ type benchRow struct {
 var benchDepartments = []string{"Engineering", "Sales", "Marketing", "Support", "Finance", "Legal", "HR", "Product", "Design", "Operations"}
 var benchCities = []string{"New York", "San Francisco", "London", "Berlin", "Tokyo", "Sydney", "Toronto", "Paris", "Singapore", "Mumbai"}
 
-func makeBenchRows(n int) []data.RowNode[benchRow] {
-	nodes := make([]data.RowNode[benchRow], n)
+func makeBenchRows(n int) []*data.RowNode[benchRow] {
+	nodes := make([]*data.RowNode[benchRow], n)
 	for i := range nodes {
-		nodes[i] = data.RowNode[benchRow]{
+		nodes[i] = &data.RowNode[benchRow]{
 			Data: benchRow{
 				Name:       fmt.Sprintf("Person_%d", i),
 				Department: benchDepartments[i%len(benchDepartments)],

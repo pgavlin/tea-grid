@@ -44,7 +44,7 @@ func (m Model[T]) View() string {
 
 	// Pinned top rows
 	for _, rn := range m.pinnedTop {
-		sections = append(sections, m.renderRow(&rn, -1, true))
+		sections = append(sections, m.renderRow(rn, -1, true))
 	}
 	if len(m.pinnedTop) > 0 {
 		sections = append(sections, m.renderSeparator())
@@ -53,7 +53,7 @@ func (m Model[T]) View() string {
 	// Body rows (virtual scrolled)
 	start, end := m.vp.visibleRowRange(len(m.displayRows), m.rowHeightFunc())
 	for i := start; i < end; i++ {
-		sections = append(sections, m.renderRow(&m.displayRows[i], i, false))
+		sections = append(sections, m.renderRow(m.displayRows[i], i, false))
 		if m.styles.BorderRow && i < end-1 {
 			sections = append(sections, m.renderRowBorder())
 		}
@@ -64,7 +64,7 @@ func (m Model[T]) View() string {
 		sections = append(sections, m.renderSeparator())
 	}
 	for _, rn := range m.pinnedBot {
-		sections = append(sections, m.renderRow(&rn, -1, true))
+		sections = append(sections, m.renderRow(rn, -1, true))
 	}
 
 	content := strings.Join(sections, "\n")
