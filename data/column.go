@@ -2,7 +2,6 @@
 package data
 
 import (
-	"fmt"
 	"math"
 	"reflect"
 	"time"
@@ -10,16 +9,8 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/filter"
+	"github.com/pgavlin/tea-grid/internal/conv"
 )
-
-// SprintValue formats a value as a string. If the value is already a string,
-// it is returned without allocation.
-func SprintValue(v any) string {
-	if s, ok := v.(string); ok {
-		return s
-	}
-	return fmt.Sprint(v)
-}
 
 // Pin indicates the pin position for columns (left/right) or rows (top/bottom).
 type Pin int
@@ -293,7 +284,7 @@ func makeMapColumn[T any](key, category string) Column[T] {
 			if v == nil {
 				return nil
 			}
-			return SprintValue(v)
+			return conv.SprintValue(v)
 		}
 	}
 
@@ -562,7 +553,7 @@ func collectDistinctValues[T any](getter func(T) any, rows []T) []string {
 		if v == nil {
 			continue
 		}
-		s := SprintValue(v)
+		s := conv.SprintValue(v)
 		if s == "" {
 			continue
 		}

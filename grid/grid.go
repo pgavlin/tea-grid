@@ -14,6 +14,7 @@ import (
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/grouping"
+	"github.com/pgavlin/tea-grid/internal/conv"
 	"github.com/pgavlin/tea-grid/selection"
 	gridsort "github.com/pgavlin/tea-grid/sort"
 )
@@ -970,7 +971,7 @@ func (m *Model[T]) passesQuickFilter(rn *data.RowNode[T], words []string) bool {
 			if col.ValueGetter == nil {
 				continue
 			}
-			if containsFold(data.SprintValue(col.ValueGetter(rn.Data)), word) {
+			if containsFold(conv.SprintValue(col.ValueGetter(rn.Data)), word) {
 				found = true
 				break
 			}
