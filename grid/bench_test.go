@@ -2,6 +2,7 @@ package grid
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -492,6 +493,38 @@ func BenchmarkRecomputeDisplayRows_QuickFilter_Cold(b *testing.B) {
 		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
 			rows := makeBenchRows(n)
 			m := newBenchGrid(rows,
+				WithQuickFilterText[benchRow]("engineering"),
+			)
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				m.dirty = true
+				m.filterDirty = true
+				m.recomputeDisplayRows()
+			}
+		})
+	}
+}
+
+func benchColsWithQuickFilterMatch() []data.Column[benchRow] {
+	cols := benchCols()
+	cols[0].QuickFilterMatch = func(r *benchRow, word string) bool { return containsFold(r.Name, word) }
+	cols[1].QuickFilterMatch = func(r *benchRow, word string) bool { return containsFold(r.Department, word) }
+	cols[2].QuickFilterMatch = func(r *benchRow, word string) bool { return containsFold(r.City, word) }
+	cols[3].QuickFilterMatch = func(r *benchRow, word string) bool { return containsFold(r.Country, word) }
+	cols[4].QuickFilterMatch = func(r *benchRow, word string) bool { return containsFold(fmt.Sprintf("%g", r.Salary), word) }
+	cols[5].QuickFilterMatch = func(r *benchRow, word string) bool { return containsFold(strconv.Itoa(r.Age), word) }
+	cols[6].QuickFilterMatch = func(r *benchRow, word string) bool { return containsFold(strconv.FormatBool(r.Active), word) }
+	cols[7].QuickFilterMatch = func(r *benchRow, word string) bool { return containsFold(fmt.Sprintf("%g", r.Score), word) }
+	return cols
+}
+
+func BenchmarkRecomputeDisplayRows_QuickFilter_Cold_WithMatch(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			m := newBenchGrid(rows,
+				WithColumns[benchRow](benchColsWithQuickFilterMatch()),
 				WithQuickFilterText[benchRow]("engineering"),
 			)
 			b.ResetTimer()

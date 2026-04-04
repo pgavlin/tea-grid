@@ -62,9 +62,9 @@ type Column[T any] struct {
 	Comparator func(a, b any) int // Custom sort.
 
 	// Filtering
-	Filterable bool           // Default: true.
-	Filter     filter.Filter  // Column filter.
-	FilterText func(T) string // Returns text for quick filter matching. If nil, ValueGetter + fmt.Sprint is used.
+	Filterable       bool                     // Default: true.
+	Filter           filter.Filter            // Column filter.
+	QuickFilterMatch func(data *T, word string) bool // Reports whether this column matches a quick filter word. Takes *T to avoid copying. If nil, falls back to ValueGetter + containsFold.
 
 	// Pinning
 	Pinned     Pin  // Left, Right, or None.

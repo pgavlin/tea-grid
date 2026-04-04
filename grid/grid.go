@@ -871,7 +871,7 @@ func (m *Model[T]) recomputeDisplayRows() {
 			if !m.passesColumnFilters(rn.Data) {
 				continue
 			}
-			if len(m.quickFilterWords) > 0 && !m.passesQuickFilter(rn.Data, m.quickFilterWords) {
+			if len(m.quickFilterWords) > 0 && !m.passesQuickFilter(rn, m.quickFilterWords) {
 				continue
 			}
 			filtered = append(filtered, rn)
@@ -956,20 +956,21 @@ func (m *Model[T]) passesColumnFilters(data T) bool {
 	return true
 }
 
-func (m *Model[T]) passesQuickFilter(row T, words []string) bool {
+func (m *Model[T]) passesQuickFilter(rn *data.RowNode[T], words []string) bool {
 	for _, word := range words {
 		found := false
 		for _, col := range m.cols {
+			if col.QuickFilterMatch != nil {
+				if col.QuickFilterMatch(&rn.Data, word) {
+					found = true
+					break
+				}
+				continue
+			}
 			if col.ValueGetter == nil {
 				continue
 			}
-			var text string
-			if col.FilterText != nil {
-				text = col.FilterText(row)
-			} else {
-				text = data.SprintValue(col.ValueGetter(row))
-			}
-			if containsFold(text, word) {
+			if containsFold(data.SprintValue(col.ValueGetter(rn.Data)), word) {
 				found = true
 				break
 			}
