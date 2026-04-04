@@ -208,6 +208,7 @@ func WithColumnPin[T any](colID string, dir data.Pin) Option[T] {
 func WithQuickFilterText[T any](text string) Option[T] {
 	return func(m *Model[T]) {
 		m.quickFilterText = text
+		m.updateQuickFilterWords()
 	}
 }
 

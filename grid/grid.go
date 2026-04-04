@@ -65,7 +65,7 @@ type Model[T any] struct {
 	quickFilterEnabled  bool
 	quickFilterText     string
 	quickFilterActive   bool
-	quickFilterScratch  []byte // scratch buffer reused across rows in passesQuickFilter
+	quickFilterWords []string // cached split of quickFilterText, updated on text change
 	filterEditColIdx    int             // -1 = no filter editor active
 	externalFilter      func(T) bool
 	// Cached list of column indices with active filters (rebuilt at start of each recompute)
@@ -481,9 +481,19 @@ func (m Model[T]) SortOrder() []gridsort.SortCriterion {
 // SetQuickFilter sets the quick filter text and marks display rows as dirty.
 func (m *Model[T]) SetQuickFilter(text string) {
 	m.quickFilterText = text
+	m.updateQuickFilterWords()
 	m.dirty = true
 	m.filterDirty = true
 	m.recomputeDisplayRows()
+}
+
+// updateQuickFilterWords recomputes the cached word list from quickFilterText.
+func (m *Model[T]) updateQuickFilterWords() {
+	if m.quickFilterText == "" {
+		m.quickFilterWords = nil
+	} else {
+		m.quickFilterWords = strings.Fields(strings.ToLower(m.quickFilterText))
+	}
 }
 
 // SetColumnFilter sets the filter for the column with the given ID.
@@ -502,6 +512,7 @@ func (m *Model[T]) SetColumnFilter(colID string, f filter.Filter) {
 // ClearFilters removes all quick and column filters.
 func (m *Model[T]) ClearFilters() {
 	m.quickFilterText = ""
+	m.updateQuickFilterWords()
 	for i := range m.cols {
 		m.cols[i].Filter = nil
 	}
@@ -831,11 +842,6 @@ func (m *Model[T]) recomputeDisplayRows() {
 		m.pinnedBot = append(m.pinnedBot, m.staticPinnedBotNodes...)
 	} else {
 		// Full filter pass.
-		var quickFilterWords []string
-		if m.quickFilterText != "" {
-			quickFilterWords = strings.Fields(strings.ToLower(m.quickFilterText))
-		}
-
 		filtered = make([]*data.RowNode[T], 0, len(m.rows))
 		m.pinnedTop = nil
 		m.pinnedBot = nil
@@ -865,7 +871,7 @@ func (m *Model[T]) recomputeDisplayRows() {
 			if !m.passesColumnFilters(rn.Data) {
 				continue
 			}
-			if len(quickFilterWords) > 0 && !m.passesQuickFilter(rn.Data, quickFilterWords) {
+			if len(m.quickFilterWords) > 0 && !m.passesQuickFilter(rn.Data, m.quickFilterWords) {
 				continue
 			}
 			filtered = append(filtered, rn)
@@ -951,22 +957,44 @@ func (m *Model[T]) passesColumnFilters(data T) bool {
 }
 
 func (m *Model[T]) passesQuickFilter(data T, words []string) bool {
-	m.quickFilterScratch = m.quickFilterScratch[:0]
-	for _, col := range m.cols {
-		if col.ValueGetter == nil {
-			continue
-		}
-		val := col.ValueGetter(data)
-		m.quickFilterScratch = fmt.Appendf(m.quickFilterScratch, " %v", val)
-	}
-	lower := strings.ToLower(string(m.quickFilterScratch))
-
 	for _, word := range words {
-		if !strings.Contains(lower, word) {
+		found := false
+		for _, col := range m.cols {
+			if col.ValueGetter == nil {
+				continue
+			}
+			var text string
+			if col.FilterText != nil {
+				text = col.FilterText(data)
+			} else {
+				text = fmt.Sprint(col.ValueGetter(data))
+			}
+			if containsFold(text, word) {
+				found = true
+				break
+			}
+		}
+		if !found {
 			return false
 		}
 	}
 	return true
+}
+
+// containsFold reports whether s contains substr under Unicode case-folding.
+func containsFold(s, substr string) bool {
+	if len(substr) == 0 {
+		return true
+	}
+	if len(substr) > len(s) {
+		return false
+	}
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if strings.EqualFold(s[i:i+len(substr)], substr) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Model[T]) sortRows(rows []*data.RowNode[T]) {

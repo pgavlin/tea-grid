@@ -364,6 +364,7 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cm
 		m.quickFilterActive = false
 		if m.quickFilterText != "" {
 			m.quickFilterText = ""
+			m.updateQuickFilterWords()
 			m.dirty = true
 			m.filterDirty = true
 			m.updateViewportSize()
@@ -375,6 +376,7 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cm
 	case tea.KeyBackspace:
 		if len(m.quickFilterText) > 0 {
 			m.quickFilterText = m.quickFilterText[:len(m.quickFilterText)-1]
+			m.updateQuickFilterWords()
 			m.dirty = true
 			m.filterDirty = true
 			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
@@ -383,6 +385,7 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cm
 
 	case tea.KeySpace:
 		m.quickFilterText += " "
+		m.updateQuickFilterWords()
 		m.dirty = true
 		m.filterDirty = true
 		return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
@@ -396,6 +399,7 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cm
 	default:
 		if len(msg.Text) > 0 {
 			m.quickFilterText += msg.Text
+			m.updateQuickFilterWords()
 			m.dirty = true
 			m.filterDirty = true
 			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }

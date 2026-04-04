@@ -53,8 +53,9 @@ type Column[T any] struct {
 	Comparator func(a, b any) int // Custom sort.
 
 	// Filtering
-	Filterable bool          // Default: true.
-	Filter     filter.Filter // Column filter.
+	Filterable bool            // Default: true.
+	Filter     filter.Filter   // Column filter.
+	FilterText func(T) string  // Returns text for quick filter matching. If nil, ValueGetter + fmt.Sprint is used.
 
 	// Pinning
 	Pinned     Pin  // Left, Right, or None.
