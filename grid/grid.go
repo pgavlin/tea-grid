@@ -956,7 +956,7 @@ func (m *Model[T]) passesColumnFilters(data T) bool {
 	return true
 }
 
-func (m *Model[T]) passesQuickFilter(data T, words []string) bool {
+func (m *Model[T]) passesQuickFilter(row T, words []string) bool {
 	for _, word := range words {
 		found := false
 		for _, col := range m.cols {
@@ -965,9 +965,9 @@ func (m *Model[T]) passesQuickFilter(data T, words []string) bool {
 			}
 			var text string
 			if col.FilterText != nil {
-				text = col.FilterText(data)
+				text = col.FilterText(row)
 			} else {
-				text = fmt.Sprint(col.ValueGetter(data))
+				text = data.SprintValue(col.ValueGetter(row))
 			}
 			if containsFold(text, word) {
 				found = true

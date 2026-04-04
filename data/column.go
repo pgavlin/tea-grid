@@ -12,6 +12,15 @@ import (
 	"github.com/pgavlin/tea-grid/filter"
 )
 
+// SprintValue formats a value as a string. If the value is already a string,
+// it is returned without allocation.
+func SprintValue(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fmt.Sprint(v)
+}
+
 // Pin indicates the pin position for columns (left/right) or rows (top/bottom).
 type Pin int
 
@@ -53,9 +62,9 @@ type Column[T any] struct {
 	Comparator func(a, b any) int // Custom sort.
 
 	// Filtering
-	Filterable bool            // Default: true.
-	Filter     filter.Filter   // Column filter.
-	FilterText func(T) string  // Returns text for quick filter matching. If nil, ValueGetter + fmt.Sprint is used.
+	Filterable bool           // Default: true.
+	Filter     filter.Filter  // Column filter.
+	FilterText func(T) string // Returns text for quick filter matching. If nil, ValueGetter + fmt.Sprint is used.
 
 	// Pinning
 	Pinned     Pin  // Left, Right, or None.
@@ -284,7 +293,7 @@ func makeMapColumn[T any](key, category string) Column[T] {
 			if v == nil {
 				return nil
 			}
-			return fmt.Sprint(v)
+			return SprintValue(v)
 		}
 	}
 
@@ -553,7 +562,7 @@ func collectDistinctValues[T any](getter func(T) any, rows []T) []string {
 		if v == nil {
 			continue
 		}
-		s := fmt.Sprint(v)
+		s := SprintValue(v)
 		if s == "" {
 			continue
 		}
