@@ -744,6 +744,7 @@ func BenchmarkUpdate_QuickFilterKeystroke(b *testing.B) {
 			rows := makeBenchRows(n)
 			m := newBenchGrid(rows,
 				WithQuickFilter[benchRow](true),
+				WithQuickFilterDebounce[benchRow](0), // disable debounce to avoid goroutine leak
 			)
 			// Activate quick filter mode
 			m.quickFilterActive = true
