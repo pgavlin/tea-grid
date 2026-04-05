@@ -132,6 +132,10 @@ type colCellStyles struct {
 	selected lipgloss.Style
 	pinned   lipgloss.Style
 	header   lipgloss.Style
+	// contentWidth is the usable cell width (column width minus horizontal
+	// frame size). Pre-computed to avoid calling GetHorizontalFrameSize()
+	// per cell, which copies the 648-byte Style struct.
+	contentWidth int
 }
 
 // New creates a new grid model with the given options.
@@ -1229,14 +1233,20 @@ func (m *Model[T]) rebuildColStyles() {
 		apply := func(s lipgloss.Style) lipgloss.Style {
 			return s.Width(w).MaxWidth(w).Height(h)
 		}
+		cell := apply(m.styles.Cell)
+		contentWidth := w - cell.GetHorizontalFrameSize()
+		if contentWidth < 1 {
+			contentWidth = 1
+		}
 		m.colStyles[i] = colCellStyles{
-			cell:     apply(m.styles.Cell),
-			evenRow:  apply(m.styles.CellEvenRow),
-			oddRow:   apply(m.styles.CellOddRow),
-			focused:  apply(m.styles.CellFocused),
-			selected: apply(m.styles.CellSelected),
-			pinned:   apply(m.styles.CellPinned),
-			header:   m.styles.HeaderCell.Width(w).MaxWidth(w),
+			cell:         cell,
+			evenRow:      apply(m.styles.CellEvenRow),
+			oddRow:       apply(m.styles.CellOddRow),
+			focused:      apply(m.styles.CellFocused),
+			selected:     apply(m.styles.CellSelected),
+			pinned:       apply(m.styles.CellPinned),
+			header:       m.styles.HeaderCell.Width(w).MaxWidth(w),
+			contentWidth: contentWidth,
 		}
 	}
 }

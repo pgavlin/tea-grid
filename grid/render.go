@@ -388,9 +388,14 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 		}
 
 		// Compute content width (column width minus style padding/borders)
-		contentWidth := w - style.GetHorizontalFrameSize()
-		if contentWidth < 1 {
-			contentWidth = 1
+		var contentWidth int
+		if usePrecomputed {
+			contentWidth = m.colStyles[idx].contentWidth
+		} else {
+			contentWidth = w - style.GetHorizontalFrameSize()
+			if contentWidth < 1 {
+				contentWidth = 1
+			}
 		}
 
 		// Use custom renderer if available, otherwise default to formatted text
