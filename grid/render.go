@@ -9,6 +9,7 @@ import (
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/grouping"
+	"github.com/pgavlin/tea-grid/internal/conv"
 )
 
 // View renders the grid as a string.
@@ -317,7 +318,7 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 		}
 
 		// Format
-		formatted := fmt.Sprintf("%v", val)
+		formatted := conv.SprintValue(val)
 		if col.ValueFormatter != nil {
 			formatted = col.ValueFormatter(val, rn.Data)
 		}

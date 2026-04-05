@@ -4,6 +4,7 @@ package grid
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -703,7 +704,7 @@ func (m *Model[T]) setRowData(rows []T) {
 			// Reuse the existing ID for stable identity
 			rn.ID = oldRows[i].ID
 		} else {
-			rn.ID = fmt.Sprintf("row-%d", m.nextRowID)
+			rn.ID = "row-" + strconv.Itoa(m.nextRowID)
 			m.nextRowID++
 		}
 		m.rows[i] = rn
@@ -728,7 +729,7 @@ func (m *Model[T]) makeRowNode(d T) *data.RowNode[T] {
 	if m.rowIDFunc != nil {
 		rn.ID = m.rowIDFunc(d)
 	} else {
-		rn.ID = fmt.Sprintf("row-%d", m.nextRowID)
+		rn.ID = "row-" + strconv.Itoa(m.nextRowID)
 		m.nextRowID++
 	}
 	return rn
