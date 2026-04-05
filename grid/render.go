@@ -225,10 +225,18 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 			header += " " + m.styles.SortDesc
 		}
 
-		// Apply header style
-		style := m.styles.HeaderCell
+		// Apply header style — use pre-computed when possible
+		var style lipgloss.Style
 		if m.focusedCell.Row == -1 && m.focusedCell.Col == idx && m.focused {
-			style = m.styles.CellFocused
+			if idx < len(m.colStyles) {
+				style = m.colStyles[idx].focused
+			} else {
+				style = m.styles.CellFocused.Width(w).MaxWidth(w)
+			}
+		} else if idx < len(m.colStyles) {
+			style = m.colStyles[idx].header
+		} else {
+			style = m.styles.HeaderCell.Width(w).MaxWidth(w)
 		}
 
 		// Truncate header to content width (column width minus style padding/borders)
@@ -238,7 +246,7 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 		}
 		header = data.TruncateOrPad(header, contentWidth)
 
-		cells = append(cells, style.Width(w).MaxWidth(w).Render(header))
+		cells = append(cells, style.Render(header))
 	}
 	return strings.Join(cells, m.colSeparator())
 }
@@ -330,32 +338,53 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 			continue
 		}
 
-		// Determine style
+		// Determine style — use pre-computed styles when possible
 		isSelected := !col.NoSelect && m.sel.ContainsCell(displayIndex, idx)
 		isFocused := m.focused && m.focusedCell.Row == displayIndex && m.focusedCell.Col == idx
 
-		// Select base style based on row context
-		style := m.styles.Cell
-		if isPinned {
-			style = m.styles.CellPinned
-		} else if displayIndex >= 0 && displayIndex%2 != 0 {
-			style = m.styles.CellOddRow
-		} else if displayIndex >= 0 {
-			style = m.styles.CellEvenRow
-		}
-
-		// Override for focus/selection
-		if isFocused {
-			style = m.styles.CellFocused
-		} else if isSelected {
-			style = m.styles.CellSelected
-		}
-
-		if m.styles.StyleFunc != nil {
-			style = applyCustomStyle(m.styles.StyleFunc(displayIndex, idx, rn.Data), style, isFocused, isSelected)
-		}
-		if col.CellStyle != nil {
-			style = applyCustomStyle(col.CellStyle(val, rn.Data), style, isFocused, isSelected)
+		var style lipgloss.Style
+		usePrecomputed := m.styles.StyleFunc == nil && col.CellStyle == nil && idx < len(m.colStyles)
+		if usePrecomputed {
+			cs := &m.colStyles[idx]
+			if isFocused {
+				style = cs.focused
+			} else if isSelected {
+				style = cs.selected
+			} else if isPinned {
+				style = cs.pinned
+			} else if displayIndex >= 0 && displayIndex%2 != 0 {
+				style = cs.oddRow
+			} else if displayIndex >= 0 {
+				style = cs.evenRow
+			} else {
+				style = cs.cell
+			}
+			// Apply row-specific height if it differs from default
+			if rowHeight != m.defaultRowHeight {
+				style = style.Height(rowHeight)
+			}
+		} else {
+			// Fallback: custom StyleFunc or CellStyle — build per cell
+			style = m.styles.Cell
+			if isPinned {
+				style = m.styles.CellPinned
+			} else if displayIndex >= 0 && displayIndex%2 != 0 {
+				style = m.styles.CellOddRow
+			} else if displayIndex >= 0 {
+				style = m.styles.CellEvenRow
+			}
+			if isFocused {
+				style = m.styles.CellFocused
+			} else if isSelected {
+				style = m.styles.CellSelected
+			}
+			if m.styles.StyleFunc != nil {
+				style = applyCustomStyle(m.styles.StyleFunc(displayIndex, idx, rn.Data), style, isFocused, isSelected)
+			}
+			if col.CellStyle != nil {
+				style = applyCustomStyle(col.CellStyle(val, rn.Data), style, isFocused, isSelected)
+			}
+			style = style.Width(w).MaxWidth(w).Height(rowHeight)
 		}
 
 		// Compute content width (column width minus style padding/borders)
@@ -393,7 +422,7 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 			cellContent = ansi.Truncate(cellContent, contentWidth, "…")
 		}
 
-		cells = append(cells, style.Width(w).MaxWidth(w).Height(rowHeight).Render(cellContent))
+		cells = append(cells, style.Render(cellContent))
 	}
 
 	return m.joinCellLines(cells, colIndices)

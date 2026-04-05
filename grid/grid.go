@@ -11,6 +11,7 @@ import (
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
@@ -116,7 +117,21 @@ type Model[T any] struct {
 	focusedCell CellPosition
 
 	// Styles
-	styles Styles
+	styles    Styles
+	colStyles []colCellStyles // pre-computed per-column styles with Width/MaxWidth/Height applied
+}
+
+// colCellStyles holds pre-computed lipgloss styles for a single column,
+// with Width, MaxWidth, and Height already applied. This avoids copying
+// the 648-byte Style struct 3 times per cell per frame.
+type colCellStyles struct {
+	cell     lipgloss.Style
+	evenRow  lipgloss.Style
+	oddRow   lipgloss.Style
+	focused  lipgloss.Style
+	selected lipgloss.Style
+	pinned   lipgloss.Style
+	header   lipgloss.Style
 }
 
 // New creates a new grid model with the given options.
@@ -1196,6 +1211,34 @@ func (m *Model[T]) computeColWidths() {
 
 	// Update visible columns count
 	m.updateVisibleColCount()
+
+	// Pre-compute per-column styles with Width/MaxWidth/Height applied
+	m.rebuildColStyles()
+}
+
+// rebuildColStyles pre-computes lipgloss styles for each column with Width,
+// MaxWidth, and Height already applied. This avoids copying the 648-byte Style
+// struct multiple times per cell per frame in the render loop.
+func (m *Model[T]) rebuildColStyles() {
+	m.colStyles = make([]colCellStyles, len(m.cols))
+	h := m.defaultRowHeight
+	if h < 1 {
+		h = 1
+	}
+	for i, w := range m.colWidths {
+		apply := func(s lipgloss.Style) lipgloss.Style {
+			return s.Width(w).MaxWidth(w).Height(h)
+		}
+		m.colStyles[i] = colCellStyles{
+			cell:     apply(m.styles.Cell),
+			evenRow:  apply(m.styles.CellEvenRow),
+			oddRow:   apply(m.styles.CellOddRow),
+			focused:  apply(m.styles.CellFocused),
+			selected: apply(m.styles.CellSelected),
+			pinned:   apply(m.styles.CellPinned),
+			header:   m.styles.HeaderCell.Width(w).MaxWidth(w),
+		}
+	}
 }
 
 // visibleCols returns indices of non-hidden columns.
