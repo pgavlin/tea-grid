@@ -603,3 +603,180 @@ func BenchmarkSelectedRowNodes(b *testing.B) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Grid construction and data loading
+// ---------------------------------------------------------------------------
+
+func BenchmarkNew(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			cols := benchCols()
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				_ = New(
+					WithColumns[benchRow](cols),
+					WithRows[benchRow](rows),
+					WithWidth[benchRow](120),
+					WithHeight[benchRow](40),
+				)
+			}
+		})
+	}
+}
+
+func BenchmarkSetRows(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			m := newBenchGrid(rows)
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				m.SetRows(rows)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Sort — isolate comparison and findCol overhead
+// ---------------------------------------------------------------------------
+
+func BenchmarkRecomputeDisplayRows_Sort_Cold(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			m := newBenchGrid(rows,
+				WithDefaultSort[benchRow]([]gridsort.SortCriterion{
+					{ColumnID: "Salary", Direction: data.SortAsc},
+				}),
+			)
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				m.dirty = true
+				m.filterDirty = true
+				m.recomputeDisplayRows()
+			}
+		})
+	}
+}
+
+func BenchmarkRecomputeDisplayRows_Sort_MultiKey(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			m := newBenchGrid(rows,
+				WithDefaultSort[benchRow]([]gridsort.SortCriterion{
+					{ColumnID: "Department", Direction: data.SortAsc},
+					{ColumnID: "Salary", Direction: data.SortDesc},
+					{ColumnID: "Name", Direction: data.SortAsc},
+				}),
+			)
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				m.dirty = true
+				m.filterDirty = true
+				m.recomputeDisplayRows()
+			}
+		})
+	}
+}
+
+func BenchmarkDefaultCompare(b *testing.B) {
+	b.Run("string", func(b *testing.B) {
+		a, bv := any("hello"), any("world")
+		b.ReportAllocs()
+		for range b.N {
+			defaultCompare(a, bv)
+		}
+	})
+	b.Run("int", func(b *testing.B) {
+		a, bv := any(42), any(99)
+		b.ReportAllocs()
+		for range b.N {
+			defaultCompare(a, bv)
+		}
+	})
+	b.Run("float64", func(b *testing.B) {
+		a, bv := any(3.14), any(2.72)
+		b.ReportAllocs()
+		for range b.N {
+			defaultCompare(a, bv)
+		}
+	})
+	b.Run("fallback", func(b *testing.B) {
+		a, bv := any(42), any("hello")
+		b.ReportAllocs()
+		for range b.N {
+			defaultCompare(a, bv)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Update full cycles — keystroke to recompute
+// ---------------------------------------------------------------------------
+
+func BenchmarkUpdate_SortToggle(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			m := newBenchGrid(rows)
+			m.focusedCell = CellPosition{Row: -1, Col: 0}
+			sortKey := tea.KeyPressMsg{Code: 'S', Text: "S"}
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				m, _ = m.Update(sortKey)
+			}
+		})
+	}
+}
+
+func BenchmarkUpdate_QuickFilterKeystroke(b *testing.B) {
+	for _, n := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
+			rows := makeBenchRows(n)
+			m := newBenchGrid(rows,
+				WithQuickFilter[benchRow](true),
+			)
+			// Activate quick filter mode
+			m.quickFilterActive = true
+			key := tea.KeyPressMsg{Code: 'e', Text: "e"}
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				m, _ = m.Update(key)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Render with varying column counts
+// ---------------------------------------------------------------------------
+
+func BenchmarkView_ColumnCount(b *testing.B) {
+	for _, ncols := range []int{4, 8, 16, 32} {
+		b.Run(fmt.Sprintf("cols=%d", ncols), func(b *testing.B) {
+			rows := makeBenchRows(10_000)
+			cols := make([]data.Column[benchRow], ncols)
+			base := benchCols()
+			for i := range cols {
+				cols[i] = base[i%len(base)]
+				cols[i].ColumnID = fmt.Sprintf("col_%d", i)
+			}
+			m := newBenchGrid(rows, WithColumns[benchRow](cols))
+			b.ResetTimer()
+			b.ReportAllocs()
+			for range b.N {
+				_ = m.View()
+			}
+		})
+	}
+}
