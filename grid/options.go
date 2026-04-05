@@ -1,6 +1,8 @@
 package grid
 
 import (
+	"time"
+
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/selection"
@@ -92,6 +94,14 @@ func WithEditable[T any](enabled bool) Option[T] {
 func WithQuickFilter[T any](enabled bool) Option[T] {
 	return func(m *Model[T]) {
 		m.quickFilterEnabled = enabled
+	}
+}
+
+// WithQuickFilterDebounce sets the delay before recomputing after a quick
+// filter keystroke. Default is 100ms. Set to 0 to disable debouncing.
+func WithQuickFilterDebounce[T any](d time.Duration) Option[T] {
+	return func(m *Model[T]) {
+		m.quickFilterDebounceDelay = d
 	}
 }
 

@@ -2,6 +2,7 @@ package grid
 
 import (
 	"fmt"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -10,6 +11,20 @@ import (
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/selection"
 )
+
+// quickFilterDebounceMsg is sent after the debounce delay to trigger a
+// quick filter recompute. The seq field must match m.quickFilterSeq;
+// if it doesn't, a newer keystroke has superseded this tick.
+type quickFilterDebounceMsg struct {
+	seq uint64
+}
+
+func quickFilterDebounceCmd(seq uint64, delay time.Duration) tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(delay)
+		return quickFilterDebounceMsg{seq: seq}
+	}
+}
 
 // Update handles messages and returns the updated model.
 func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
@@ -26,6 +41,11 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 			m, cmd = m.handleQuickFilterKeyMsg(msg)
 		} else {
 			m, cmd = m.handleKeyMsg(msg)
+		}
+	case quickFilterDebounceMsg:
+		if msg.seq == m.quickFilterSeq {
+			m.dirty = true
+			m.filterDirty = true
 		}
 	}
 
@@ -377,22 +397,20 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cm
 		if len(m.quickFilterText) > 0 {
 			m.quickFilterText = m.quickFilterText[:len(m.quickFilterText)-1]
 			m.updateQuickFilterWords()
-			m.dirty = true
-			m.filterDirty = true
-			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
+			return m, m.quickFilterChanged()
 		}
 		return m, nil
 
 	case tea.KeySpace:
 		m.quickFilterText += " "
 		m.updateQuickFilterWords()
-		m.dirty = true
-		m.filterDirty = true
-		return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
+		return m, m.quickFilterChanged()
 
 	case tea.KeyEnter:
-		// Confirm filter and return to normal mode
+		// Confirm filter and apply immediately.
 		m.quickFilterActive = false
+		m.dirty = true
+		m.filterDirty = true
 		m.updateViewportSize()
 		return m, nil
 
@@ -400,13 +418,28 @@ func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cm
 		if len(msg.Text) > 0 {
 			m.quickFilterText += msg.Text
 			m.updateQuickFilterWords()
-			m.dirty = true
-			m.filterDirty = true
-			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: m.quickFilterText} }
+			return m, m.quickFilterChanged()
 		}
 	}
 
 	return m, nil
+}
+
+// quickFilterChanged returns a command batch: the QuickFilterChangedMsg
+// (immediate) and a debounced recompute. If debounce is 0, the recompute
+// is triggered immediately instead.
+func (m *Model[T]) quickFilterChanged() tea.Cmd {
+	text := m.quickFilterText
+	notify := func() tea.Msg { return QuickFilterChangedMsg{Text: text} }
+
+	if m.quickFilterDebounceDelay <= 0 {
+		m.dirty = true
+		m.filterDirty = true
+		return notify
+	}
+
+	m.quickFilterSeq++
+	return tea.Batch(notify, quickFilterDebounceCmd(m.quickFilterSeq, m.quickFilterDebounceDelay))
 }
 
 // handleFilterEditKeyMsg handles key messages while the column filter editor is active.

@@ -1336,7 +1336,7 @@ func TestQuickFilter_EscClearsAndCloses(t *testing.T) {
 }
 
 func TestQuickFilter_FiltersResults(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
+	m := newTestGrid(WithQuickFilter[TestRow](true), WithQuickFilterDebounce[TestRow](0))
 	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = sendKey(m, tea.KeyPressMsg{Code: 'e', Text: "e"})
 	m = sendKey(m, tea.KeyPressMsg{Code: 'n', Text: "n"})
@@ -6093,7 +6093,7 @@ func TestQuickFilterKeyMsg_EscWithText(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestQuickFilterKeyMsg_BackspaceEmitsMsg(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
+	m := newTestGrid(WithQuickFilter[TestRow](true), WithQuickFilterDebounce[TestRow](0))
 	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = sendKey(m, tea.KeyPressMsg{Code: 'b', Text: "b"})
@@ -6116,7 +6116,7 @@ func TestQuickFilterKeyMsg_BackspaceEmitsMsg(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestQuickFilterKeyMsg_RunesEmitsMsg(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
+	m := newTestGrid(WithQuickFilter[TestRow](true), WithQuickFilterDebounce[TestRow](0))
 	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	var cmd tea.Cmd
 	m, cmd = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})

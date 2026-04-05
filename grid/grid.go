@@ -63,10 +63,12 @@ type Model[T any] struct {
 	postSort  func([]*data.RowNode[T]) []*data.RowNode[T]
 
 	// Filtering
-	quickFilterEnabled  bool
-	quickFilterText     string
-	quickFilterActive   bool
-	quickFilterWords []string // cached split of quickFilterText, updated on text change
+	quickFilterEnabled       bool
+	quickFilterText          string
+	quickFilterActive        bool
+	quickFilterWords         []string      // cached split of quickFilterText, updated on text change
+	quickFilterSeq           uint64        // bumped on each keystroke, used to discard stale debounce ticks
+	quickFilterDebounceDelay time.Duration // delay before recomputing after keystroke (default 100ms, 0 = immediate)
 	filterEditColIdx    int             // -1 = no filter editor active
 	externalFilter      func(T) bool
 	// Cached list of column indices with active filters (rebuilt at start of each recompute)
@@ -119,18 +121,19 @@ type Model[T any] struct {
 // New creates a new grid model with the given options.
 func New[T any](opts ...Option[T]) Model[T] {
 	m := Model[T]{
-		KeyMap:                 DefaultKeyMap(),
-		Help:                   help.New(),
-		styles:                 DefaultStyles(),
-		vp:                     newViewport(),
-		sel:                    selection.New(selection.SelectNone),
-		groupModel:             grouping.Model[T]{Expanded: make(map[string]bool), DefaultExpanded: -1},
-		defaultRowHeight:       1,
-		dirty:                  true,
-		filterDirty:            true,
-		focusedCell:            CellPosition{Row: 0, Col: 0},
-		filterEditColIdx:       -1,
-		cachedFilterEditColIdx: -1,
+		KeyMap:                   DefaultKeyMap(),
+		Help:                     help.New(),
+		styles:                   DefaultStyles(),
+		vp:                       newViewport(),
+		sel:                      selection.New(selection.SelectNone),
+		groupModel:               grouping.Model[T]{Expanded: make(map[string]bool), DefaultExpanded: -1},
+		defaultRowHeight:         1,
+		dirty:                    true,
+		filterDirty:              true,
+		focusedCell:              CellPosition{Row: 0, Col: 0},
+		filterEditColIdx:         -1,
+		cachedFilterEditColIdx:   -1,
+		quickFilterDebounceDelay: 100 * time.Millisecond,
 	}
 
 	for _, opt := range opts {
