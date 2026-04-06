@@ -246,7 +246,7 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 		}
 		header = data.TruncateOrPad(header, contentWidth)
 
-		cells = append(cells, style.Render(header))
+		cells = append(cells, style.RenderRef(header))
 	}
 	return strings.Join(cells, m.colSeparator())
 }
@@ -427,7 +427,7 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 			cellContent = ansi.Truncate(cellContent, contentWidth, "…")
 		}
 
-		cells = append(cells, style.Render(cellContent))
+		cells = append(cells, style.RenderRef(cellContent))
 	}
 
 	return m.joinCellLines(cells, colIndices)
@@ -587,7 +587,8 @@ func (m Model[T]) renderAggCells(rn *data.RowNode[T], colIndices []int) string {
 			cellContent = data.TruncateOrPad("", contentWidth)
 		}
 
-		cells = append(cells, style.Width(w).MaxWidth(w).Render(cellContent))
+		sized := style.Width(w).MaxWidth(w)
+		cells = append(cells, sized.RenderRef(cellContent))
 	}
 
 	return strings.Join(cells, m.colSeparator())

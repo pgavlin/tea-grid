@@ -328,7 +328,8 @@ func (f *SetFilter) View() string {
 	searchLine := f.search.RenderLine(f.width, "")
 	if f.inList {
 		// Dim the search line when in list mode
-		searchLine = lipgloss.NewStyle().Faint(true).Render(searchLine)
+		dimStyle := lipgloss.NewStyle().Faint(true)
+		searchLine = dimStyle.Render(searchLine)
 	}
 	lines = append(lines, searchLine)
 
@@ -355,7 +356,8 @@ func (f *SetFilter) View() string {
 		entry = lineedit.TruncateOrPad(entry, f.width)
 
 		if f.inList && i == f.selectedIdx {
-			entry = lipgloss.NewStyle().Reverse(true).Render(entry)
+			reverseStyle := lipgloss.NewStyle().Reverse(true)
+			entry = reverseStyle.Render(entry)
 		}
 
 		lines = append(lines, entry)
