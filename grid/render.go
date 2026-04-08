@@ -207,6 +207,7 @@ func (m Model[T]) renderHeader() string {
 func (m Model[T]) renderHeaderCells(colIndices []int) string {
 	sep := m.colSeparator()
 	var b strings.Builder
+	b.Grow(m.width * 3)
 	first := true
 	for _, idx := range colIndices {
 		col := m.cols[idx]
@@ -317,6 +318,7 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 	}
 	if useAllPrecomputed && rowHeight == m.defaultRowHeight {
 		var b strings.Builder
+		b.Grow(m.width * 3) // pre-size for ANSI sequences + content
 		first := true
 		for _, idx := range colIndices {
 			col := m.cols[idx]

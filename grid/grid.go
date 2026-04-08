@@ -121,6 +121,9 @@ type Model[T any] struct {
 	styles    Styles
 	colStyles []colCellStyles // pre-computed per-column styles with Width/MaxWidth/Height applied
 	cellBlock stain.Block     // reusable block for cell rendering (avoids buffer growth allocs)
+
+	// Cached visible column indices, rebuilt on column/pin changes.
+	cachedLeft, cachedCenter, cachedRight []int
 }
 
 // colCellStyles holds pre-computed lipgloss styles for a single column,
@@ -1215,10 +1218,9 @@ func (m *Model[T]) computeColWidths() {
 		}
 	}
 
-	// Update visible columns count
+	// Rebuild cached column indices, styles, and visible count
+	m.rebuildVisibleColIndices()
 	m.updateVisibleColCount()
-
-	// Pre-compute per-column styles with Width/MaxWidth/Height applied
 	m.rebuildColStyles()
 }
 
@@ -1265,22 +1267,30 @@ func (m *Model[T]) visibleCols() []int {
 	return result
 }
 
-// visibleColIndices returns column indices partitioned by pin direction.
+// visibleColIndices returns cached column indices partitioned by pin direction.
 func (m *Model[T]) visibleColIndices() (left, center, right []int) {
+	return m.cachedLeft, m.cachedCenter, m.cachedRight
+}
+
+// rebuildVisibleColIndices recomputes the cached left/center/right column
+// index slices. Called when columns or pin state changes.
+func (m *Model[T]) rebuildVisibleColIndices() {
+	m.cachedLeft = m.cachedLeft[:0]
+	m.cachedCenter = m.cachedCenter[:0]
+	m.cachedRight = m.cachedRight[:0]
 	for i, col := range m.cols {
 		if col.Hide {
 			continue
 		}
 		switch col.Pinned {
 		case data.PinLeft:
-			left = append(left, i)
+			m.cachedLeft = append(m.cachedLeft, i)
 		case data.PinRight:
-			right = append(right, i)
+			m.cachedRight = append(m.cachedRight, i)
 		default:
-			center = append(center, i)
+			m.cachedCenter = append(m.cachedCenter, i)
 		}
 	}
-	return
 }
 
 func (m *Model[T]) updateVisibleColCount() {
