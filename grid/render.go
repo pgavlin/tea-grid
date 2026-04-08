@@ -205,7 +205,9 @@ func (m Model[T]) renderHeader() string {
 
 // renderHeaderCells renders header cells for a set of column indices.
 func (m Model[T]) renderHeaderCells(colIndices []int) string {
-	var cells []string
+	sep := m.colSeparator()
+	var b strings.Builder
+	first := true
 	for _, idx := range colIndices {
 		col := m.cols[idx]
 		w := m.colWidths[idx]
@@ -226,6 +228,11 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 			header += " " + m.styles.SortDesc
 		}
 
+		if !first {
+			b.WriteString(sep)
+		}
+		first = false
+
 		// Apply header style — use pre-computed stain styles when possible
 		if idx < len(m.colStyles) {
 			var ss *stain.Style
@@ -236,7 +243,8 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 			}
 			contentWidth := m.colStyles[idx].contentWidth
 			header = data.TruncateOrPad(header, contentWidth)
-			cells = append(cells, ss.Render(header).String())
+			ss.RenderTo(&m.cellBlock, header)
+			b.Write(m.cellBlock.Bytes())
 		} else {
 			style := m.styles.HeaderCell
 			if m.focusedCell.Row == -1 && m.focusedCell.Col == idx && m.focused {
@@ -248,10 +256,10 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 				contentWidth = 1
 			}
 			header = data.TruncateOrPad(header, contentWidth)
-			cells = append(cells, style.Render(header))
+			b.WriteString(style.Render(header))
 		}
 	}
-	return strings.Join(cells, m.colSeparator())
+	return b.String()
 }
 
 // renderHeaderBorder renders the border below the header.
@@ -287,68 +295,46 @@ func (m Model[T]) renderRow(rn *data.RowNode[T], displayIndex int, isPinned bool
 
 // renderCells renders cells for a row across specified column indices.
 func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayIndex int, isPinned bool) string {
-	var cells []string
-
 	rowHeight := rn.RowHeight
 	if rowHeight < 1 {
 		rowHeight = 1
 	}
 
-	skipUntil := -1
-	for _, idx := range colIndices {
-		if idx < skipUntil {
-			continue
-		}
+	sep := m.colSeparator()
 
-		col := m.cols[idx]
-		w := m.colWidths[idx]
-
-		// Handle column spanning
-		span := 1
-		if col.ColumnSpan != nil {
-			span = col.ColumnSpan(rn.Data)
-		}
-		if span > 1 {
-			// Add widths of spanned columns
-			for s := 1; s < span; s++ {
-				nextIdx := idx + s
-				if nextIdx < len(m.cols) {
-					w += m.colWidths[nextIdx]
-					if m.styles.BorderColumn {
-						w++ // account for separator
-					}
-				}
+	// Fast path: when all cells use pre-computed stain styles, write directly
+	// into a strings.Builder via RenderTo with a reusable Block, avoiding
+	// per-cell String() copies and the []string intermediate slice.
+	useAllPrecomputed := m.styles.StyleFunc == nil && m.editState == nil
+	if useAllPrecomputed {
+		for _, idx := range colIndices {
+			col := m.cols[idx]
+			if col.CellStyle != nil || col.ColumnSpan != nil || idx >= len(m.colStyles) {
+				useAllPrecomputed = false
+				break
 			}
-			skipUntil = idx + span
 		}
+	}
+	if useAllPrecomputed && rowHeight == m.defaultRowHeight {
+		var b strings.Builder
+		first := true
+		for _, idx := range colIndices {
+			col := m.cols[idx]
 
-		// Get value
-		var val any
-		if col.ValueGetter != nil {
-			val = col.ValueGetter(rn.Data)
-		}
+			// Get value + format
+			var val any
+			if col.ValueGetter != nil {
+				val = col.ValueGetter(rn.Data)
+			}
+			formatted := conv.SprintValue(val)
+			if col.ValueFormatter != nil {
+				formatted = col.ValueFormatter(val, rn.Data)
+			}
 
-		// Format
-		formatted := conv.SprintValue(val)
-		if col.ValueFormatter != nil {
-			formatted = col.ValueFormatter(val, rn.Data)
-		}
+			// Select stain style
+			isSelected := !col.NoSelect && m.sel.ContainsCell(displayIndex, idx)
+			isFocused := m.focused && m.focusedCell.Row == displayIndex && m.focusedCell.Col == idx
 
-		// Check if this cell is being edited
-		if m.editState != nil && m.editState.position.Row == displayIndex && m.editState.position.Col == idx {
-			editorView := m.editState.editor.View()
-			cells = append(cells, m.styles.EditorInput.Width(w).MaxWidth(w).Height(rowHeight).Render(editorView))
-			continue
-		}
-
-		// Determine style — use pre-computed stain styles when possible
-		isSelected := !col.NoSelect && m.sel.ContainsCell(displayIndex, idx)
-		isFocused := m.focused && m.focusedCell.Row == displayIndex && m.focusedCell.Col == idx
-
-		usePrecomputed := m.styles.StyleFunc == nil && col.CellStyle == nil &&
-			idx < len(m.colStyles) && rowHeight == m.defaultRowHeight
-
-		if usePrecomputed {
 			cs := &m.colStyles[idx]
 			var ss *stain.Style
 			if isFocused {
@@ -365,15 +351,9 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 				ss = cs.cell
 			}
 
+			// Render content
 			contentWidth := cs.contentWidth
 			cellContent := formatted
-			ctx := data.CellContext[T]{
-				Value: val, FormattedValue: formatted,
-				Data: rn.Data, RowNode: rn, Column: &col,
-				ColumnIndex: idx, RowIndex: displayIndex,
-				IsSelected: isSelected, IsFocused: isFocused,
-				Width: contentWidth, Height: rowHeight,
-			}
 			var renderer data.CellRenderer[T]
 			if col.CellRendererSelector != nil {
 				renderer = col.CellRendererSelector(rn.Data)
@@ -382,60 +362,133 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 				renderer = col.CellRenderer
 			}
 			if renderer != nil {
+				ctx := data.CellContext[T]{
+					Value: val, FormattedValue: formatted,
+					Data: rn.Data, RowNode: rn, Column: &col,
+					ColumnIndex: idx, RowIndex: displayIndex,
+					IsSelected: isSelected, IsFocused: isFocused,
+					Width: contentWidth, Height: rowHeight,
+				}
 				cellContent = renderer.Render(ctx)
 			} else {
 				cellContent = ansi.Truncate(cellContent, contentWidth, "…")
 			}
-			cells = append(cells, ss.Render(cellContent).String())
-		} else {
-			// Fallback: custom StyleFunc or CellStyle — use lipgloss directly
-			style := m.styles.Cell
-			if isPinned {
-				style = m.styles.CellPinned
-			} else if displayIndex >= 0 && displayIndex%2 != 0 {
-				style = m.styles.CellOddRow
-			} else if displayIndex >= 0 {
-				style = m.styles.CellEvenRow
-			}
-			if isFocused {
-				style = m.styles.CellFocused
-			} else if isSelected {
-				style = m.styles.CellSelected
-			}
-			if m.styles.StyleFunc != nil {
-				style = applyCustomStyle(m.styles.StyleFunc(displayIndex, idx, rn.Data), style, isFocused, isSelected)
-			}
-			if col.CellStyle != nil {
-				style = applyCustomStyle(col.CellStyle(val, rn.Data), style, isFocused, isSelected)
-			}
-			style = style.Width(w).MaxWidth(w).Height(rowHeight)
 
-			contentWidth := w - style.GetHorizontalFrameSize()
-			if contentWidth < 1 {
-				contentWidth = 1
+			// Write separator + rendered cell bytes directly into builder
+			if !first {
+				b.WriteString(sep)
 			}
-			cellContent := formatted
-			ctx := data.CellContext[T]{
-				Value: val, FormattedValue: formatted,
-				Data: rn.Data, RowNode: rn, Column: &col,
-				ColumnIndex: idx, RowIndex: displayIndex,
-				IsSelected: isSelected, IsFocused: isFocused,
-				Width: contentWidth, Height: rowHeight,
+			first = false
+			ss.RenderTo(&m.cellBlock, cellContent)
+			rendered := m.cellBlock.Bytes()
+			// If any cell produces multi-line output, fall through to the
+			// slow path which handles cross-cell line alignment.
+			for _, c := range rendered {
+				if c == '\n' {
+					goto slowPath
+				}
 			}
-			var renderer data.CellRenderer[T]
-			if col.CellRendererSelector != nil {
-				renderer = col.CellRendererSelector(rn.Data)
-			}
-			if renderer == nil {
-				renderer = col.CellRenderer
-			}
-			if renderer != nil {
-				cellContent = renderer.Render(ctx)
-			} else {
-				cellContent = ansi.Truncate(cellContent, contentWidth, "…")
-			}
-			cells = append(cells, style.Render(cellContent))
+			b.Write(rendered)
 		}
+		return b.String()
+	}
+
+slowPath:
+
+	// Slow path: column spanning, editing, custom StyleFunc/CellStyle, or
+	// non-default row height. Collect []string and join via joinCellLines.
+	var cells []string
+	skipUntil := -1
+	for _, idx := range colIndices {
+		if idx < skipUntil {
+			continue
+		}
+
+		col := m.cols[idx]
+		w := m.colWidths[idx]
+
+		// Handle column spanning
+		span := 1
+		if col.ColumnSpan != nil {
+			span = col.ColumnSpan(rn.Data)
+		}
+		if span > 1 {
+			for s := 1; s < span; s++ {
+				nextIdx := idx + s
+				if nextIdx < len(m.cols) {
+					w += m.colWidths[nextIdx]
+					if m.styles.BorderColumn {
+						w++
+					}
+				}
+			}
+			skipUntil = idx + span
+		}
+
+		var val any
+		if col.ValueGetter != nil {
+			val = col.ValueGetter(rn.Data)
+		}
+		formatted := conv.SprintValue(val)
+		if col.ValueFormatter != nil {
+			formatted = col.ValueFormatter(val, rn.Data)
+		}
+
+		if m.editState != nil && m.editState.position.Row == displayIndex && m.editState.position.Col == idx {
+			editorView := m.editState.editor.View()
+			cells = append(cells, m.styles.EditorInput.Width(w).MaxWidth(w).Height(rowHeight).Render(editorView))
+			continue
+		}
+
+		isSelected := !col.NoSelect && m.sel.ContainsCell(displayIndex, idx)
+		isFocused := m.focused && m.focusedCell.Row == displayIndex && m.focusedCell.Col == idx
+
+		style := m.styles.Cell
+		if isPinned {
+			style = m.styles.CellPinned
+		} else if displayIndex >= 0 && displayIndex%2 != 0 {
+			style = m.styles.CellOddRow
+		} else if displayIndex >= 0 {
+			style = m.styles.CellEvenRow
+		}
+		if isFocused {
+			style = m.styles.CellFocused
+		} else if isSelected {
+			style = m.styles.CellSelected
+		}
+		if m.styles.StyleFunc != nil {
+			style = applyCustomStyle(m.styles.StyleFunc(displayIndex, idx, rn.Data), style, isFocused, isSelected)
+		}
+		if col.CellStyle != nil {
+			style = applyCustomStyle(col.CellStyle(val, rn.Data), style, isFocused, isSelected)
+		}
+		style = style.Width(w).MaxWidth(w).Height(rowHeight)
+
+		contentWidth := w - style.GetHorizontalFrameSize()
+		if contentWidth < 1 {
+			contentWidth = 1
+		}
+		cellContent := formatted
+		ctx := data.CellContext[T]{
+			Value: val, FormattedValue: formatted,
+			Data: rn.Data, RowNode: rn, Column: &col,
+			ColumnIndex: idx, RowIndex: displayIndex,
+			IsSelected: isSelected, IsFocused: isFocused,
+			Width: contentWidth, Height: rowHeight,
+		}
+		var renderer data.CellRenderer[T]
+		if col.CellRendererSelector != nil {
+			renderer = col.CellRendererSelector(rn.Data)
+		}
+		if renderer == nil {
+			renderer = col.CellRenderer
+		}
+		if renderer != nil {
+			cellContent = renderer.Render(ctx)
+		} else {
+			cellContent = ansi.Truncate(cellContent, contentWidth, "…")
+		}
+		cells = append(cells, style.Render(cellContent))
 	}
 
 	return m.joinCellLines(cells, colIndices)

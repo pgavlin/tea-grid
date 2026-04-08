@@ -120,6 +120,7 @@ type Model[T any] struct {
 	// Styles
 	styles    Styles
 	colStyles []colCellStyles // pre-computed per-column styles with Width/MaxWidth/Height applied
+	cellBlock stain.Block     // reusable block for cell rendering (avoids buffer growth allocs)
 }
 
 // colCellStyles holds pre-computed lipgloss styles for a single column,
