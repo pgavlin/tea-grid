@@ -7,6 +7,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/pgavlin/stain"
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/grouping"
 	"github.com/pgavlin/tea-grid/internal/conv"
@@ -225,28 +226,30 @@ func (m Model[T]) renderHeaderCells(colIndices []int) string {
 			header += " " + m.styles.SortDesc
 		}
 
-		// Apply header style — use pre-computed when possible
-		var style lipgloss.Style
-		if m.focusedCell.Row == -1 && m.focusedCell.Col == idx && m.focused {
-			if idx < len(m.colStyles) {
-				style = m.colStyles[idx].focused
+		// Apply header style — use pre-computed stain styles when possible
+		if idx < len(m.colStyles) {
+			var ss *stain.Style
+			if m.focusedCell.Row == -1 && m.focusedCell.Col == idx && m.focused {
+				ss = m.colStyles[idx].focused
 			} else {
-				style = m.styles.CellFocused.Width(w).MaxWidth(w)
+				ss = m.colStyles[idx].header
 			}
-		} else if idx < len(m.colStyles) {
-			style = m.colStyles[idx].header
+			contentWidth := m.colStyles[idx].contentWidth
+			header = data.TruncateOrPad(header, contentWidth)
+			cells = append(cells, ss.Render(header).String())
 		} else {
-			style = m.styles.HeaderCell.Width(w).MaxWidth(w)
+			style := m.styles.HeaderCell
+			if m.focusedCell.Row == -1 && m.focusedCell.Col == idx && m.focused {
+				style = m.styles.CellFocused
+			}
+			style = style.Width(w).MaxWidth(w)
+			contentWidth := w - style.GetHorizontalFrameSize()
+			if contentWidth < 1 {
+				contentWidth = 1
+			}
+			header = data.TruncateOrPad(header, contentWidth)
+			cells = append(cells, style.Render(header))
 		}
-
-		// Truncate header to content width (column width minus style padding/borders)
-		contentWidth := w - style.GetHorizontalFrameSize()
-		if contentWidth < 1 {
-			contentWidth = 1
-		}
-		header = data.TruncateOrPad(header, contentWidth)
-
-		cells = append(cells, style.RenderRef(header))
 	}
 	return strings.Join(cells, m.colSeparator())
 }
@@ -338,34 +341,55 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 			continue
 		}
 
-		// Determine style — use pre-computed styles when possible
+		// Determine style — use pre-computed stain styles when possible
 		isSelected := !col.NoSelect && m.sel.ContainsCell(displayIndex, idx)
 		isFocused := m.focused && m.focusedCell.Row == displayIndex && m.focusedCell.Col == idx
 
-		var style lipgloss.Style
-		usePrecomputed := m.styles.StyleFunc == nil && col.CellStyle == nil && idx < len(m.colStyles)
+		usePrecomputed := m.styles.StyleFunc == nil && col.CellStyle == nil &&
+			idx < len(m.colStyles) && rowHeight == m.defaultRowHeight
+
 		if usePrecomputed {
 			cs := &m.colStyles[idx]
+			var ss *stain.Style
 			if isFocused {
-				style = cs.focused
+				ss = cs.focused
 			} else if isSelected {
-				style = cs.selected
+				ss = cs.selected
 			} else if isPinned {
-				style = cs.pinned
+				ss = cs.pinned
 			} else if displayIndex >= 0 && displayIndex%2 != 0 {
-				style = cs.oddRow
+				ss = cs.oddRow
 			} else if displayIndex >= 0 {
-				style = cs.evenRow
+				ss = cs.evenRow
 			} else {
-				style = cs.cell
+				ss = cs.cell
 			}
-			// Apply row-specific height if it differs from default
-			if rowHeight != m.defaultRowHeight {
-				style = style.Height(rowHeight)
+
+			contentWidth := cs.contentWidth
+			cellContent := formatted
+			ctx := data.CellContext[T]{
+				Value: val, FormattedValue: formatted,
+				Data: rn.Data, RowNode: rn, Column: &col,
+				ColumnIndex: idx, RowIndex: displayIndex,
+				IsSelected: isSelected, IsFocused: isFocused,
+				Width: contentWidth, Height: rowHeight,
 			}
+			var renderer data.CellRenderer[T]
+			if col.CellRendererSelector != nil {
+				renderer = col.CellRendererSelector(rn.Data)
+			}
+			if renderer == nil {
+				renderer = col.CellRenderer
+			}
+			if renderer != nil {
+				cellContent = renderer.Render(ctx)
+			} else {
+				cellContent = ansi.Truncate(cellContent, contentWidth, "…")
+			}
+			cells = append(cells, ss.Render(cellContent).String())
 		} else {
-			// Fallback: custom StyleFunc or CellStyle — build per cell
-			style = m.styles.Cell
+			// Fallback: custom StyleFunc or CellStyle — use lipgloss directly
+			style := m.styles.Cell
 			if isPinned {
 				style = m.styles.CellPinned
 			} else if displayIndex >= 0 && displayIndex%2 != 0 {
@@ -385,49 +409,33 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 				style = applyCustomStyle(col.CellStyle(val, rn.Data), style, isFocused, isSelected)
 			}
 			style = style.Width(w).MaxWidth(w).Height(rowHeight)
-		}
 
-		// Compute content width (column width minus style padding/borders)
-		var contentWidth int
-		if usePrecomputed {
-			contentWidth = m.colStyles[idx].contentWidth
-		} else {
-			contentWidth = w - style.GetHorizontalFrameSize()
+			contentWidth := w - style.GetHorizontalFrameSize()
 			if contentWidth < 1 {
 				contentWidth = 1
 			}
+			cellContent := formatted
+			ctx := data.CellContext[T]{
+				Value: val, FormattedValue: formatted,
+				Data: rn.Data, RowNode: rn, Column: &col,
+				ColumnIndex: idx, RowIndex: displayIndex,
+				IsSelected: isSelected, IsFocused: isFocused,
+				Width: contentWidth, Height: rowHeight,
+			}
+			var renderer data.CellRenderer[T]
+			if col.CellRendererSelector != nil {
+				renderer = col.CellRendererSelector(rn.Data)
+			}
+			if renderer == nil {
+				renderer = col.CellRenderer
+			}
+			if renderer != nil {
+				cellContent = renderer.Render(ctx)
+			} else {
+				cellContent = ansi.Truncate(cellContent, contentWidth, "…")
+			}
+			cells = append(cells, style.Render(cellContent))
 		}
-
-		// Use custom renderer if available, otherwise default to formatted text
-		cellContent := formatted
-		ctx := data.CellContext[T]{
-			Value:          val,
-			FormattedValue: formatted,
-			Data:           rn.Data,
-			RowNode:        rn,
-			Column:         &col,
-			ColumnIndex:    idx,
-			RowIndex:       displayIndex,
-			IsSelected:     isSelected,
-			IsFocused:      isFocused,
-			Width:          contentWidth,
-			Height:         rowHeight,
-		}
-
-		var renderer data.CellRenderer[T]
-		if col.CellRendererSelector != nil {
-			renderer = col.CellRendererSelector(rn.Data)
-		}
-		if renderer == nil {
-			renderer = col.CellRenderer
-		}
-		if renderer != nil {
-			cellContent = renderer.Render(ctx)
-		} else {
-			cellContent = ansi.Truncate(cellContent, contentWidth, "…")
-		}
-
-		cells = append(cells, style.RenderRef(cellContent))
 	}
 
 	return m.joinCellLines(cells, colIndices)
@@ -588,7 +596,7 @@ func (m Model[T]) renderAggCells(rn *data.RowNode[T], colIndices []int) string {
 		}
 
 		sized := style.Width(w).MaxWidth(w)
-		cells = append(cells, sized.RenderRef(cellContent))
+		cells = append(cells, sized.Render(cellContent))
 	}
 
 	return strings.Join(cells, m.colSeparator())

@@ -12,6 +12,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/pgavlin/stain"
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
@@ -125,13 +126,13 @@ type Model[T any] struct {
 // with Width, MaxWidth, and Height already applied. This avoids copying
 // the 648-byte Style struct 3 times per cell per frame.
 type colCellStyles struct {
-	cell     lipgloss.Style
-	evenRow  lipgloss.Style
-	oddRow   lipgloss.Style
-	focused  lipgloss.Style
-	selected lipgloss.Style
-	pinned   lipgloss.Style
-	header   lipgloss.Style
+	cell     *stain.Style
+	evenRow  *stain.Style
+	oddRow   *stain.Style
+	focused  *stain.Style
+	selected *stain.Style
+	pinned   *stain.Style
+	header   *stain.Style
 	// contentWidth is the usable cell width (column width minus horizontal
 	// frame size). Pre-computed to avoid calling GetHorizontalFrameSize()
 	// per cell, which copies the 648-byte Style struct.
@@ -1229,23 +1230,24 @@ func (m *Model[T]) rebuildColStyles() {
 	if h < 1 {
 		h = 1
 	}
+	profile := stain.ANSI256
 	for i, w := range m.colWidths {
-		apply := func(s lipgloss.Style) lipgloss.Style {
-			return s.Width(w).MaxWidth(w).Height(h)
+		apply := func(s lipgloss.Style) *stain.Style {
+			return stain.Compile(s.Width(w).MaxWidth(w).Height(h), profile)
 		}
-		cell := apply(m.styles.Cell)
+		cell := m.styles.Cell.Width(w).MaxWidth(w).Height(h)
 		contentWidth := w - cell.GetHorizontalFrameSize()
 		if contentWidth < 1 {
 			contentWidth = 1
 		}
 		m.colStyles[i] = colCellStyles{
-			cell:         cell,
+			cell:         stain.Compile(cell, profile),
 			evenRow:      apply(m.styles.CellEvenRow),
 			oddRow:       apply(m.styles.CellOddRow),
 			focused:      apply(m.styles.CellFocused),
 			selected:     apply(m.styles.CellSelected),
 			pinned:       apply(m.styles.CellPinned),
-			header:       m.styles.HeaderCell.Width(w).MaxWidth(w),
+			header:       stain.Compile(m.styles.HeaderCell.Width(w).MaxWidth(w), profile),
 			contentWidth: contentWidth,
 		}
 	}
