@@ -1,8 +1,10 @@
 package grid
 
 import (
+	"cmp"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -49,14 +51,14 @@ func makeBenchRows(n int) []benchRow {
 
 func benchCols() []data.Column[benchRow] {
 	return []data.Column[benchRow]{
-		{ColumnID: "Name", HeaderName: "Name", ValueGetter: func(r benchRow) any { return r.Name }, Sortable: true, Filterable: true, MinWidth: 4, Flex: 1},
-		{ColumnID: "Department", HeaderName: "Department", ValueGetter: func(r benchRow) any { return r.Department }, Sortable: true, Filterable: true, MinWidth: 4, Flex: 1},
-		{ColumnID: "City", HeaderName: "City", ValueGetter: func(r benchRow) any { return r.City }, Sortable: true, Filterable: true, MinWidth: 4, Flex: 1},
-		{ColumnID: "Country", HeaderName: "Country", ValueGetter: func(r benchRow) any { return r.Country }, Sortable: true, Filterable: true, MinWidth: 4, Flex: 1},
-		{ColumnID: "Salary", HeaderName: "Salary", ValueGetter: func(r benchRow) any { return r.Salary }, Sortable: true, Filterable: true, MinWidth: 4},
-		{ColumnID: "Age", HeaderName: "Age", ValueGetter: func(r benchRow) any { return r.Age }, Sortable: true, Filterable: true, MinWidth: 4},
-		{ColumnID: "Active", HeaderName: "Active", ValueGetter: func(r benchRow) any { return r.Active }, Sortable: true, Filterable: true, MinWidth: 4},
-		{ColumnID: "Score", HeaderName: "Score", ValueGetter: func(r benchRow) any { return r.Score }, Sortable: true, Filterable: true, MinWidth: 4},
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r benchRow) any { return r.Name }, Text: func(r *benchRow) string { return r.Name }, Compare: func(a, b *benchRow) int { return strings.Compare(a.Name, b.Name) }, Sortable: true, Filterable: true, MinWidth: 4, Flex: 1},
+		{ColumnID: "Department", HeaderName: "Department", Value: func(r benchRow) any { return r.Department }, Text: func(r *benchRow) string { return r.Department }, Compare: func(a, b *benchRow) int { return strings.Compare(a.Department, b.Department) }, Sortable: true, Filterable: true, MinWidth: 4, Flex: 1},
+		{ColumnID: "City", HeaderName: "City", Value: func(r benchRow) any { return r.City }, Text: func(r *benchRow) string { return r.City }, Compare: func(a, b *benchRow) int { return strings.Compare(a.City, b.City) }, Sortable: true, Filterable: true, MinWidth: 4, Flex: 1},
+		{ColumnID: "Country", HeaderName: "Country", Value: func(r benchRow) any { return r.Country }, Text: func(r *benchRow) string { return r.Country }, Compare: func(a, b *benchRow) int { return strings.Compare(a.Country, b.Country) }, Sortable: true, Filterable: true, MinWidth: 4, Flex: 1},
+		{ColumnID: "Salary", HeaderName: "Salary", Value: func(r benchRow) any { return r.Salary }, Text: func(r *benchRow) string { return strconv.FormatFloat(r.Salary, 'f', 0, 64) }, Compare: func(a, b *benchRow) int { return cmp.Compare(a.Salary, b.Salary) }, Sortable: true, Filterable: true, MinWidth: 4},
+		{ColumnID: "Age", HeaderName: "Age", Value: func(r benchRow) any { return r.Age }, Text: func(r *benchRow) string { return strconv.Itoa(r.Age) }, Compare: func(a, b *benchRow) int { return cmp.Compare(a.Age, b.Age) }, Sortable: true, Filterable: true, MinWidth: 4},
+		{ColumnID: "Active", HeaderName: "Active", Value: func(r benchRow) any { return r.Active }, Text: func(r *benchRow) string { return strconv.FormatBool(r.Active) }, Sortable: true, Filterable: true, MinWidth: 4},
+		{ColumnID: "Score", HeaderName: "Score", Value: func(r benchRow) any { return r.Score }, Text: func(r *benchRow) string { return strconv.FormatFloat(r.Score, 'f', 1, 64) }, Compare: func(a, b *benchRow) int { return cmp.Compare(a.Score, b.Score) }, Sortable: true, Filterable: true, MinWidth: 4},
 	}
 }
 

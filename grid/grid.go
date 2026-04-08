@@ -977,7 +977,7 @@ func (m *Model[T]) rebuildActiveFilters() {
 func (m *Model[T]) passesColumnFilters(data T) bool {
 	for _, i := range m.activeFilters {
 		col := m.cols[i]
-		val := col.ValueGetter(data)
+		val := col.Value(data)
 		if !col.Filter.Matches(val) {
 			return false
 		}
@@ -996,10 +996,15 @@ func (m *Model[T]) passesQuickFilter(rn *data.RowNode[T], words []string) bool {
 				}
 				continue
 			}
-			if col.ValueGetter == nil {
+			var text string
+			if col.Text != nil {
+				text = col.Text(&rn.Data)
+			} else if col.Value != nil {
+				text = conv.SprintValue(col.Value(rn.Data))
+			} else {
 				continue
 			}
-			if containsFold(conv.SprintValue(col.ValueGetter(rn.Data)), word) {
+			if containsFold(text, word) {
 				found = true
 				break
 			}
@@ -1035,17 +1040,23 @@ func (m *Model[T]) sortRows(rows []*data.RowNode[T]) {
 	sort.SliceStable(rows, func(i, j int) bool {
 		for _, sc := range m.sortModel.SortOrder {
 			col := m.findCol(sc.ColumnID)
-			if col == nil || col.ValueGetter == nil {
+			if col == nil {
 				continue
 			}
-			a := col.ValueGetter(rows[i].Data)
-			b := col.ValueGetter(rows[j].Data)
 
 			var cmp int
-			if col.Comparator != nil {
-				cmp = col.Comparator(a, b)
+			if col.Compare != nil {
+				cmp = col.Compare(&rows[i].Data, &rows[j].Data)
+			} else if col.Value != nil {
+				a := col.Value(rows[i].Data)
+				b := col.Value(rows[j].Data)
+				if col.Comparator != nil {
+					cmp = col.Comparator(a, b)
+				} else {
+					cmp = defaultCompare(a, b)
+				}
 			} else {
-				cmp = defaultCompare(a, b)
+				continue
 			}
 
 			if sc.Direction == data.SortDesc {
@@ -1076,7 +1087,7 @@ func (m *Model[T]) sortGroupsAtLevel(groups []*data.RowNode[T], level int) {
 		}
 		if sortDir != data.SortNone {
 			col := m.findCol(groupColumnID)
-			if col != nil && col.ValueGetter != nil {
+			if col != nil && col.Value != nil {
 				sort.SliceStable(groups, func(i, j int) bool {
 					aVal := m.firstLeafValue(groups[i], col)
 					bVal := m.firstLeafValue(groups[j], col)
@@ -1115,7 +1126,7 @@ func (m *Model[T]) sortGroupsAtLevel(groups []*data.RowNode[T], level int) {
 // firstLeafValue walks down to the first leaf row and returns the column value.
 func (m *Model[T]) firstLeafValue(node *data.RowNode[T], col *data.Column[T]) any {
 	if !node.IsGroup {
-		return col.ValueGetter(node.Data)
+		return col.Value(node.Data)
 	}
 	if len(node.Children) > 0 {
 		return m.firstLeafValue(node.Children[0], col)

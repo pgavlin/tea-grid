@@ -323,14 +323,19 @@ func (m Model[T]) renderCells(rn *data.RowNode[T], colIndices []int, displayInde
 		for _, idx := range colIndices {
 			col := m.cols[idx]
 
-			// Get value + format
+			// Get display text — use typed Text path when available
+			var formatted string
 			var val any
-			if col.ValueGetter != nil {
-				val = col.ValueGetter(rn.Data)
-			}
-			formatted := conv.SprintValue(val)
-			if col.ValueFormatter != nil {
-				formatted = col.ValueFormatter(val, rn.Data)
+			if col.Text != nil {
+				formatted = col.Text(&rn.Data)
+			} else {
+				if col.Value != nil {
+					val = col.Value(rn.Data)
+				}
+				formatted = conv.SprintValue(val)
+				if col.ValueFormatter != nil {
+					formatted = col.ValueFormatter(val, rn.Data)
+				}
 			}
 
 			// Select stain style
@@ -428,8 +433,8 @@ slowPath:
 		}
 
 		var val any
-		if col.ValueGetter != nil {
-			val = col.ValueGetter(rn.Data)
+		if col.Value != nil {
+			val = col.Value(rn.Data)
 		}
 		formatted := conv.SprintValue(val)
 		if col.ValueFormatter != nil {
@@ -664,8 +669,8 @@ func collectLeafValues[T any](node *data.RowNode[T], col *data.Column[T]) []any 
 	for _, child := range node.Children {
 		if child.IsGroup {
 			values = append(values, collectLeafValues(child, col)...)
-		} else if col.ValueGetter != nil {
-			values = append(values, col.ValueGetter(child.Data))
+		} else if col.Value != nil {
+			values = append(values, col.Value(child.Data))
 		}
 	}
 	return values

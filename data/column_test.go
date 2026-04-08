@@ -73,16 +73,16 @@ func TestFromTypeExportedFields(t *testing.T) {
 	}
 }
 
-func TestFromTypeValueGetter(t *testing.T) {
+func TestFromTypeValue(t *testing.T) {
 	cols := FromType[Person]()
 	p := Person{Name: "Alice", Age: 30}
 
-	name := cols[0].ValueGetter(p)
+	name := cols[0].Value(p)
 	if name != "Alice" {
 		t.Errorf("Name getter: expected Alice, got %v", name)
 	}
 
-	age := cols[1].ValueGetter(p)
+	age := cols[1].Value(p)
 	if age != 30 {
 		t.Errorf("Age getter: expected 30, got %v", age)
 	}
@@ -95,7 +95,7 @@ func TestFromTypePointerType(t *testing.T) {
 	}
 
 	p := &Person{Name: "Bob", Age: 25}
-	name := cols[0].ValueGetter(p)
+	name := cols[0].Value(p)
 	if name != "Bob" {
 		t.Errorf("pointer Name getter: expected Bob, got %v", name)
 	}
@@ -151,7 +151,7 @@ func TestFromTypeMultipleFieldTypes(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := cols[tt.idx].ValueGetter(row)
+		got := cols[tt.idx].Value(row)
 		if got != tt.want {
 			t.Errorf("col %d: got %v, want %v", tt.idx, got, tt.want)
 		}
@@ -238,16 +238,16 @@ func TestFromRowsMapStringAny(t *testing.T) {
 	if !ok {
 		t.Fatal("missing 'name' column")
 	}
-	if v := nameCol.ValueGetter(rows[0]); v != "Alice" {
-		t.Errorf("name ValueGetter: expected Alice, got %v", v)
+	if v := nameCol.Value(rows[0]); v != "Alice" {
+		t.Errorf("name Value: expected Alice, got %v", v)
 	}
 
 	ageCol, ok := colMap["age"]
 	if !ok {
 		t.Fatal("missing 'age' column")
 	}
-	if v := ageCol.ValueGetter(rows[0]); v != float64(30) {
-		t.Errorf("age ValueGetter: expected 30, got %v", v)
+	if v := ageCol.Value(rows[0]); v != float64(30) {
+		t.Errorf("age Value: expected 30, got %v", v)
 	}
 }
 
@@ -299,7 +299,7 @@ func TestFromRowsMapTimeConversion(t *testing.T) {
 		t.Fatalf("expected 1 column, got %d", len(cols))
 	}
 
-	v := cols[0].ValueGetter(rows[0])
+	v := cols[0].Value(rows[0])
 	if _, ok := v.(time.Time); !ok {
 		t.Errorf("expected time.Time, got %T (%v)", v, v)
 	}
@@ -374,7 +374,7 @@ func TestFromRowsSliceOfStructs(t *testing.T) {
 	}
 }
 
-func TestFromRowsSliceValueGetter(t *testing.T) {
+func TestFromRowsSliceValue(t *testing.T) {
 	rows := [][]any{
 		{sliceTestPerson{Name: "Alice", Age: 30, Email: "alice@test.com"}},
 		{sliceTestProduct{Name: "Widget", Price: 9.99, InStock: true}},
@@ -388,19 +388,19 @@ func TestFromRowsSliceValueGetter(t *testing.T) {
 
 	// Name exists on both types.
 	nameCol := colMap["Name"]
-	if v := nameCol.ValueGetter(rows[0]); v != "Alice" {
+	if v := nameCol.Value(rows[0]); v != "Alice" {
 		t.Errorf("Name from Person: expected Alice, got %v", v)
 	}
-	if v := nameCol.ValueGetter(rows[1]); v != "Widget" {
+	if v := nameCol.Value(rows[1]); v != "Widget" {
 		t.Errorf("Name from Product: expected Widget, got %v", v)
 	}
 
 	// Age only exists on Person; nil from Product.
 	ageCol := colMap["Age"]
-	if v := ageCol.ValueGetter(rows[0]); v != 30 {
+	if v := ageCol.Value(rows[0]); v != 30 {
 		t.Errorf("Age from Person: expected 30, got %v", v)
 	}
-	if v := ageCol.ValueGetter(rows[1]); v != nil {
+	if v := ageCol.Value(rows[1]); v != nil {
 		t.Errorf("Age from Product: expected nil, got %v", v)
 	}
 }
@@ -454,8 +454,8 @@ func TestFromRowsStructFallback(t *testing.T) {
 		t.Errorf("second col: expected Age, got %q", cols[1].ColumnID)
 	}
 
-	// Verify ValueGetter works.
-	if v := cols[0].ValueGetter(rows[0]); v != "Alice" {
+	// Verify Value works.
+	if v := cols[0].Value(rows[0]); v != "Alice" {
 		t.Errorf("Name getter: expected Alice, got %v", v)
 	}
 }
@@ -474,11 +474,11 @@ func TestFromTypeNilPointerValue(t *testing.T) {
 	if len(cols) != 2 {
 		t.Fatalf("expected 2 columns, got %d", len(cols))
 	}
-	// ValueGetter with a nil pointer should return nil.
+	// Value with a nil pointer should return nil.
 	var p *Person
-	v := cols[0].ValueGetter(p)
+	v := cols[0].Value(p)
 	if v != nil {
-		t.Errorf("nil pointer ValueGetter should return nil, got %v", v)
+		t.Errorf("nil pointer Value should return nil, got %v", v)
 	}
 }
 
@@ -549,7 +549,7 @@ func TestMakeMapColumnBoolNilValue(t *testing.T) {
 	col := makeMapColumn[map[string]any]("flag", "bool")
 	// Row with nil value for the key.
 	row := map[string]any{"flag": nil}
-	v := col.ValueGetter(row)
+	v := col.Value(row)
 	if v != nil {
 		t.Errorf("bool category nil value: expected nil, got %v", v)
 	}
@@ -560,7 +560,7 @@ func TestMakeMapColumnBoolNilValue(t *testing.T) {
 func TestMakeMapColumnBoolValue(t *testing.T) {
 	col := makeMapColumn[map[string]any]("flag", "bool")
 	row := map[string]any{"flag": true}
-	v := col.ValueGetter(row)
+	v := col.Value(row)
 	if v != true {
 		t.Errorf("bool category: expected true, got %v", v)
 	}
@@ -571,7 +571,7 @@ func TestMakeMapColumnBoolValue(t *testing.T) {
 func TestMakeMapColumnBoolNonBoolValue(t *testing.T) {
 	col := makeMapColumn[map[string]any]("flag", "bool")
 	row := map[string]any{"flag": "notbool"}
-	v := col.ValueGetter(row)
+	v := col.Value(row)
 	if v != "notbool" {
 		t.Errorf("bool category non-bool value: expected 'notbool', got %v", v)
 	}
@@ -584,21 +584,21 @@ func TestMakeMapColumnTimeCategory(t *testing.T) {
 
 	// Valid time string.
 	row := map[string]any{"date": "2025-06-15"}
-	v := col.ValueGetter(row)
+	v := col.Value(row)
 	if _, ok := v.(time.Time); !ok {
 		t.Errorf("time category: expected time.Time, got %T (%v)", v, v)
 	}
 
 	// Nil value.
 	row2 := map[string]any{"date": nil}
-	v2 := col.ValueGetter(row2)
+	v2 := col.Value(row2)
 	if v2 != nil {
 		t.Errorf("time category nil: expected nil, got %v", v2)
 	}
 
 	// Non-parseable string.
 	row3 := map[string]any{"date": "not-a-date"}
-	v3 := col.ValueGetter(row3)
+	v3 := col.Value(row3)
 	// Should return the string as-is since it doesn't parse.
 	if v3 != "not-a-date" {
 		t.Errorf("time category non-parseable: expected 'not-a-date', got %v", v3)
@@ -606,7 +606,7 @@ func TestMakeMapColumnTimeCategory(t *testing.T) {
 
 	// Non-string value.
 	row4 := map[string]any{"date": 12345}
-	v4 := col.ValueGetter(row4)
+	v4 := col.Value(row4)
 	if v4 != 12345 {
 		t.Errorf("time category non-string: expected 12345, got %v", v4)
 	}
@@ -617,7 +617,7 @@ func TestMakeMapColumnTimeCategory(t *testing.T) {
 func TestMakeMapColumnNumberNilValue(t *testing.T) {
 	col := makeMapColumn[map[string]any]("score", "number")
 	row := map[string]any{"score": nil}
-	v := col.ValueGetter(row)
+	v := col.Value(row)
 	if v != nil {
 		t.Errorf("number category nil: expected nil, got %v", v)
 	}
@@ -628,7 +628,7 @@ func TestMakeMapColumnNumberNilValue(t *testing.T) {
 func TestMakeMapColumnNumberNonFloat(t *testing.T) {
 	col := makeMapColumn[map[string]any]("score", "number")
 	row := map[string]any{"score": "notanumber"}
-	v := col.ValueGetter(row)
+	v := col.Value(row)
 	if v != "notanumber" {
 		t.Errorf("number category non-float: expected 'notanumber', got %v", v)
 	}
@@ -639,7 +639,7 @@ func TestMakeMapColumnNumberNonFloat(t *testing.T) {
 func TestMakeMapColumnStringNilValue(t *testing.T) {
 	col := makeMapColumn[map[string]any]("label", "string")
 	row := map[string]any{"label": nil}
-	v := col.ValueGetter(row)
+	v := col.Value(row)
 	if v != nil {
 		t.Errorf("string category nil: expected nil, got %v", v)
 	}
@@ -980,7 +980,7 @@ func TestFromRowsEmptySliceOfSlices(t *testing.T) {
 func TestMakeMapColumnIntCategory(t *testing.T) {
 	col := makeMapColumn[map[string]any]("count", "int")
 	row := map[string]any{"count": float64(42)}
-	v := col.ValueGetter(row)
+	v := col.Value(row)
 	if v != float64(42) {
 		t.Errorf("int category: expected 42, got %v", v)
 	}
@@ -991,7 +991,7 @@ func TestMakeMapColumnIntCategory(t *testing.T) {
 func TestMakeMapColumnStringCategory(t *testing.T) {
 	col := makeMapColumn[map[string]any]("name", "string")
 	row := map[string]any{"name": 42}
-	v := col.ValueGetter(row)
+	v := col.Value(row)
 	// Default category calls fmt.Sprint on non-nil values.
 	if v != "42" {
 		t.Errorf("string category fmt.Sprint: expected '42', got %v", v)

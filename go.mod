@@ -9,6 +9,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/klauspost/compress v1.18.4
+	github.com/pgavlin/stain v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -23,7 +24,6 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-runewidth v0.0.20 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/pgavlin/stain v0.0.0-00010101000000-000000000000 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect

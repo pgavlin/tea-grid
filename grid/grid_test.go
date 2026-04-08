@@ -28,10 +28,10 @@ type TestRow struct {
 
 func testCols() []data.Column[TestRow] {
 	return []data.Column[TestRow]{
-		{ColumnID: "Name", HeaderName: "Name", ValueGetter: func(r TestRow) any { return r.Name }, Sortable: true, Filterable: true, MinWidth: 4},
-		{ColumnID: "Department", HeaderName: "Department", ValueGetter: func(r TestRow) any { return r.Department }, Sortable: true, Filterable: true, MinWidth: 4},
-		{ColumnID: "Salary", HeaderName: "Salary", ValueGetter: func(r TestRow) any { return r.Salary }, Sortable: true, Filterable: true, MinWidth: 4},
-		{ColumnID: "Active", HeaderName: "Active", ValueGetter: func(r TestRow) any { return r.Active }, Sortable: true, Filterable: true, MinWidth: 4},
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, Sortable: true, Filterable: true, MinWidth: 4},
+		{ColumnID: "Department", HeaderName: "Department", Value: func(r TestRow) any { return r.Department }, Sortable: true, Filterable: true, MinWidth: 4},
+		{ColumnID: "Salary", HeaderName: "Salary", Value: func(r TestRow) any { return r.Salary }, Sortable: true, Filterable: true, MinWidth: 4},
+		{ColumnID: "Active", HeaderName: "Active", Value: func(r TestRow) any { return r.Active }, Sortable: true, Filterable: true, MinWidth: 4},
 	}
 }
 
@@ -375,7 +375,7 @@ func TestSetRows_Rows_RoundTrip(t *testing.T) {
 func TestSetColumns_Columns_RoundTrip(t *testing.T) {
 	m := newTestGrid()
 	newCols := []data.Column[TestRow]{
-		{ColumnID: "Name", HeaderName: "Name", ValueGetter: func(r TestRow) any { return r.Name }},
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }},
 	}
 	m.SetColumns(newCols)
 	got := m.Columns()
@@ -707,8 +707,8 @@ func TestRemoveRow_DeselectsRemovedRow(t *testing.T) {
 
 func TestColumnSizing_FixedWidth(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 20},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Width: 20},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Width: 30},
 	}
 	m := newTestGrid(WithColumns[TestRow](cols))
 	if m.colWidths[0] != 20 {
@@ -721,8 +721,8 @@ func TestColumnSizing_FixedWidth(t *testing.T) {
 
 func TestColumnSizing_FlexDistribution(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -738,8 +738,8 @@ func TestColumnSizing_FlexDistribution(t *testing.T) {
 
 func TestColumnSizing_MinWidthRespected(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, MinWidth: 10, Flex: 1},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, MinWidth: 10, Flex: 1},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, MinWidth: 10, Flex: 1},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, MinWidth: 10, Flex: 1},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -754,8 +754,8 @@ func TestColumnSizing_MinWidthRespected(t *testing.T) {
 
 func TestColumnSizing_MaxWidthClamped(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4, MaxWidth: 15},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4, MaxWidth: 15},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -767,8 +767,8 @@ func TestColumnSizing_MaxWidthClamped(t *testing.T) {
 
 func TestColumnSizing_MixedFixedAndFlex(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 20},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Width: 20},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -784,8 +784,8 @@ func TestColumnSizing_MixedFixedAndFlex(t *testing.T) {
 
 func TestColumnSizing_BorderColumnSubtractsSpace(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = true
@@ -799,7 +799,7 @@ func TestColumnSizing_BorderColumnSubtractsSpace(t *testing.T) {
 
 func TestColumnSizing_SingleFlexColumn(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -811,8 +811,8 @@ func TestColumnSizing_SingleFlexColumn(t *testing.T) {
 
 func TestColumnSizing_HiddenColumnsGetWidthZero(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4, Hide: true},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4, Hide: true},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -2521,9 +2521,9 @@ func TestSelectedRowNodes(t *testing.T) {
 func TestHorizontalScroll_ColumnsExceedViewport(t *testing.T) {
 	// Create columns whose MinWidths total > viewport width (80)
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, MinWidth: 30},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, MinWidth: 30},
-		{ColumnID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, MinWidth: 30},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, MinWidth: 30},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, MinWidth: 30},
+		{ColumnID: "C", HeaderName: "C", Value: func(r TestRow) any { return r.Salary }, MinWidth: 30},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -2551,10 +2551,10 @@ func TestHorizontalScroll_ColumnsExceedViewport(t *testing.T) {
 func TestHorizontalScroll_LeftColUpdatesVisibleCols(t *testing.T) {
 	// Columns with varying widths; total exceeds viewport width
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 25},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 25},
-		{ColumnID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 25},
-		{ColumnID: "D", HeaderName: "D", ValueGetter: func(r TestRow) any { return r.Active }, Width: 25},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Width: 25},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Width: 25},
+		{ColumnID: "C", HeaderName: "C", Value: func(r TestRow) any { return r.Salary }, Width: 25},
+		{ColumnID: "D", HeaderName: "D", Value: func(r TestRow) any { return r.Active }, Width: 25},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -2582,10 +2582,10 @@ func TestHorizontalScroll_LeftColUpdatesVisibleCols(t *testing.T) {
 func TestHorizontalScroll_VaryingWidths(t *testing.T) {
 	// First column is very wide, rest are narrow
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 50},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 10},
-		{ColumnID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 10},
-		{ColumnID: "D", HeaderName: "D", ValueGetter: func(r TestRow) any { return r.Active }, Width: 10},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Width: 50},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Width: 10},
+		{ColumnID: "C", HeaderName: "C", Value: func(r TestRow) any { return r.Salary }, Width: 10},
+		{ColumnID: "D", HeaderName: "D", Value: func(r TestRow) any { return r.Active }, Width: 10},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -2628,9 +2628,9 @@ func TestHorizontalScroll_VaryingWidths(t *testing.T) {
 func TestUpdateVisibleColCount_CountsFromLeftCol(t *testing.T) {
 	// Set up a grid with fixed-width columns that exceed viewport
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 30},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30},
-		{ColumnID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 30},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Width: 30},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Width: 30},
+		{ColumnID: "C", HeaderName: "C", Value: func(r TestRow) any { return r.Salary }, Width: 30},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -3783,13 +3783,13 @@ func TestPassesColumnFilters_SkipColumnBeingEdited(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// grid.go:710 - passesQuickFilter: column with nil ValueGetter
+// grid.go:710 - passesQuickFilter: column with nil Value
 // -----------------------------------------------------------------------
 
-func TestPassesQuickFilter_NilValueGetter(t *testing.T) {
+func TestPassesQuickFilter_NilValue(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "Name", HeaderName: "Name", ValueGetter: func(r TestRow) any { return r.Name }, MinWidth: 4},
-		{ColumnID: "NilGetter", HeaderName: "NilGetter", ValueGetter: nil, MinWidth: 4},
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, MinWidth: 4},
+		{ColumnID: "NilGetter", HeaderName: "NilGetter", Value: nil, MinWidth: 4},
 	}
 	m := New[TestRow](
 		WithColumns[TestRow](cols),
@@ -3801,14 +3801,14 @@ func TestPassesQuickFilter_NilValueGetter(t *testing.T) {
 	// Set a quick filter that matches Alice
 	m.SetQuickFilter("alice")
 	m.recomputeDisplayRows()
-	// Should match Alice despite the nil ValueGetter column
+	// Should match Alice despite the nil Value column
 	if len(m.displayRows) != 1 {
-		t.Errorf("expected 1 row matching 'alice' with nil ValueGetter column, got %d", len(m.displayRows))
+		t.Errorf("expected 1 row matching 'alice' with nil Value column, got %d", len(m.displayRows))
 	}
 }
 
 // -----------------------------------------------------------------------
-// grid.go:735 - sortRows: custom Comparator, nil col/ValueGetter skip
+// grid.go:735 - sortRows: custom Comparator, nil col/Value skip
 // -----------------------------------------------------------------------
 
 func TestSortRows_CustomComparator(t *testing.T) {
@@ -3852,9 +3852,9 @@ func TestSortRows_NilColSkip(t *testing.T) {
 	}
 }
 
-func TestSortRows_NilValueGetterSkip(t *testing.T) {
+func TestSortRows_NilValueSkip(t *testing.T) {
 	cols := testCols()
-	cols[0].ValueGetter = nil // nil ValueGetter on first column
+	cols[0].Value = nil // nil Value on first column
 	m := newTestGrid(
 		WithColumns[TestRow](cols),
 		WithDefaultSort[TestRow]([]gridsort.SortCriterion{
@@ -3976,8 +3976,8 @@ func TestFindCol_NotFound(t *testing.T) {
 
 func TestComputeColWidths_MaxWidthClamp(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4, MaxWidth: 10},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4, MaxWidth: 10},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Flex: 1, MinWidth: 4, MaxWidth: 10},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Flex: 1, MinWidth: 4, MaxWidth: 10},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -4058,10 +4058,10 @@ func TestUpdateVisibleColCount_LeftColExceedsCenter(t *testing.T) {
 
 func TestUpdateVisibleColCount_PinnedColumnsSubtractWidth(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "Left", HeaderName: "Left", ValueGetter: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, Width: 30, MinWidth: 4},
-		{ColumnID: "Center1", HeaderName: "C1", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30, MinWidth: 4},
-		{ColumnID: "Center2", HeaderName: "C2", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 30, MinWidth: 4},
-		{ColumnID: "Right", HeaderName: "Right", ValueGetter: func(r TestRow) any { return r.Active }, Pinned: data.PinRight, Width: 30, MinWidth: 4},
+		{ColumnID: "Left", HeaderName: "Left", Value: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, Width: 30, MinWidth: 4},
+		{ColumnID: "Center1", HeaderName: "C1", Value: func(r TestRow) any { return r.Department }, Width: 30, MinWidth: 4},
+		{ColumnID: "Center2", HeaderName: "C2", Value: func(r TestRow) any { return r.Salary }, Width: 30, MinWidth: 4},
+		{ColumnID: "Right", HeaderName: "Right", Value: func(r TestRow) any { return r.Active }, Pinned: data.PinRight, Width: 30, MinWidth: 4},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -4150,10 +4150,10 @@ func TestRenderFilterEditor_ColIdxNegative(t *testing.T) {
 
 func TestRenderGroupHeaders_PinnedColumnGroups(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "Name", HeaderName: "Name", ValueGetter: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, MinWidth: 4},
-		{ColumnID: "Department", HeaderName: "Dept", ValueGetter: func(r TestRow) any { return r.Department }, MinWidth: 4},
-		{ColumnID: "Salary", HeaderName: "Sal", ValueGetter: func(r TestRow) any { return r.Salary }, MinWidth: 4},
-		{ColumnID: "Active", HeaderName: "Act", ValueGetter: func(r TestRow) any { return r.Active }, Pinned: data.PinRight, MinWidth: 4},
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, MinWidth: 4},
+		{ColumnID: "Department", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, MinWidth: 4},
+		{ColumnID: "Salary", HeaderName: "Sal", Value: func(r TestRow) any { return r.Salary }, MinWidth: 4},
+		{ColumnID: "Active", HeaderName: "Act", Value: func(r TestRow) any { return r.Active }, Pinned: data.PinRight, MinWidth: 4},
 	}
 	groups := []data.ColumnGroup[TestRow]{
 		{HeaderName: "Personal", Columns: cols[:2]},
@@ -4181,12 +4181,12 @@ func TestRenderGroupHeaders_PinnedColumnGroups(t *testing.T) {
 func TestRenderHeader_ScrollIndicators(t *testing.T) {
 	// Create many columns that exceed viewport width, with left+right pinned
 	cols := []data.Column[TestRow]{
-		{ColumnID: "Left", HeaderName: "Left", ValueGetter: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, Width: 10, MinWidth: 4},
-		{ColumnID: "C1", HeaderName: "C1", ValueGetter: func(r TestRow) any { return r.Department }, Width: 20, MinWidth: 4},
-		{ColumnID: "C2", HeaderName: "C2", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 20, MinWidth: 4},
-		{ColumnID: "C3", HeaderName: "C3", ValueGetter: func(r TestRow) any { return r.Active }, Width: 20, MinWidth: 4},
-		{ColumnID: "C4", HeaderName: "C4", ValueGetter: func(r TestRow) any { return r.Name }, Width: 20, MinWidth: 4},
-		{ColumnID: "Right", HeaderName: "Right", ValueGetter: func(r TestRow) any { return r.Active }, Pinned: data.PinRight, Width: 10, MinWidth: 4},
+		{ColumnID: "Left", HeaderName: "Left", Value: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, Width: 10, MinWidth: 4},
+		{ColumnID: "C1", HeaderName: "C1", Value: func(r TestRow) any { return r.Department }, Width: 20, MinWidth: 4},
+		{ColumnID: "C2", HeaderName: "C2", Value: func(r TestRow) any { return r.Salary }, Width: 20, MinWidth: 4},
+		{ColumnID: "C3", HeaderName: "C3", Value: func(r TestRow) any { return r.Active }, Width: 20, MinWidth: 4},
+		{ColumnID: "C4", HeaderName: "C4", Value: func(r TestRow) any { return r.Name }, Width: 20, MinWidth: 4},
+		{ColumnID: "Right", HeaderName: "Right", Value: func(r TestRow) any { return r.Active }, Pinned: data.PinRight, Width: 10, MinWidth: 4},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -4496,10 +4496,10 @@ func TestColSeparator_BorderColumnFalse(t *testing.T) {
 
 func TestScrollSeparators_BothScrollIndicators(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 30, MinWidth: 4},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30, MinWidth: 4},
-		{ColumnID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 30, MinWidth: 4},
-		{ColumnID: "D", HeaderName: "D", ValueGetter: func(r TestRow) any { return r.Active }, Width: 30, MinWidth: 4},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Width: 30, MinWidth: 4},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Width: 30, MinWidth: 4},
+		{ColumnID: "C", HeaderName: "C", Value: func(r TestRow) any { return r.Salary }, Width: 30, MinWidth: 4},
+		{ColumnID: "D", HeaderName: "D", Value: func(r TestRow) any { return r.Active }, Width: 30, MinWidth: 4},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -4525,8 +4525,8 @@ func TestScrollSeparators_BothScrollIndicators(t *testing.T) {
 func TestVisibleCenterCols_EmptyCenter(t *testing.T) {
 	// All columns pinned, no center columns
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, MinWidth: 4},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Pinned: data.PinRight, MinWidth: 4},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, MinWidth: 4},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Pinned: data.PinRight, MinWidth: 4},
 	}
 	m := newTestGrid(WithColumns[TestRow](cols))
 	_, center, _ := m.visibleColIndices()
@@ -5177,9 +5177,9 @@ func TestRender_BorderRowEnabled(t *testing.T) {
 
 func TestRender_ScrollIndicatorWithoutPinnedCols(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 30, MinWidth: 4},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30, MinWidth: 4},
-		{ColumnID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 30, MinWidth: 4},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Width: 30, MinWidth: 4},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Width: 30, MinWidth: 4},
+		{ColumnID: "C", HeaderName: "C", Value: func(r TestRow) any { return r.Salary }, Width: 30, MinWidth: 4},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -5382,9 +5382,9 @@ func TestHandleKeyMsg_FocusedRowBeyondTotalRows(t *testing.T) {
 
 func TestRender_AllPinnedRegions(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "Left", HeaderName: "Left", ValueGetter: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, Width: 15, MinWidth: 4},
-		{ColumnID: "Center", HeaderName: "Center", ValueGetter: func(r TestRow) any { return r.Department }, Width: 30, MinWidth: 4},
-		{ColumnID: "Right", HeaderName: "Right", ValueGetter: func(r TestRow) any { return r.Salary }, Pinned: data.PinRight, Width: 15, MinWidth: 4},
+		{ColumnID: "Left", HeaderName: "Left", Value: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, Width: 15, MinWidth: 4},
+		{ColumnID: "Center", HeaderName: "Center", Value: func(r TestRow) any { return r.Department }, Width: 30, MinWidth: 4},
+		{ColumnID: "Right", HeaderName: "Right", Value: func(r TestRow) any { return r.Salary }, Pinned: data.PinRight, Width: 15, MinWidth: 4},
 	}
 	m := New[TestRow](
 		WithColumns[TestRow](cols),
@@ -5411,8 +5411,8 @@ func TestRender_AllPinnedRegions(t *testing.T) {
 
 func TestUpdateVisibleColCount_NoCenterColumns(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "Left", HeaderName: "Left", ValueGetter: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, Width: 40, MinWidth: 4},
-		{ColumnID: "Right", HeaderName: "Right", ValueGetter: func(r TestRow) any { return r.Department }, Pinned: data.PinRight, Width: 40, MinWidth: 4},
+		{ColumnID: "Left", HeaderName: "Left", Value: func(r TestRow) any { return r.Name }, Pinned: data.PinLeft, Width: 40, MinWidth: 4},
+		{ColumnID: "Right", HeaderName: "Right", Value: func(r TestRow) any { return r.Department }, Pinned: data.PinRight, Width: 40, MinWidth: 4},
 	}
 	m := newTestGrid(WithColumns[TestRow](cols))
 	m.updateVisibleColCount()
@@ -5627,8 +5627,8 @@ func TestSortGroupsAtLevel_CustomComparatorOnGroupColumn(t *testing.T) {
 
 func TestComputeColWidths_AllColumnsHidden(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Hide: true, MinWidth: 4},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Hide: true, MinWidth: 4},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Hide: true, MinWidth: 4},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Hide: true, MinWidth: 4},
 	}
 	m := newTestGrid(WithColumns[TestRow](cols))
 	// computeColWidths should return early when no visible cols
@@ -5733,10 +5733,10 @@ func TestRenderHeader_RightScrollIndicatorWithoutPinned(t *testing.T) {
 	// Use narrower fixed-width columns so the visible ones don't fill the entire width,
 	// leaving room for the scroll indicator character.
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 20},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 20},
-		{ColumnID: "C", HeaderName: "C", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 20},
-		{ColumnID: "D", HeaderName: "D", ValueGetter: func(r TestRow) any { return r.Active }, Width: 20},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Width: 20},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Width: 20},
+		{ColumnID: "C", HeaderName: "C", Value: func(r TestRow) any { return r.Salary }, Width: 20},
+		{ColumnID: "D", HeaderName: "D", Value: func(r TestRow) any { return r.Active }, Width: 20},
 	}
 	s := DefaultStyles()
 	s.BorderColumn = false
@@ -5772,8 +5772,8 @@ func TestRender_ExtremelyNarrowWidth(t *testing.T) {
 	// Use fixed Width:1 columns so that contentWidth = 1 - padding(2) = -1 < 1,
 	// triggering the contentWidth < 1 guard in renderHeaderCells (line 237) and renderCells (line 363).
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Width: 1, Sortable: true},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Width: 1, Sortable: true},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Width: 1, Sortable: true},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Width: 1, Sortable: true},
 	}
 	m := New[TestRow](
 		WithColumns[TestRow](cols),
@@ -5793,9 +5793,9 @@ func TestRender_NarrowGroupRow(t *testing.T) {
 	// Use grid Width=1 so renderGroupRow hits contentWidth < 1 guard (line 423).
 	// Also use fixed Width:1 columns so renderAggCells hits contentWidth < 1 guard (line 480).
 	cols := []data.Column[TestRow]{
-		{ColumnID: "Name", HeaderName: "Name", ValueGetter: func(r TestRow) any { return r.Name }, Width: 1, Sortable: true},
-		{ColumnID: "Department", HeaderName: "Dept", ValueGetter: func(r TestRow) any { return r.Department }, Width: 1, Sortable: true},
-		{ColumnID: "Salary", HeaderName: "Salary", ValueGetter: func(r TestRow) any { return r.Salary }, Width: 1, AggFunc: "sum", Sortable: true},
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, Width: 1, Sortable: true},
+		{ColumnID: "Department", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, Width: 1, Sortable: true},
+		{ColumnID: "Salary", HeaderName: "Salary", Value: func(r TestRow) any { return r.Salary }, Width: 1, AggFunc: "sum", Sortable: true},
 	}
 	m := New[TestRow](
 		WithColumns[TestRow](cols),
@@ -6213,8 +6213,8 @@ func TestMoveFocus_EmptyDisplayRows(t *testing.T) {
 
 func TestMoveFocus_NoVisibleCols(t *testing.T) {
 	cols := []data.Column[TestRow]{
-		{ColumnID: "A", HeaderName: "A", ValueGetter: func(r TestRow) any { return r.Name }, Hide: true},
-		{ColumnID: "B", HeaderName: "B", ValueGetter: func(r TestRow) any { return r.Department }, Hide: true},
+		{ColumnID: "A", HeaderName: "A", Value: func(r TestRow) any { return r.Name }, Hide: true},
+		{ColumnID: "B", HeaderName: "B", Value: func(r TestRow) any { return r.Department }, Hide: true},
 	}
 	m := New[TestRow](
 		WithColumns[TestRow](cols),
@@ -7176,7 +7176,7 @@ func TestRender_MultiLineCellRenderer_WithBorder(t *testing.T) {
 		{
 			ColumnID:   "Name",
 			HeaderName: "Name",
-			ValueGetter: func(r TestRow) any { return r.Name },
+			Value: func(r TestRow) any { return r.Name },
 			Width:      10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\n(%s)", ctx.Value, "info")
@@ -7185,7 +7185,7 @@ func TestRender_MultiLineCellRenderer_WithBorder(t *testing.T) {
 		{
 			ColumnID:    "Dept",
 			HeaderName:  "Dept",
-			ValueGetter: func(r TestRow) any { return r.Department },
+			Value: func(r TestRow) any { return r.Department },
 			Width:       10,
 		},
 	}
@@ -7224,7 +7224,7 @@ func TestRender_MultiLineCellRenderer_NoBorder(t *testing.T) {
 		{
 			ColumnID:   "Name",
 			HeaderName: "Name",
-			ValueGetter: func(r TestRow) any { return r.Name },
+			Value: func(r TestRow) any { return r.Name },
 			Width:      10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\nline2", ctx.Value)
@@ -7233,7 +7233,7 @@ func TestRender_MultiLineCellRenderer_NoBorder(t *testing.T) {
 		{
 			ColumnID:    "Dept",
 			HeaderName:  "Dept",
-			ValueGetter: func(r TestRow) any { return r.Department },
+			Value: func(r TestRow) any { return r.Department },
 			Width:       10,
 		},
 	}
@@ -7260,7 +7260,7 @@ func TestRender_MultiLineCellRenderer_PinnedColumns(t *testing.T) {
 		{
 			ColumnID:   "Name",
 			HeaderName: "Name",
-			ValueGetter: func(r TestRow) any { return r.Name },
+			Value: func(r TestRow) any { return r.Name },
 			Width:      10,
 			Pinned:     data.PinLeft,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
@@ -7270,13 +7270,13 @@ func TestRender_MultiLineCellRenderer_PinnedColumns(t *testing.T) {
 		{
 			ColumnID:    "Dept",
 			HeaderName:  "Dept",
-			ValueGetter: func(r TestRow) any { return r.Department },
+			Value: func(r TestRow) any { return r.Department },
 			Width:       10,
 		},
 		{
 			ColumnID:    "Active",
 			HeaderName:  "Active",
-			ValueGetter: func(r TestRow) any { return r.Active },
+			Value: func(r TestRow) any { return r.Active },
 			Width:       10,
 			Pinned:      data.PinRight,
 		},

@@ -35,10 +35,10 @@ func makeBenchRows(n int) []*data.RowNode[benchRow] {
 
 func benchCols() []data.Column[benchRow] {
 	return []data.Column[benchRow]{
-		{ColumnID: "Name", HeaderName: "Name", ValueGetter: func(r benchRow) any { return r.Name }},
-		{ColumnID: "Department", HeaderName: "Department", ValueGetter: func(r benchRow) any { return r.Department }},
-		{ColumnID: "City", HeaderName: "City", ValueGetter: func(r benchRow) any { return r.City }},
-		{ColumnID: "Salary", HeaderName: "Salary", ValueGetter: func(r benchRow) any { return r.Salary }},
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r benchRow) any { return r.Name }},
+		{ColumnID: "Department", HeaderName: "Department", Value: func(r benchRow) any { return r.Department }},
+		{ColumnID: "City", HeaderName: "City", Value: func(r benchRow) any { return r.City }},
+		{ColumnID: "Salary", HeaderName: "Salary", Value: func(r benchRow) any { return r.Salary }},
 	}
 }
 

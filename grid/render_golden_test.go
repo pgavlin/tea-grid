@@ -88,7 +88,7 @@ func TestGolden_MultiLineRow_SingleCol_Height2(t *testing.T) {
 		{
 			ColumnID:    "Name",
 			HeaderName:  "Name",
-			ValueGetter: func(r TestRow) any { return r.Name },
+			Value: func(r TestRow) any { return r.Name },
 			Width:       12,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\n(details)", ctx.Value)
@@ -112,7 +112,7 @@ func TestGolden_MultiLineRow_TwoCols_OnlyFirstMultiLine(t *testing.T) {
 		{
 			ColumnID:    "Name",
 			HeaderName:  "Name",
-			ValueGetter: func(r TestRow) any { return r.Name },
+			Value: func(r TestRow) any { return r.Name },
 			Width:       10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\nline2", ctx.Value)
@@ -121,7 +121,7 @@ func TestGolden_MultiLineRow_TwoCols_OnlyFirstMultiLine(t *testing.T) {
 		{
 			ColumnID:    "Dept",
 			HeaderName:  "Dept",
-			ValueGetter: func(r TestRow) any { return r.Department },
+			Value: func(r TestRow) any { return r.Department },
 			Width:       10,
 		},
 	}
@@ -142,7 +142,7 @@ func TestGolden_MultiLineRow_TwoCols_BothMultiLine(t *testing.T) {
 		{
 			ColumnID:    "Name",
 			HeaderName:  "Name",
-			ValueGetter: func(r TestRow) any { return r.Name },
+			Value: func(r TestRow) any { return r.Name },
 			Width:       10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\n(%s)", ctx.Value, "info")
@@ -151,7 +151,7 @@ func TestGolden_MultiLineRow_TwoCols_BothMultiLine(t *testing.T) {
 		{
 			ColumnID:    "Dept",
 			HeaderName:  "Dept",
-			ValueGetter: func(r TestRow) any { return r.Department },
+			Value: func(r TestRow) any { return r.Department },
 			Width:       10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\n---", ctx.Value)
@@ -175,7 +175,7 @@ func TestGolden_MultiLineRow_Height3_ShortContent(t *testing.T) {
 		{
 			ColumnID:    "Name",
 			HeaderName:  "Name",
-			ValueGetter: func(r TestRow) any { return r.Name },
+			Value: func(r TestRow) any { return r.Name },
 			Width:       10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				// Only 1 line of content in a 3-line cell
@@ -185,7 +185,7 @@ func TestGolden_MultiLineRow_Height3_ShortContent(t *testing.T) {
 		{
 			ColumnID:    "Dept",
 			HeaderName:  "Dept",
-			ValueGetter: func(r TestRow) any { return r.Department },
+			Value: func(r TestRow) any { return r.Department },
 			Width:       10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\nline2\nline3", ctx.Value)
@@ -209,13 +209,13 @@ func TestGolden_MultiLineRow_EvenOddBg(t *testing.T) {
 		{
 			ColumnID:    "Name",
 			HeaderName:  "Name",
-			ValueGetter: func(r TestRow) any { return r.Name },
+			Value: func(r TestRow) any { return r.Name },
 			Width:       10,
 		},
 		{
 			ColumnID:    "Dept",
 			HeaderName:  "Dept",
-			ValueGetter: func(r TestRow) any { return r.Department },
+			Value: func(r TestRow) any { return r.Department },
 			Width:       10,
 		},
 	}

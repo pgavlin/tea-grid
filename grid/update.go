@@ -633,8 +633,8 @@ func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 
 	// Get current value
 	var val any
-	if col.ValueGetter != nil {
-		val = col.ValueGetter(rn.Data)
+	if col.Value != nil {
+		val = col.Value(rn.Data)
 	}
 
 	// Format value for context

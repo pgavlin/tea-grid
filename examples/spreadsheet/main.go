@@ -307,7 +307,7 @@ func (m *model) buildColumns() []data.Column[*SpreadsheetRow] {
 		Filterable: false,
 		Editable:   false,
 		NoSelect:   true,
-		ValueGetter: func(r *SpreadsheetRow) any {
+		Value: func(r *SpreadsheetRow) any {
 			return r.RowIndex + 1
 		},
 		ValueFormatter: func(v any, _ *SpreadsheetRow) string {
@@ -337,7 +337,7 @@ func (m *model) buildColumns() []data.Column[*SpreadsheetRow] {
 			Editable:   true,
 			Filter:     filter.NewTextFilter(),
 			CellEditor: NewFormulaEditor(colID),
-			ValueGetter: func(r *SpreadsheetRow) any {
+			Value: func(r *SpreadsheetRow) any {
 				cell, ok := r.Cells[colID]
 				if !ok {
 					return nil

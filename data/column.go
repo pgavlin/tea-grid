@@ -38,9 +38,12 @@ type Column[T any] struct {
 	ColumnID   string // Unique identifier. Required.
 	HeaderName string // Display name in the header row.
 
-	// Data access
-	ValueGetter    func(T) any                    // Extracts the cell value from the row data. Required.
-	ValueFormatter func(value any, data T) string // Format the value for display.
+	// Data access — Value is the universal fallback. Typed fast paths
+	// (Text, Compare, QuickFilterMatch) skip the any round-trip on hot paths.
+	Value          func(T) any                    // Extracts the cell value. Used by column filters, editors, aggregation, and as fallback for typed paths.
+	ValueFormatter func(value any, data T) string // Format Value() output for display. Ignored when Text is set.
+	Text           func(*T) string                // Returns the display string for a cell. If nil, falls back to ValueFormatter(Value()) or SprintValue(Value()).
+	Compare        func(*T, *T) int               // Compares two rows for sorting. If nil, falls back to defaultCompare(Value(a), Value(b)).
 
 	// Sizing
 	Width    int // Fixed width in terminal columns. 0 = auto.
@@ -50,12 +53,12 @@ type Column[T any] struct {
 
 	// Sorting
 	Sortable   bool               // Default: true.
-	Comparator func(a, b any) int // Custom sort.
+	Comparator func(a, b any) int // Custom sort via Value(). Ignored when Compare is set.
 
 	// Filtering
 	Filterable       bool                     // Default: true.
 	Filter           filter.Filter            // Column filter.
-	QuickFilterMatch func(data *T, word string) bool // Reports whether this column matches a quick filter word. Takes *T to avoid copying. If nil, falls back to ValueGetter + containsFold.
+	QuickFilterMatch func(data *T, word string) bool // Reports whether this column matches a quick filter word. Takes *T to avoid copying. If nil, falls back to Text or Value + containsFold.
 
 	// Pinning
 	Pinned     Pin  // Left, Right, or None.
@@ -92,7 +95,7 @@ type ColumnGroup[T any] struct {
 // FromType returns a []Column[T] derived from T's exported struct fields.
 // For each exported field, it produces a Column with:
 //   - ColumnID and HeaderName set to the field name
-//   - ValueGetter set to a function that retrieves the field's value from T
+//   - Value set to a function that retrieves the field's value from T
 //
 // Panics if T is not a struct type.
 func FromType[T any]() []Column[T] {
@@ -115,7 +118,7 @@ func FromType[T any]() []Column[T] {
 		col := Column[T]{
 			ColumnID:   field.Name,
 			HeaderName: field.Name,
-			ValueGetter: func(data T) any {
+			Value: func(data T) any {
 				v := reflect.ValueOf(data)
 				if v.Kind() == reflect.Ptr {
 					if v.IsNil() {
@@ -227,7 +230,7 @@ func columnsFromMap[T any](rows []T) []Column[T] {
 	for _, key := range keys {
 		category := inferMapColumnType(key, rows)
 		col := makeMapColumn[T](key, category)
-		applyTypeDefaults(&col, category, collectDistinctValues(col.ValueGetter, rows))
+		applyTypeDefaults(&col, category, collectDistinctValues(col.Value, rows))
 		cols = append(cols, col)
 	}
 	return cols
@@ -244,7 +247,7 @@ func makeMapColumn[T any](key, category string) Column[T] {
 
 	switch category {
 	case "int", "number":
-		col.ValueGetter = func(row T) any {
+		col.Value = func(row T) any {
 			v := mapIndex(row, key)
 			if v == nil {
 				return nil
@@ -255,7 +258,7 @@ func makeMapColumn[T any](key, category string) Column[T] {
 			return v
 		}
 	case "bool":
-		col.ValueGetter = func(row T) any {
+		col.Value = func(row T) any {
 			v := mapIndex(row, key)
 			if v == nil {
 				return nil
@@ -266,7 +269,7 @@ func makeMapColumn[T any](key, category string) Column[T] {
 			return v
 		}
 	case "time":
-		col.ValueGetter = func(row T) any {
+		col.Value = func(row T) any {
 			v := mapIndex(row, key)
 			if v == nil {
 				return nil
@@ -279,7 +282,7 @@ func makeMapColumn[T any](key, category string) Column[T] {
 			return v
 		}
 	default: // string
-		col.ValueGetter = func(row T) any {
+		col.Value = func(row T) any {
 			v := mapIndex(row, key)
 			if v == nil {
 				return nil
@@ -443,7 +446,7 @@ func columnsFromSlice[T any](rows []T) []Column[T] {
 		col := Column[T]{
 			ColumnID:    fieldName,
 			HeaderName:  fieldName,
-			ValueGetter: getter,
+			Value: getter,
 			Sortable:    true,
 			Filterable:  true,
 		}

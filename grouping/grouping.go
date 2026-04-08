@@ -99,7 +99,7 @@ func BuildGroups[T any](
 	groupMap := make(map[string][]*data.RowNode[T])
 	var groupOrder []string
 	for _, row := range rows {
-		val := groupCol.ValueGetter(row.Data)
+		val := groupCol.Value(row.Data)
 		key := fmt.Sprintf("%v", val)
 		if _, exists := groupMap[key]; !exists {
 			groupOrder = append(groupOrder, key)

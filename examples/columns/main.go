@@ -51,7 +51,7 @@ func main() {
 		{
 			ColumnID:    "name",
 			HeaderName:  "Employee Name",
-			ValueGetter: func(e Employee) any { return e.Name },
+			Value: func(e Employee) any { return e.Name },
 			Pinned:      data.PinLeft,
 			MinWidth:    20,
 			Flex:        2,
@@ -61,7 +61,7 @@ func main() {
 		{
 			ColumnID:    "department",
 			HeaderName:  "Dept",
-			ValueGetter: func(e Employee) any { return e.Department },
+			Value: func(e Employee) any { return e.Department },
 			Width:       15,
 			Sortable:    true,
 			Filterable:  true,
@@ -70,7 +70,7 @@ func main() {
 		{
 			ColumnID:    "salary",
 			HeaderName:  "Salary",
-			ValueGetter: func(e Employee) any { return e.Salary },
+			Value: func(e Employee) any { return e.Salary },
 			Width:       12,
 			Sortable:    true,
 			Filterable:  true,
@@ -83,7 +83,7 @@ func main() {
 		{
 			ColumnID:    "active",
 			HeaderName:  "Active",
-			ValueGetter: func(e Employee) any { return e.Active },
+			Value: func(e Employee) any { return e.Active },
 			Width:       8,
 			Filterable:  true,
 			Filter:      filter.NewBoolFilter(),

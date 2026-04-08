@@ -121,7 +121,7 @@ func buildColumns(headers []string, rows []Row) []data.Column[Row] {
 
 		switch typ {
 		case "number":
-			col.ValueGetter = func(r Row) any {
+			col.Value = func(r Row) any {
 				if idx >= len(r) {
 					return 0.0
 				}
@@ -136,7 +136,7 @@ func buildColumns(headers []string, rows []Row) []data.Column[Row] {
 			col.Width = 14
 
 		case "bool":
-			col.ValueGetter = func(r Row) any {
+			col.Value = func(r Row) any {
 				if idx >= len(r) {
 					return false
 				}
@@ -152,7 +152,7 @@ func buildColumns(headers []string, rows []Row) []data.Column[Row] {
 			col.Width = 10
 
 		default: // string
-			col.ValueGetter = func(r Row) any {
+			col.Value = func(r Row) any {
 				if idx >= len(r) {
 					return ""
 				}
