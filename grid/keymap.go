@@ -52,6 +52,7 @@ type KeyMap struct {
 	// Filtering
 	QuickFilter  key.Binding
 	ColumnFilter key.Binding
+	ClearFilters key.Binding
 
 	// Grouping
 	ToggleGroupColumn key.Binding
@@ -195,6 +196,10 @@ func DefaultKeyMap() KeyMap {
 		ColumnFilter: key.NewBinding(
 			key.WithKeys("ctrl+f"),
 			key.WithHelp("ctrl+f", "column filter"),
+		),
+		ClearFilters: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "clear filters"),
 		),
 		ToggleGroupColumn: key.NewBinding(
 			key.WithKeys("G"),
