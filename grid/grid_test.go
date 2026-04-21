@@ -8024,7 +8024,6 @@ func TestKeyMap_AutoSize_NotDispatchedInEditMode(t *testing.T) {
 	}
 }
 
-
 func TestHasActiveFilters(t *testing.T) {
 	cols := testCols()
 	cols[0].Filter = filter.NewTextFilter()
