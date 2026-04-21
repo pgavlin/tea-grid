@@ -1164,6 +1164,64 @@ func (m *Model[T]) findCol(colID string) *data.Column[T] {
 	return nil
 }
 
+// --- Column widths ---
+
+// AutoSizeColumns re-measures every non-hidden column against the currently
+// displayed rows (post-filter, post-sort) and stores the clamped widths as
+// sticky overrides. Overrides win over Width, AutoFit, and Flex until
+// cleared by ResetColumnWidth(s).
+func (m *Model[T]) AutoSizeColumns() {
+	if m.manualWidths == nil {
+		m.manualWidths = make(map[string]int)
+	}
+	for i := range m.cols {
+		if m.cols[i].Hide {
+			continue
+		}
+		m.manualWidths[m.cols[i].ColumnID] = m.measureColumnWidth(m.cols[i], i, m.displayRows)
+	}
+	m.computeColWidths()
+}
+
+// AutoSizeColumn re-measures a single column against displayed rows and
+// records a sticky override. A colID that doesn't match any column is
+// silently ignored.
+func (m *Model[T]) AutoSizeColumn(colID string) {
+	for i := range m.cols {
+		if m.cols[i].ColumnID != colID {
+			continue
+		}
+		if m.cols[i].Hide {
+			return
+		}
+		if m.manualWidths == nil {
+			m.manualWidths = make(map[string]int)
+		}
+		m.manualWidths[colID] = m.measureColumnWidth(m.cols[i], i, m.displayRows)
+		m.computeColWidths()
+		return
+	}
+}
+
+// ResetColumnWidths clears all sticky width overrides. Columns revert to
+// their declared sizing (Width / AutoFit / Flex).
+func (m *Model[T]) ResetColumnWidths() {
+	if len(m.manualWidths) == 0 {
+		return
+	}
+	m.manualWidths = nil
+	m.computeColWidths()
+}
+
+// ResetColumnWidth clears the sticky override for one column.
+func (m *Model[T]) ResetColumnWidth(colID string) {
+	if _, ok := m.manualWidths[colID]; !ok {
+		return
+	}
+	delete(m.manualWidths, colID)
+	m.computeColWidths()
+}
+
 // refreshHasAutoFit recomputes the hasAutoFit cache from the current
 // column set.
 func (m *Model[T]) refreshHasAutoFit() {

@@ -7764,3 +7764,182 @@ func TestComputeColWidths_ManualOverride_WinsOverFlex(t *testing.T) {
 		t.Errorf("Dept column = %d, want %d", m.colWidths[1], 80-6)
 	}
 }
+
+// -----------------------------------------------------------------------
+// AutoSizeColumn(s) / ResetColumnWidth(s)
+// -----------------------------------------------------------------------
+
+func TestAutoSizeColumns_MeasuresDisplayedRows(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{
+			ColumnID:   "Name",
+			HeaderName: "N",
+			Value:      func(r TestRow) any { return r.Name },
+			Filter:     filter.NewTextFilter(),
+			MinWidth:   1,
+			Flex:       1,
+		},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithRows[TestRow]([]TestRow{{Name: "Al"}, {Name: "Bartholomew"}}),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	tf := filter.NewTextFilter()
+	tf.SetText("Al")
+	m.SetColumnFilter("Name", tf)
+	m.AutoSizeColumns()
+	if got := m.colWidths[0]; got != 2 {
+		t.Errorf("AutoSizeColumns measured against displayed rows, expected 2, got %d", got)
+	}
+}
+
+func TestAutoSizeColumn_Single(t *testing.T) {
+	cols := testCols()
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	deptBefore := m.colWidths[1]
+	m.AutoSizeColumn("Name")
+	if _, ok := m.manualWidths["Name"]; !ok {
+		t.Error("expected manualWidths[\"Name\"] to be set")
+	}
+	if _, ok := m.manualWidths["Department"]; ok {
+		t.Error("only Name should have an override")
+	}
+	if m.colWidths[1] == 0 {
+		t.Errorf("Dept column should retain flex width, got %d (before: %d)", m.colWidths[1], deptBefore)
+	}
+}
+
+func TestAutoSizeColumn_UnknownID_IsNoop(t *testing.T) {
+	m := newTestGrid()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("expected no panic for unknown ID, got: %v", r)
+		}
+	}()
+	m.AutoSizeColumn("not-a-real-column")
+	if len(m.manualWidths) != 0 {
+		t.Errorf("expected no overrides, got %v", m.manualWidths)
+	}
+}
+
+func TestResetColumnWidth_RevertsToDeclared(t *testing.T) {
+	cols := testCols()
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	m.AutoSizeColumn("Name")
+	before := m.colWidths[0]
+	m.ResetColumnWidth("Name")
+	if _, ok := m.manualWidths["Name"]; ok {
+		t.Error("expected override cleared")
+	}
+	if m.colWidths[0] == before {
+		t.Errorf("expected width to change after reset (flex should kick back in); got %d (same as override)", m.colWidths[0])
+	}
+}
+
+func TestResetColumnWidths_ClearsAll(t *testing.T) {
+	m := newTestGrid()
+	m.AutoSizeColumn("Name")
+	m.AutoSizeColumn("Department")
+	if len(m.manualWidths) != 2 {
+		t.Fatalf("expected 2 overrides, got %d", len(m.manualWidths))
+	}
+	m.ResetColumnWidths()
+	if len(m.manualWidths) != 0 {
+		t.Errorf("expected 0 overrides, got %d", len(m.manualWidths))
+	}
+}
+
+func TestAutoSizeColumns_StickyAcrossSetRows(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "N", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithRows[TestRow]([]TestRow{{Name: "Al"}}),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	m.AutoSizeColumns()
+	before := m.colWidths[0]
+	m.SetRows([]TestRow{{Name: "Bartholomew"}})
+	if m.colWidths[0] != before {
+		t.Errorf("override should persist across SetRows: %d -> %d", before, m.colWidths[0])
+	}
+}
+
+func TestAutoSizeColumns_StickyAcrossFilter(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "N", Value: func(r TestRow) any { return r.Name }, Filter: filter.NewTextFilter(), MinWidth: 1, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithRows[TestRow]([]TestRow{{Name: "Alice"}, {Name: "Bartholomew"}}),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	m.AutoSizeColumns()
+	before := m.colWidths[0]
+	tf := filter.NewTextFilter()
+	tf.SetText("Alice")
+	m.SetColumnFilter("Name", tf)
+	if m.colWidths[0] != before {
+		t.Errorf("override should persist across filter: %d -> %d", before, m.colWidths[0])
+	}
+}
+
+func TestAutoSizeColumns_RespectsMinMaxWidth(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "N", Value: func(r TestRow) any { return r.Name }, MinWidth: 10, MaxWidth: 20, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithRows[TestRow]([]TestRow{{Name: "Al"}}),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	m.AutoSizeColumns()
+	if got := m.manualWidths["Name"]; got != 10 {
+		t.Errorf("override clamped to MinWidth=10, got %d", got)
+	}
+}
+
+func TestAutoSizeColumns_NoRows(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "LongerHeader", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	m.AutoSizeColumns()
+	if got := m.manualWidths["Name"]; got != len("LongerHeader") {
+		t.Errorf("no-rows AutoSize should equal header width %d, got %d", len("LongerHeader"), got)
+	}
+}
+
+func TestAutoSizeColumns_SkipsHidden(t *testing.T) {
+	cols := testCols()
+	cols[0].Hide = true
+	m := newTestGrid(WithColumns[TestRow](cols))
+	m.AutoSizeColumns()
+	if _, ok := m.manualWidths["Name"]; ok {
+		t.Error("hidden column should not be measured by AutoSizeColumns")
+	}
+}
