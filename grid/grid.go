@@ -1266,11 +1266,15 @@ func (m *Model[T]) computeColWidths() {
 	var flexCols []colInfo
 	for _, idx := range visibleCols {
 		col := m.cols[idx]
-		if col.Width > 0 {
-			// Fixed width
+		switch {
+		case col.Width > 0:
 			m.colWidths[idx] = col.Width
 			remaining -= col.Width
-		} else {
+		case col.AutoFit:
+			w := m.measureColumnWidth(col, idx, m.rows)
+			m.colWidths[idx] = w
+			remaining -= w
+		default:
 			minW := col.MinWidth
 			if minW == 0 {
 				minW = 4

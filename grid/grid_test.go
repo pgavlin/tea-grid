@@ -7482,3 +7482,149 @@ func TestMeasureColumnWidth_WideRunes(t *testing.T) {
 		t.Errorf("expected display width 6 for CJK, got %d", got)
 	}
 }
+
+// -----------------------------------------------------------------------
+// computeColWidths AutoFit
+// -----------------------------------------------------------------------
+
+func TestComputeColWidths_AutoFit_Basic(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, AutoFit: true},
+		{ColumnID: "Dept", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, MinWidth: 1, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	// testData: longest Name is "Carol" (5). Header "Name" (4). Max = 5.
+	if m.colWidths[0] != 5 {
+		t.Errorf("AutoFit column width = %d, want 5", m.colWidths[0])
+	}
+}
+
+func TestComputeColWidths_AutoFit_ClampedByMaxWidth(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, MaxWidth: 3, AutoFit: true},
+		{ColumnID: "Dept", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, MinWidth: 1, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	if m.colWidths[0] != 3 {
+		t.Errorf("AutoFit column clamped to MaxWidth=3, got %d", m.colWidths[0])
+	}
+}
+
+func TestComputeColWidths_AutoFit_ClampedByMinWidth(t *testing.T) {
+	// No rows → empty measurement → clamp to MinWidth
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "N", Value: func(r TestRow) any { return r.Name }, MinWidth: 10, AutoFit: true},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	if m.colWidths[0] != 10 {
+		t.Errorf("AutoFit column with no rows clamped to MinWidth=10, got %d", m.colWidths[0])
+	}
+}
+
+func TestComputeColWidths_AutoFit_HeaderIsMeasured(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "X", HeaderName: "LongHeaderText", Value: func(r TestRow) any { return "a" }, MinWidth: 1, AutoFit: true},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	if m.colWidths[0] != len("LongHeaderText") {
+		t.Errorf("expected width %d (header), got %d", len("LongHeaderText"), m.colWidths[0])
+	}
+}
+
+func TestComputeColWidths_AutoFit_IgnoredWhenWidthSet(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, Width: 20, AutoFit: true},
+		{ColumnID: "Dept", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, MinWidth: 1, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	if m.colWidths[0] != 20 {
+		t.Errorf("Width=20 should win over AutoFit, got %d", m.colWidths[0])
+	}
+}
+
+func TestComputeColWidths_AutoFit_TakesPrecedenceOverFlex(t *testing.T) {
+	// AutoFit column should be sized to content, not share the flex pool.
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, AutoFit: true, Flex: 3},
+		{ColumnID: "Dept", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, MinWidth: 1, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	// Longest Name is "Carol" = 5
+	if m.colWidths[0] != 5 {
+		t.Errorf("AutoFit+Flex: AutoFit wins, expected 5, got %d", m.colWidths[0])
+	}
+	// Dept column should absorb the rest
+	if m.colWidths[1] != 80-5 {
+		t.Errorf("Dept column should absorb remaining width, expected %d, got %d", 80-5, m.colWidths[1])
+	}
+}
+
+func TestComputeColWidths_AutoFit_SpanningCellsIgnored(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{
+			ColumnID:   "Name",
+			HeaderName: "N",
+			Value:      func(r TestRow) any { return r.Name },
+			ColumnSpan: func(r TestRow) int { return 2 },
+			MinWidth:   1,
+			AutoFit:    true,
+		},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithRows[TestRow]([]TestRow{{Name: "Bartholomew"}}),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	// Spanning cells are skipped; only the header "N" contributes → clamp to MinWidth=1.
+	if m.colWidths[0] != 1 {
+		t.Errorf("spanning cells skipped, expected MinWidth=1, got %d", m.colWidths[0])
+	}
+}
+
+func TestComputeColWidths_AutoFit_HiddenColumn(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, Hide: true, AutoFit: true},
+		{ColumnID: "Dept", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, MinWidth: 1, Flex: 1},
+	}
+	m := newTestGrid(WithColumns[TestRow](cols))
+	if m.colWidths[0] != 0 {
+		t.Errorf("hidden AutoFit column width should be 0, got %d", m.colWidths[0])
+	}
+}
+
+func TestComputeColWidths_AutoFit_StableUnderFilter(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "N", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, AutoFit: true, Filter: filter.NewTextFilter()},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	before := m.colWidths[0]
+	// Apply a filter that narrows to only "Alice" rows
+	tf := filter.NewTextFilter()
+	tf.SetText("Alice")
+	m.SetColumnFilter("Name", tf)
+	after := m.colWidths[0]
+	if before != after {
+		t.Errorf("AutoFit should be stable under filter: %d -> %d", before, after)
+	}
+}
