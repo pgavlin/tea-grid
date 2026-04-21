@@ -55,6 +55,13 @@ type Model[T any] struct {
 	// Column widths (computed)
 	colWidths []int
 
+	// True if any column has AutoFit = true. Used to gate data-triggered
+	// layout recomputes on SetRows / InsertRow / RemoveRow / UpdateRow.
+	hasAutoFit bool
+
+	// Sticky width overrides set by AutoSizeColumn(s). Keyed by ColumnID.
+	manualWidths map[string]int
+
 	// Viewport and scrolling
 	vp viewport
 
@@ -192,6 +199,7 @@ func New[T any](opts ...Option[T]) Model[T] {
 
 	// Build initial display rows and compute layout
 	m.recomputeDisplayRows()
+	m.refreshHasAutoFit()
 	m.computeColWidths()
 	m.updateViewportSize()
 
@@ -212,6 +220,9 @@ func (m *Model[T]) SetRows(rows []T) {
 	m.pruneSelection()
 	m.dirty = true
 	m.recomputeDisplayRows()
+	if m.hasAutoFit {
+		m.computeColWidths()
+	}
 }
 
 // Rows returns the raw row data.
@@ -228,6 +239,7 @@ func (m *Model[T]) SetColumns(cols []data.Column[T]) {
 	m.cols = cols
 	m.dirty = true
 	m.filterDirty = true
+	m.refreshHasAutoFit()
 	m.recomputeDisplayRows()
 	m.computeColWidths()
 }
@@ -245,6 +257,9 @@ func (m *Model[T]) UpdateRow(id string, d T) {
 			m.dirty = true
 			m.filterDirty = true
 			m.recomputeDisplayRows()
+			if m.hasAutoFit {
+				m.computeColWidths()
+			}
 			return
 		}
 	}
@@ -262,6 +277,9 @@ func (m *Model[T]) InsertRow(index int, d T) {
 	m.dirty = true
 	m.filterDirty = true
 	m.recomputeDisplayRows()
+	if m.hasAutoFit {
+		m.computeColWidths()
+	}
 }
 
 // RemoveRow removes the row with the given ID.
@@ -273,6 +291,9 @@ func (m *Model[T]) RemoveRow(id string) {
 			m.dirty = true
 			m.filterDirty = true
 			m.recomputeDisplayRows()
+			if m.hasAutoFit {
+				m.computeColWidths()
+			}
 			return
 		}
 	}
@@ -1141,6 +1162,18 @@ func (m *Model[T]) findCol(colID string) *data.Column[T] {
 		}
 	}
 	return nil
+}
+
+// refreshHasAutoFit recomputes the hasAutoFit cache from the current
+// column set.
+func (m *Model[T]) refreshHasAutoFit() {
+	m.hasAutoFit = false
+	for i := range m.cols {
+		if m.cols[i].AutoFit {
+			m.hasAutoFit = true
+			return
+		}
+	}
 }
 
 // measureColumnWidth returns the content-fit width for col measured against

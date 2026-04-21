@@ -7628,3 +7628,87 @@ func TestComputeColWidths_AutoFit_StableUnderFilter(t *testing.T) {
 		t.Errorf("AutoFit should be stable under filter: %d -> %d", before, after)
 	}
 }
+
+// -----------------------------------------------------------------------
+// AutoFit data-mutation triggers
+// -----------------------------------------------------------------------
+
+func TestComputeColWidths_AutoFit_RecomputesOnSetRows(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "N", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, AutoFit: true},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithRows[TestRow]([]TestRow{{Name: "Al"}}),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	if got := m.colWidths[0]; got != 2 {
+		t.Fatalf("initial width = %d, want 2", got)
+	}
+	m.SetRows([]TestRow{{Name: "Bartholomew"}})
+	if got := m.colWidths[0]; got != len("Bartholomew") {
+		t.Errorf("after SetRows width = %d, want %d", got, len("Bartholomew"))
+	}
+}
+
+func TestComputeColWidths_AutoFit_RecomputesOnInsertRow(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "N", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, AutoFit: true},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithRows[TestRow]([]TestRow{{Name: "Al"}}),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	m.InsertRow(0, TestRow{Name: "Bartholomew"})
+	if got := m.colWidths[0]; got != len("Bartholomew") {
+		t.Errorf("after InsertRow width = %d, want %d", got, len("Bartholomew"))
+	}
+}
+
+func TestComputeColWidths_AutoFit_RecomputesOnUpdateRow(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "N", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, AutoFit: true},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithRows[TestRow]([]TestRow{{Name: "Al"}}),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	rowID := m.rows[0].ID
+	m.UpdateRow(rowID, TestRow{Name: "Bartholomew"})
+	if got := m.colWidths[0]; got != len("Bartholomew") {
+		t.Errorf("after UpdateRow width = %d, want %d", got, len("Bartholomew"))
+	}
+}
+
+func TestComputeColWidths_AutoFit_RecomputesOnRemoveRow(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "N", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, AutoFit: true},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := New(
+		WithColumns[TestRow](cols),
+		WithRows[TestRow]([]TestRow{{Name: "Al"}, {Name: "Bartholomew"}}),
+		WithWidth[TestRow](80),
+		WithStyles[TestRow](s),
+	)
+	if got := m.colWidths[0]; got != len("Bartholomew") {
+		t.Fatalf("initial width = %d, want %d", got, len("Bartholomew"))
+	}
+	longID := m.rows[1].ID
+	m.RemoveRow(longID)
+	if got := m.colWidths[0]; got != 2 {
+		t.Errorf("after RemoveRow width = %d, want 2", got)
+	}
+}
