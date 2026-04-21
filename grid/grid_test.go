@@ -7346,9 +7346,9 @@ func TestMeasureColumnWidth_HeaderOnly(t *testing.T) {
 		MinWidth:   4,
 	}
 	m := newTestGrid()
-	got := m.measureColumnWidth(col, 0, nil)
-	if got != 4 {
-		t.Errorf("empty rows + short header should clamp to MinWidth=4, got %d", got)
+	// header "Name" (4) + frame (2) = 6; MinWidth doesn't clamp.
+	if got := m.measureColumnWidth(col, 0, nil); got != 6 {
+		t.Errorf("empty rows: header(4) + frame(2) = 6, got %d", got)
 	}
 }
 
@@ -7364,9 +7364,9 @@ func TestMeasureColumnWidth_RowsDriveWidth(t *testing.T) {
 		{Data: TestRow{Name: "Bartholomew"}},
 	}
 	m := newTestGrid()
-	got := m.measureColumnWidth(col, 0, rows)
-	if got != len("Bartholomew") {
-		t.Errorf("expected width %d, got %d", len("Bartholomew"), got)
+	// content width = 11 + default cell frame (2) = 13
+	if got := m.measureColumnWidth(col, 0, rows); got != len("Bartholomew")+2 {
+		t.Errorf("expected width %d, got %d", len("Bartholomew")+2, got)
 	}
 }
 
@@ -7411,9 +7411,9 @@ func TestMeasureColumnWidth_UsesTextFallback(t *testing.T) {
 	}
 	rows := []*data.RowNode[TestRow]{{Data: TestRow{Name: "Al"}}}
 	m := newTestGrid()
-	got := m.measureColumnWidth(col, 0, rows)
-	if got != 4 {
-		t.Errorf("Text() should produce \"[Al]\" (4 chars), got width %d", got)
+	// "[Al]" = 4 content chars + default cell frame (2) = 6
+	if got := m.measureColumnWidth(col, 0, rows); got != 6 {
+		t.Errorf("Text() should produce \"[Al]\" (4 chars) + frame (2), got width %d", got)
 	}
 }
 
@@ -7439,9 +7439,9 @@ func TestMeasureColumnWidth_UsesNaturalWidthRenderer(t *testing.T) {
 		{Data: TestRow{Salary: 2}},
 	}
 	m := newTestGrid()
-	got := m.measureColumnWidth(col, 0, rows)
-	if got != 7 {
-		t.Errorf("expected NaturalWidth=7, got %d", got)
+	// NaturalWidth=7 content + frame (2) = 9
+	if got := m.measureColumnWidth(col, 0, rows); got != 9 {
+		t.Errorf("expected NaturalWidth=7 + frame (2), got %d", got)
 	}
 }
 
@@ -7459,9 +7459,9 @@ func TestMeasureColumnWidth_RendererWithoutNaturalWidthFallsThroughToText(t *tes
 	}
 	rows := []*data.RowNode[TestRow]{{Data: TestRow{Name: "Al"}}}
 	m := newTestGrid()
-	got := m.measureColumnWidth(col, 0, rows)
-	if got != 2 {
-		t.Errorf("renderer without NaturalWidth should be ignored for measurement; expected 2 (from Value \"Al\"), got %d", got)
+	// fallback content = 2 ("Al") + frame (2) = 4
+	if got := m.measureColumnWidth(col, 0, rows); got != 4 {
+		t.Errorf("renderer without NaturalWidth should fall through to text; expected 4 (2 + frame), got %d", got)
 	}
 }
 
@@ -7475,9 +7475,9 @@ func TestMeasureColumnWidth_SkipsSpanningCells(t *testing.T) {
 	}
 	rows := []*data.RowNode[TestRow]{{Data: TestRow{Name: "Bartholomew"}}}
 	m := newTestGrid()
-	got := m.measureColumnWidth(col, 0, rows)
-	if got != 1 {
-		t.Errorf("spanning cells should be skipped; expected MinWidth=1, got %d", got)
+	// spanning row is skipped; only header "N"(1) contributes + frame(2) = 3.
+	if got := m.measureColumnWidth(col, 0, rows); got != 3 {
+		t.Errorf("spanning cells skipped; expected header(1)+frame(2)=3, got %d", got)
 	}
 }
 
@@ -7488,12 +7488,11 @@ func TestMeasureColumnWidth_WideRunes(t *testing.T) {
 		Value:      func(r TestRow) any { return r.Name },
 		MinWidth:   1,
 	}
-	// "日本語" is 3 runes but 6 display columns.
+	// "日本語" is 3 runes but 6 display columns; + frame (2) = 8.
 	rows := []*data.RowNode[TestRow]{{Data: TestRow{Name: "日本語"}}}
 	m := newTestGrid()
-	got := m.measureColumnWidth(col, 0, rows)
-	if got != 6 {
-		t.Errorf("expected display width 6 for CJK, got %d", got)
+	if got := m.measureColumnWidth(col, 0, rows); got != 8 {
+		t.Errorf("expected display width 6 + frame (2) for CJK, got %d", got)
 	}
 }
 
@@ -7509,9 +7508,9 @@ func TestComputeColWidths_AutoFit_Basic(t *testing.T) {
 	s := DefaultStyles()
 	s.BorderColumn = false
 	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
-	// testData: longest Name is "Carol" (5). Header "Name" (4). Max = 5.
-	if m.colWidths[0] != 5 {
-		t.Errorf("AutoFit column width = %d, want 5", m.colWidths[0])
+	// testData: longest Name is "Carol" (5). Header "Name" (4). Max = 5 + frame (2) = 7.
+	if m.colWidths[0] != 7 {
+		t.Errorf("AutoFit column width = %d, want 7 (5 + frame)", m.colWidths[0])
 	}
 }
 
@@ -7552,8 +7551,8 @@ func TestComputeColWidths_AutoFit_HeaderIsMeasured(t *testing.T) {
 	s := DefaultStyles()
 	s.BorderColumn = false
 	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
-	if m.colWidths[0] != len("LongHeaderText") {
-		t.Errorf("expected width %d (header), got %d", len("LongHeaderText"), m.colWidths[0])
+	if m.colWidths[0] != len("LongHeaderText")+2 {
+		t.Errorf("expected width %d (header + frame), got %d", len("LongHeaderText")+2, m.colWidths[0])
 	}
 }
 
@@ -7579,13 +7578,13 @@ func TestComputeColWidths_AutoFit_TakesPrecedenceOverFlex(t *testing.T) {
 	s := DefaultStyles()
 	s.BorderColumn = false
 	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
-	// Longest Name is "Carol" = 5
-	if m.colWidths[0] != 5 {
-		t.Errorf("AutoFit+Flex: AutoFit wins, expected 5, got %d", m.colWidths[0])
+	// Longest Name is "Carol" = 5 + frame (2) = 7
+	if m.colWidths[0] != 7 {
+		t.Errorf("AutoFit+Flex: AutoFit wins, expected 7 (5 + frame), got %d", m.colWidths[0])
 	}
 	// Dept column should absorb the rest
-	if m.colWidths[1] != 80-5 {
-		t.Errorf("Dept column should absorb remaining width, expected %d, got %d", 80-5, m.colWidths[1])
+	if m.colWidths[1] != 80-7 {
+		t.Errorf("Dept column should absorb remaining width, expected %d, got %d", 80-7, m.colWidths[1])
 	}
 }
 
@@ -7608,9 +7607,9 @@ func TestComputeColWidths_AutoFit_SpanningCellsIgnored(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithStyles[TestRow](s),
 	)
-	// Spanning cells are skipped; only the header "N" contributes → clamp to MinWidth=1.
-	if m.colWidths[0] != 1 {
-		t.Errorf("spanning cells skipped, expected MinWidth=1, got %d", m.colWidths[0])
+	// Spanning cells are skipped; only header "N"(1) + frame(2) = 3. MinWidth=1 doesn't clamp.
+	if m.colWidths[0] != 3 {
+		t.Errorf("spanning cells skipped, expected 3 (header + frame), got %d", m.colWidths[0])
 	}
 }
 
@@ -7659,12 +7658,14 @@ func TestComputeColWidths_AutoFit_RecomputesOnSetRows(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithStyles[TestRow](s),
 	)
-	if got := m.colWidths[0]; got != 2 {
-		t.Fatalf("initial width = %d, want 2", got)
+	// "Al"(2) + frame(2) = 4
+	if got := m.colWidths[0]; got != 4 {
+		t.Fatalf("initial width = %d, want 4", got)
 	}
 	m.SetRows([]TestRow{{Name: "Bartholomew"}})
-	if got := m.colWidths[0]; got != len("Bartholomew") {
-		t.Errorf("after SetRows width = %d, want %d", got, len("Bartholomew"))
+	// "Bartholomew"(11) + frame(2) = 13
+	if got := m.colWidths[0]; got != len("Bartholomew")+2 {
+		t.Errorf("after SetRows width = %d, want %d", got, len("Bartholomew")+2)
 	}
 }
 
@@ -7681,8 +7682,8 @@ func TestComputeColWidths_AutoFit_RecomputesOnInsertRow(t *testing.T) {
 		WithStyles[TestRow](s),
 	)
 	m.InsertRow(0, TestRow{Name: "Bartholomew"})
-	if got := m.colWidths[0]; got != len("Bartholomew") {
-		t.Errorf("after InsertRow width = %d, want %d", got, len("Bartholomew"))
+	if got := m.colWidths[0]; got != len("Bartholomew")+2 {
+		t.Errorf("after InsertRow width = %d, want %d", got, len("Bartholomew")+2)
 	}
 }
 
@@ -7700,8 +7701,8 @@ func TestComputeColWidths_AutoFit_RecomputesOnUpdateRow(t *testing.T) {
 	)
 	rowID := m.rows[0].ID
 	m.UpdateRow(rowID, TestRow{Name: "Bartholomew"})
-	if got := m.colWidths[0]; got != len("Bartholomew") {
-		t.Errorf("after UpdateRow width = %d, want %d", got, len("Bartholomew"))
+	if got := m.colWidths[0]; got != len("Bartholomew")+2 {
+		t.Errorf("after UpdateRow width = %d, want %d", got, len("Bartholomew")+2)
 	}
 }
 
@@ -7717,13 +7718,14 @@ func TestComputeColWidths_AutoFit_RecomputesOnRemoveRow(t *testing.T) {
 		WithWidth[TestRow](80),
 		WithStyles[TestRow](s),
 	)
-	if got := m.colWidths[0]; got != len("Bartholomew") {
-		t.Fatalf("initial width = %d, want %d", got, len("Bartholomew"))
+	if got := m.colWidths[0]; got != len("Bartholomew")+2 {
+		t.Fatalf("initial width = %d, want %d", got, len("Bartholomew")+2)
 	}
 	longID := m.rows[1].ID
 	m.RemoveRow(longID)
-	if got := m.colWidths[0]; got != 2 {
-		t.Errorf("after RemoveRow width = %d, want 2", got)
+	// After remove: only "Al" (2) + frame (2) = 4
+	if got := m.colWidths[0]; got != 4 {
+		t.Errorf("after RemoveRow width = %d, want 4", got)
 	}
 }
 
@@ -7806,8 +7808,9 @@ func TestAutoSizeColumns_MeasuresDisplayedRows(t *testing.T) {
 	tf.SetText("Al")
 	m.SetColumnFilter("Name", tf)
 	m.AutoSizeColumns()
-	if got := m.colWidths[0]; got != 2 {
-		t.Errorf("AutoSizeColumns measured against displayed rows, expected 2, got %d", got)
+	// Only "Al" is visible: content 2 + frame (2) = 4
+	if got := m.colWidths[0]; got != 4 {
+		t.Errorf("AutoSizeColumns measured against displayed rows, expected 4, got %d", got)
 	}
 }
 
@@ -7943,8 +7946,9 @@ func TestAutoSizeColumns_NoRows(t *testing.T) {
 		WithStyles[TestRow](s),
 	)
 	m.AutoSizeColumns()
-	if got := m.manualWidths["Name"]; got != len("LongerHeader") {
-		t.Errorf("no-rows AutoSize should equal header width %d, got %d", len("LongerHeader"), got)
+	// header "LongerHeader" (12) + frame (2) = 14
+	if got := m.manualWidths["Name"]; got != len("LongerHeader")+2 {
+		t.Errorf("no-rows AutoSize should equal header width %d (+ frame), got %d", len("LongerHeader")+2, got)
 	}
 }
 

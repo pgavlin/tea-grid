@@ -1249,10 +1249,13 @@ func (m *Model[T]) refreshHasAutoFit() {
 	}
 }
 
-// measureColumnWidth returns the content-fit width for col measured against
-// the given rows. It takes the max of the header width and each row's
-// rendered display width (via NaturalWidthRenderer or the Text/Value chain),
-// then clamps to [MinWidth (default 4), MaxWidth (0 = unbounded)].
+// measureColumnWidth returns the content-fit column width for col measured
+// against the given rows. It takes the max of the header width and each
+// row's rendered display width (via NaturalWidthRenderer or the Text/Value
+// chain), adds the horizontal frame (cell padding / header padding) so the
+// returned value is a full column width, then clamps to
+// [MinWidth (default 4), MaxWidth (0 = unbounded)].
+//
 // Cells with ColumnSpan > 1 are skipped — they lie about per-column width
 // by design.
 func (m *Model[T]) measureColumnWidth(col data.Column[T], colIdx int, rows []*data.RowNode[T]) int {
@@ -1285,6 +1288,15 @@ func (m *Model[T]) measureColumnWidth(col data.Column[T], colIdx int, rows []*da
 			w = cellW
 		}
 	}
+
+	// Convert measured content width into a full column width by accounting
+	// for horizontal frame overhead (cell padding). Both header and body
+	// cells reserve their own frame, so take the larger of the two.
+	frame := m.styles.Cell.GetHorizontalFrameSize()
+	if hf := m.styles.HeaderCell.GetHorizontalFrameSize(); hf > frame {
+		frame = hf
+	}
+	w += frame
 
 	if w < minW {
 		w = minW
