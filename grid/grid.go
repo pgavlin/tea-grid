@@ -1143,6 +1143,98 @@ func (m *Model[T]) findCol(colID string) *data.Column[T] {
 	return nil
 }
 
+// measureColumnWidth returns the content-fit width for col measured against
+// the given rows. It takes the max of the header width and each row's
+// rendered display width (via NaturalWidthRenderer or the Text/Value chain),
+// then clamps to [MinWidth (default 4), MaxWidth (0 = unbounded)].
+// Cells with ColumnSpan > 1 are skipped — they lie about per-column width
+// by design.
+func (m *Model[T]) measureColumnWidth(col data.Column[T], colIdx int, rows []*data.RowNode[T]) int {
+	minW := col.MinWidth
+	if minW == 0 {
+		minW = 4
+	}
+
+	w := lipgloss.Width(col.HeaderName)
+
+	var natural data.NaturalWidthRenderer[T]
+	if col.CellRenderer != nil {
+		if nw, ok := col.CellRenderer.(data.NaturalWidthRenderer[T]); ok {
+			natural = nw
+		}
+	}
+
+	for i, rn := range rows {
+		if col.ColumnSpan != nil && col.ColumnSpan(rn.Data) > 1 {
+			continue
+		}
+		var cellW int
+		if natural != nil {
+			ctx := m.buildMeasureContext(col, colIdx, i, rn)
+			cellW = natural.NaturalWidth(ctx)
+		} else {
+			cellW = lipgloss.Width(measureCellText(col, rn.Data))
+		}
+		if cellW > w {
+			w = cellW
+		}
+	}
+
+	if w < minW {
+		w = minW
+	}
+	if col.MaxWidth > 0 && w > col.MaxWidth {
+		w = col.MaxWidth
+	}
+	return w
+}
+
+// measureCellText produces the string a column would render for row via the
+// Text / ValueFormatter / Value fallback chain (no CellRenderer invocation).
+func measureCellText[T any](col data.Column[T], row T) string {
+	if col.Text != nil {
+		return col.Text(&row)
+	}
+	var v any
+	if col.Value != nil {
+		v = col.Value(row)
+	}
+	if col.ValueFormatter != nil {
+		return col.ValueFormatter(v, row)
+	}
+	return conv.SprintValue(v)
+}
+
+// buildMeasureContext constructs a CellContext suitable for a NaturalWidth
+// query. Width = MaxWidth if set, else 0 (signals "no target width").
+func (m *Model[T]) buildMeasureContext(col data.Column[T], colIdx, rowIdx int, rn *data.RowNode[T]) data.CellContext[T] {
+	var val any
+	var formatted string
+	if col.Text != nil {
+		formatted = col.Text(&rn.Data)
+	} else {
+		if col.Value != nil {
+			val = col.Value(rn.Data)
+		}
+		formatted = conv.SprintValue(val)
+		if col.ValueFormatter != nil {
+			formatted = col.ValueFormatter(val, rn.Data)
+		}
+	}
+	w := col.MaxWidth
+	return data.CellContext[T]{
+		Value:          val,
+		FormattedValue: formatted,
+		Data:           rn.Data,
+		RowNode:        rn,
+		Column:         &col,
+		ColumnIndex:    colIdx,
+		RowIndex:       rowIdx,
+		Width:          w,
+		Height:         1,
+	}
+}
+
 // computeColWidths runs the column sizing algorithm.
 func (m *Model[T]) computeColWidths() {
 	if len(m.cols) == 0 || m.width == 0 {

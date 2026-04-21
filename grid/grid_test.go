@@ -7319,3 +7319,166 @@ func TestJoinCellLines_FourColumns_OnlyOneMultiLine(t *testing.T) {
 		t.Errorf("line 2: expected %q, got %q", "   │   │cc3│   ", lines[2])
 	}
 }
+
+// -----------------------------------------------------------------------
+// measureColumnWidth (AutoFit)
+// -----------------------------------------------------------------------
+
+func TestMeasureColumnWidth_HeaderOnly(t *testing.T) {
+	col := data.Column[TestRow]{
+		ColumnID:   "Name",
+		HeaderName: "Name",
+		Value:      func(r TestRow) any { return r.Name },
+		MinWidth:   4,
+	}
+	m := newTestGrid()
+	got := m.measureColumnWidth(col, 0, nil)
+	if got != 4 {
+		t.Errorf("empty rows + short header should clamp to MinWidth=4, got %d", got)
+	}
+}
+
+func TestMeasureColumnWidth_RowsDriveWidth(t *testing.T) {
+	col := data.Column[TestRow]{
+		ColumnID:   "Name",
+		HeaderName: "N",
+		Value:      func(r TestRow) any { return r.Name },
+		MinWidth:   1,
+	}
+	rows := []*data.RowNode[TestRow]{
+		{Data: TestRow{Name: "Alice"}},
+		{Data: TestRow{Name: "Bartholomew"}},
+	}
+	m := newTestGrid()
+	got := m.measureColumnWidth(col, 0, rows)
+	if got != len("Bartholomew") {
+		t.Errorf("expected width %d, got %d", len("Bartholomew"), got)
+	}
+}
+
+func TestMeasureColumnWidth_ClampsToMaxWidth(t *testing.T) {
+	col := data.Column[TestRow]{
+		ColumnID:   "Name",
+		HeaderName: "N",
+		Value:      func(r TestRow) any { return r.Name },
+		MinWidth:   1,
+		MaxWidth:   5,
+	}
+	rows := []*data.RowNode[TestRow]{{Data: TestRow{Name: "Bartholomew"}}}
+	m := newTestGrid()
+	got := m.measureColumnWidth(col, 0, rows)
+	if got != 5 {
+		t.Errorf("expected width clamped to MaxWidth=5, got %d", got)
+	}
+}
+
+func TestMeasureColumnWidth_ClampsToMinWidth(t *testing.T) {
+	col := data.Column[TestRow]{
+		ColumnID:   "Name",
+		HeaderName: "N",
+		Value:      func(r TestRow) any { return r.Name },
+		MinWidth:   10,
+	}
+	rows := []*data.RowNode[TestRow]{{Data: TestRow{Name: "Al"}}}
+	m := newTestGrid()
+	got := m.measureColumnWidth(col, 0, rows)
+	if got != 10 {
+		t.Errorf("expected width clamped to MinWidth=10, got %d", got)
+	}
+}
+
+func TestMeasureColumnWidth_UsesTextFallback(t *testing.T) {
+	col := data.Column[TestRow]{
+		ColumnID:   "Name",
+		HeaderName: "N",
+		Text:       func(r *TestRow) string { return "[" + r.Name + "]" },
+		Value:      func(r TestRow) any { return r.Name },
+		MinWidth:   1,
+	}
+	rows := []*data.RowNode[TestRow]{{Data: TestRow{Name: "Al"}}}
+	m := newTestGrid()
+	got := m.measureColumnWidth(col, 0, rows)
+	if got != 4 {
+		t.Errorf("Text() should produce \"[Al]\" (4 chars), got width %d", got)
+	}
+}
+
+type fixedNaturalRenderer struct {
+	width int
+}
+
+func (r fixedNaturalRenderer) Render(ctx data.CellContext[TestRow]) string { return "" }
+func (r fixedNaturalRenderer) NaturalWidth(ctx data.CellContext[TestRow]) int {
+	return r.width
+}
+
+func TestMeasureColumnWidth_UsesNaturalWidthRenderer(t *testing.T) {
+	col := data.Column[TestRow]{
+		ColumnID:     "Bar",
+		HeaderName:   "B",
+		CellRenderer: fixedNaturalRenderer{width: 7},
+		Value:        func(r TestRow) any { return r.Salary },
+		MinWidth:     1,
+	}
+	rows := []*data.RowNode[TestRow]{
+		{Data: TestRow{Salary: 1}},
+		{Data: TestRow{Salary: 2}},
+	}
+	m := newTestGrid()
+	got := m.measureColumnWidth(col, 0, rows)
+	if got != 7 {
+		t.Errorf("expected NaturalWidth=7, got %d", got)
+	}
+}
+
+type ignoredRenderer struct{}
+
+func (ignoredRenderer) Render(ctx data.CellContext[TestRow]) string { return "XXXXXXXX" }
+
+func TestMeasureColumnWidth_RendererWithoutNaturalWidthFallsThroughToText(t *testing.T) {
+	col := data.Column[TestRow]{
+		ColumnID:     "Name",
+		HeaderName:   "N",
+		CellRenderer: ignoredRenderer{},
+		Value:        func(r TestRow) any { return r.Name },
+		MinWidth:     1,
+	}
+	rows := []*data.RowNode[TestRow]{{Data: TestRow{Name: "Al"}}}
+	m := newTestGrid()
+	got := m.measureColumnWidth(col, 0, rows)
+	if got != 2 {
+		t.Errorf("renderer without NaturalWidth should be ignored for measurement; expected 2 (from Value \"Al\"), got %d", got)
+	}
+}
+
+func TestMeasureColumnWidth_SkipsSpanningCells(t *testing.T) {
+	col := data.Column[TestRow]{
+		ColumnID:   "Name",
+		HeaderName: "N",
+		Value:      func(r TestRow) any { return r.Name },
+		ColumnSpan: func(r TestRow) int { return 3 },
+		MinWidth:   1,
+	}
+	rows := []*data.RowNode[TestRow]{{Data: TestRow{Name: "Bartholomew"}}}
+	m := newTestGrid()
+	got := m.measureColumnWidth(col, 0, rows)
+	if got != 1 {
+		t.Errorf("spanning cells should be skipped; expected MinWidth=1, got %d", got)
+	}
+}
+
+func TestMeasureColumnWidth_WideRunes(t *testing.T) {
+	col := data.Column[TestRow]{
+		ColumnID:   "Name",
+		HeaderName: "N",
+		Value:      func(r TestRow) any { return r.Name },
+		MinWidth:   1,
+	}
+	// "日本語" is 3 runes but 6 display columns.
+	rows := []*data.RowNode[TestRow]{{Data: TestRow{Name: "日本語"}}}
+	m := newTestGrid()
+	got := m.measureColumnWidth(col, 0, rows)
+	if got != 6 {
+		t.Errorf("expected display width 6 for CJK, got %d", got)
+	}
+}
