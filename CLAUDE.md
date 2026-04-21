@@ -76,7 +76,23 @@ internal/lineedit →  (standalone, line editing widget for filter input)
 
 ### Column Width Algorithm
 
-In `grid.go:computeColWidths`: fixed-width columns allocated first, then remaining space distributed to flex columns by weight (cumulative division to avoid pixel loss). MinWidth (default 4) and MaxWidth are respected. Hidden columns get width 0. Border separators subtract from available space when `BorderColumn=true`.
+In `grid.go:computeColWidths`, column sizing precedence is:
+
+1. **Sticky override** set by `AutoSizeColumn(s)` (stored in `Model.manualWidths`), cleared by `ResetColumnWidth(s)`.
+2. `Column.Width > 0` — fixed width.
+3. `Column.AutoFit = true` — content-measured against raw rows (`m.rows`), clamped to `[MinWidth, MaxWidth]`. Recomputed on `New`/`SetColumns`/`SetRows`/`InsertRow`/`RemoveRow`/`UpdateRow`/`SetWidth`/pin changes; stable under filter/sort/scroll/selection/edit. Cached via `Model.hasAutoFit` to avoid measurement cost on grids with no AutoFit columns.
+4. `Column.Flex` — remaining space distributed by weight (cumulative division to avoid pixel loss).
+
+Auto-fit measurement uses a `NaturalWidthRenderer[T]` sub-interface on `CellRenderer[T]`. Renderers that scale to `ctx.Width` (`BarRenderer`, `ProgressRenderer`, `SparklineRenderer`) implement it; text-ish renderers fall back to the `Text → ValueFormatter(Value) → SprintValue(Value)` chain.
+
+Imperative methods on `Model[T]` (measured against `m.displayRows`, sticky until cleared):
+- `AutoSizeColumns()` — fit every visible column.
+- `AutoSizeColumn(colID)` — fit one column.
+- `ResetColumnWidths()` / `ResetColumnWidth(colID)` — clear overrides.
+
+Default keybindings: `w` (fit focused column) and `W` (fit all). `ResetColumnWidth(s)` have no default binding.
+
+MinWidth (default 4) and MaxWidth are respected in all paths. Hidden columns get width 0. Border separators subtract from available space when `BorderColumn=true`.
 
 ### Update Routing
 
