@@ -31,6 +31,16 @@ func (f CellRendererFunc[T]) Render(ctx CellContext[T]) string {
 	return f(ctx)
 }
 
+// NaturalWidthRenderer reports a renderer's preferred display width,
+// independent of ctx.Width. Renderers that want their output to drive
+// AutoFit should implement this. Renderers that produce width-independent
+// output (e.g. plain text) can skip it; the column's AutoFit path falls
+// back to Column.Text / ValueFormatter / Value for measurement.
+type NaturalWidthRenderer[T any] interface {
+	CellRenderer[T]
+	NaturalWidth(ctx CellContext[T]) int
+}
+
 // CellEditor handles inline editing of a cell value.
 type CellEditor[T any] interface {
 	// Init is called when editing begins. Returns initial command.

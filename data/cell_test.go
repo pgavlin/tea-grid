@@ -678,3 +678,30 @@ func TestRowNodeTreeStructure(t *testing.T) {
 		t.Error("second child data mismatch")
 	}
 }
+
+// --- NaturalWidthRenderer ---
+
+// naturalWidthTestRenderer is a test renderer that implements
+// both CellRenderer and NaturalWidthRenderer.
+type naturalWidthTestRenderer struct {
+	natural int
+}
+
+func (r naturalWidthTestRenderer) Render(ctx CellContext[int]) string {
+	return "x"
+}
+
+func (r naturalWidthTestRenderer) NaturalWidth(ctx CellContext[int]) int {
+	return r.natural
+}
+
+func TestNaturalWidthRenderer_InterfaceSatisfied(t *testing.T) {
+	var r CellRenderer[int] = naturalWidthTestRenderer{natural: 7}
+	nw, ok := r.(NaturalWidthRenderer[int])
+	if !ok {
+		t.Fatal("expected renderer to satisfy NaturalWidthRenderer[int]")
+	}
+	if got := nw.NaturalWidth(CellContext[int]{}); got != 7 {
+		t.Errorf("NaturalWidth = %d, want 7", got)
+	}
+}
