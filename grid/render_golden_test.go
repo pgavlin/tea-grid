@@ -86,10 +86,10 @@ func bgStyles() Styles {
 func TestGolden_MultiLineRow_SingleCol_Height2(t *testing.T) {
 	cols := []data.Column[TestRow]{
 		{
-			ColumnID:    "Name",
-			HeaderName:  "Name",
-			Value: func(r TestRow) any { return r.Name },
-			Width:       12,
+			ColumnID:   "Name",
+			HeaderName: "Name",
+			Value:      func(r TestRow) any { return r.Name },
+			Width:      12,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\n(details)", ctx.Value)
 			}),
@@ -110,19 +110,19 @@ func TestGolden_MultiLineRow_SingleCol_Height2(t *testing.T) {
 func TestGolden_MultiLineRow_TwoCols_OnlyFirstMultiLine(t *testing.T) {
 	cols := []data.Column[TestRow]{
 		{
-			ColumnID:    "Name",
-			HeaderName:  "Name",
-			Value: func(r TestRow) any { return r.Name },
-			Width:       10,
+			ColumnID:   "Name",
+			HeaderName: "Name",
+			Value:      func(r TestRow) any { return r.Name },
+			Width:      10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\nline2", ctx.Value)
 			}),
 		},
 		{
-			ColumnID:    "Dept",
-			HeaderName:  "Dept",
-			Value: func(r TestRow) any { return r.Department },
-			Width:       10,
+			ColumnID:   "Dept",
+			HeaderName: "Dept",
+			Value:      func(r TestRow) any { return r.Department },
+			Width:      10,
 		},
 	}
 	m := New[TestRow](
@@ -140,19 +140,19 @@ func TestGolden_MultiLineRow_TwoCols_OnlyFirstMultiLine(t *testing.T) {
 func TestGolden_MultiLineRow_TwoCols_BothMultiLine(t *testing.T) {
 	cols := []data.Column[TestRow]{
 		{
-			ColumnID:    "Name",
-			HeaderName:  "Name",
-			Value: func(r TestRow) any { return r.Name },
-			Width:       10,
+			ColumnID:   "Name",
+			HeaderName: "Name",
+			Value:      func(r TestRow) any { return r.Name },
+			Width:      10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\n(%s)", ctx.Value, "info")
 			}),
 		},
 		{
-			ColumnID:    "Dept",
-			HeaderName:  "Dept",
-			Value: func(r TestRow) any { return r.Department },
-			Width:       10,
+			ColumnID:   "Dept",
+			HeaderName: "Dept",
+			Value:      func(r TestRow) any { return r.Department },
+			Width:      10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\n---", ctx.Value)
 			}),
@@ -173,20 +173,20 @@ func TestGolden_MultiLineRow_TwoCols_BothMultiLine(t *testing.T) {
 func TestGolden_MultiLineRow_Height3_ShortContent(t *testing.T) {
 	cols := []data.Column[TestRow]{
 		{
-			ColumnID:    "Name",
-			HeaderName:  "Name",
-			Value: func(r TestRow) any { return r.Name },
-			Width:       10,
+			ColumnID:   "Name",
+			HeaderName: "Name",
+			Value:      func(r TestRow) any { return r.Name },
+			Width:      10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				// Only 1 line of content in a 3-line cell
 				return fmt.Sprintf("%v", ctx.Value)
 			}),
 		},
 		{
-			ColumnID:    "Dept",
-			HeaderName:  "Dept",
-			Value: func(r TestRow) any { return r.Department },
-			Width:       10,
+			ColumnID:   "Dept",
+			HeaderName: "Dept",
+			Value:      func(r TestRow) any { return r.Department },
+			Width:      10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\nline2\nline3", ctx.Value)
 			}),
@@ -207,16 +207,16 @@ func TestGolden_MultiLineRow_Height3_ShortContent(t *testing.T) {
 func TestGolden_MultiLineRow_EvenOddBg(t *testing.T) {
 	cols := []data.Column[TestRow]{
 		{
-			ColumnID:    "Name",
-			HeaderName:  "Name",
-			Value: func(r TestRow) any { return r.Name },
-			Width:       10,
+			ColumnID:   "Name",
+			HeaderName: "Name",
+			Value:      func(r TestRow) any { return r.Name },
+			Width:      10,
 		},
 		{
-			ColumnID:    "Dept",
-			HeaderName:  "Dept",
-			Value: func(r TestRow) any { return r.Department },
-			Width:       10,
+			ColumnID:   "Dept",
+			HeaderName: "Dept",
+			Value:      func(r TestRow) any { return r.Department },
+			Width:      10,
 		},
 	}
 	m := New[TestRow](

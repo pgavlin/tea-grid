@@ -15,19 +15,19 @@ type testRow struct {
 func testCols() []data.Column[testRow] {
 	return []data.Column[testRow]{
 		{
-			ColumnID:    "Name",
-			HeaderName:  "Name",
-			Value: func(r testRow) any { return r.Name },
+			ColumnID:   "Name",
+			HeaderName: "Name",
+			Value:      func(r testRow) any { return r.Name },
 		},
 		{
-			ColumnID:    "Department",
-			HeaderName:  "Department",
-			Value: func(r testRow) any { return r.Department },
+			ColumnID:   "Department",
+			HeaderName: "Department",
+			Value:      func(r testRow) any { return r.Department },
 		},
 		{
-			ColumnID:    "Salary",
-			HeaderName:  "Salary",
-			Value: func(r testRow) any { return r.Salary },
+			ColumnID:   "Salary",
+			HeaderName: "Salary",
+			Value:      func(r testRow) any { return r.Salary },
 		},
 	}
 }

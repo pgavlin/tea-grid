@@ -897,9 +897,10 @@ func (m *Model[T]) recomputeDisplayRows() {
 		m.pinnedTop = nil
 		m.pinnedBot = nil
 		for _, rn := range m.rows {
-			if rn.Pinned == data.PinTop {
+			switch rn.Pinned {
+			case data.PinTop:
 				m.pinnedTop = append(m.pinnedTop, rn)
-			} else if rn.Pinned == data.PinBottom {
+			case data.PinBottom:
 				m.pinnedBot = append(m.pinnedBot, rn)
 			}
 		}

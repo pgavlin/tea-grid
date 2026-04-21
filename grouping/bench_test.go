@@ -14,8 +14,10 @@ type benchRow struct {
 	Salary     float64
 }
 
-var benchDepartments = []string{"Engineering", "Sales", "Marketing", "Support", "Finance", "Legal", "HR", "Product", "Design", "Operations"}
-var benchCities = []string{"New York", "San Francisco", "London", "Berlin", "Tokyo", "Sydney", "Toronto", "Paris", "Singapore", "Mumbai"}
+var (
+	benchDepartments = []string{"Engineering", "Sales", "Marketing", "Support", "Finance", "Legal", "HR", "Product", "Design", "Operations"}
+	benchCities      = []string{"New York", "San Francisco", "London", "Berlin", "Tokyo", "Sydney", "Toronto", "Paris", "Singapore", "Mumbai"}
+)
 
 func makeBenchRows(n int) []*data.RowNode[benchRow] {
 	nodes := make([]*data.RowNode[benchRow], n)

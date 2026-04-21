@@ -28,9 +28,11 @@ type benchRow struct {
 	Score      float64
 }
 
-var departments = []string{"Engineering", "Sales", "Marketing", "Support", "Finance", "Legal", "HR", "Product", "Design", "Operations"}
-var cities = []string{"New York", "San Francisco", "London", "Berlin", "Tokyo", "Sydney", "Toronto", "Paris", "Singapore", "Mumbai"}
-var countries = []string{"US", "UK", "DE", "JP", "AU", "CA", "FR", "SG", "IN", "BR"}
+var (
+	departments = []string{"Engineering", "Sales", "Marketing", "Support", "Finance", "Legal", "HR", "Product", "Design", "Operations"}
+	cities      = []string{"New York", "San Francisco", "London", "Berlin", "Tokyo", "Sydney", "Toronto", "Paris", "Singapore", "Mumbai"}
+	countries   = []string{"US", "UK", "DE", "JP", "AU", "CA", "FR", "SG", "IN", "BR"}
+)
 
 func makeBenchRows(n int) []benchRow {
 	rows := make([]benchRow, n)
