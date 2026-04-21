@@ -7943,3 +7943,20 @@ func TestAutoSizeColumns_SkipsHidden(t *testing.T) {
 		t.Error("hidden column should not be measured by AutoSizeColumns")
 	}
 }
+
+func TestSetColumns_PrunesRemovedOverrides(t *testing.T) {
+	m := newTestGrid()
+	m.AutoSizeColumn("Name")
+	m.AutoSizeColumn("Department")
+	// Replace with a set that drops "Name"
+	newCols := []data.Column[TestRow]{
+		{ColumnID: "Department", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, MinWidth: 1, Flex: 1},
+	}
+	m.SetColumns(newCols)
+	if _, ok := m.manualWidths["Name"]; ok {
+		t.Error("expected override for removed column \"Name\" to be pruned")
+	}
+	if _, ok := m.manualWidths["Department"]; !ok {
+		t.Error("expected override for surviving column \"Department\" to persist")
+	}
+}

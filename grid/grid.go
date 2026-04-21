@@ -239,6 +239,20 @@ func (m *Model[T]) SetColumns(cols []data.Column[T]) {
 	m.cols = cols
 	m.dirty = true
 	m.filterDirty = true
+
+	// Prune overrides for columns that no longer exist.
+	if len(m.manualWidths) > 0 {
+		present := make(map[string]struct{}, len(cols))
+		for i := range cols {
+			present[cols[i].ColumnID] = struct{}{}
+		}
+		for id := range m.manualWidths {
+			if _, ok := present[id]; !ok {
+				delete(m.manualWidths, id)
+			}
+		}
+	}
+
 	m.refreshHasAutoFit()
 	m.recomputeDisplayRows()
 	m.computeColWidths()
