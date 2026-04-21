@@ -7960,3 +7960,48 @@ func TestSetColumns_PrunesRemovedOverrides(t *testing.T) {
 		t.Error("expected override for surviving column \"Department\" to persist")
 	}
 }
+
+// -----------------------------------------------------------------------
+// w / W keybindings for AutoSizeColumn(s)
+// -----------------------------------------------------------------------
+
+func TestKeyMap_AutoSizeColumn_FitsFocusedColumn(t *testing.T) {
+	m := newTestGrid()
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+	m = sendKey(m, tea.KeyPressMsg{Code: 'w', Text: "w"})
+	if _, ok := m.manualWidths["Name"]; !ok {
+		t.Error("expected 'w' to set override on focused column")
+	}
+	if _, ok := m.manualWidths["Department"]; ok {
+		t.Error("expected 'w' to not affect other columns")
+	}
+}
+
+func TestKeyMap_AutoSizeColumns_FitsAll(t *testing.T) {
+	m := newTestGrid()
+	m = sendKey(m, tea.KeyPressMsg{Code: 'W', Text: "W"})
+	for _, c := range m.cols {
+		if c.Hide {
+			continue
+		}
+		if _, ok := m.manualWidths[c.ColumnID]; !ok {
+			t.Errorf("expected override for column %q", c.ColumnID)
+		}
+	}
+}
+
+func TestKeyMap_AutoSize_NotDispatchedInEditMode(t *testing.T) {
+	cols := testCols()
+	cols[0].Editable = true
+	cols[0].ValueSetter = func(r *TestRow, v any) { r.Name = v.(string) }
+	m := newTestGrid(WithColumns[TestRow](cols), WithEditable[TestRow](true))
+	m.focusedCell = CellPosition{Row: 0, Col: 0}
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.editState == nil {
+		t.Fatal("expected edit mode after Enter")
+	}
+	m = sendKey(m, tea.KeyPressMsg{Code: 'w', Text: "w"})
+	if _, ok := m.manualWidths["Name"]; ok {
+		t.Error("'w' in edit mode must not trigger AutoSize")
+	}
+}

@@ -61,6 +61,10 @@ type KeyMap struct {
 	ExpandAll         key.Binding
 	CollapseAll       key.Binding
 
+	// Column sizing
+	AutoSizeColumn  key.Binding // Fit focused column to content.
+	AutoSizeColumns key.Binding // Fit all visible columns to content.
+
 	// General
 	Help key.Binding
 }
@@ -215,6 +219,14 @@ func DefaultKeyMap() KeyMap {
 		CollapseAll: key.NewBinding(
 			key.WithKeys("ctrl+shift+left"),
 			key.WithHelp("ctrl+shift+←", "collapse all"),
+		),
+		AutoSizeColumn: key.NewBinding(
+			key.WithKeys("w"),
+			key.WithHelp("w", "fit column width"),
+		),
+		AutoSizeColumns: key.NewBinding(
+			key.WithKeys("W"),
+			key.WithHelp("W", "fit all column widths"),
 		),
 	}
 }

@@ -132,6 +132,16 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, m.KeyMap.AutoSizeColumn):
+		if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
+			m.AutoSizeColumn(m.cols[m.focusedCell.Col].ColumnID)
+		}
+		return m, nil
+
+	case key.Matches(msg, m.KeyMap.AutoSizeColumns):
+		m.AutoSizeColumns()
+		return m, nil
+
 	// Toggle group column from any row
 	case key.Matches(msg, m.KeyMap.ToggleGroupColumn):
 		if m.focusedCell.Col >= 0 && m.focusedCell.Col < len(m.cols) {
