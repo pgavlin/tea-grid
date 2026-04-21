@@ -57,8 +57,8 @@ type Column[T any] struct {
 	Comparator func(a, b any) int // Custom sort via Value(). Ignored when Compare is set.
 
 	// Filtering
-	Filterable       bool                     // Default: true.
-	Filter           filter.Filter            // Column filter.
+	Filterable       bool                            // Default: true.
+	Filter           filter.Filter                   // Column filter.
 	QuickFilterMatch func(data *T, word string) bool // Reports whether this column matches a quick filter word. Takes *T to avoid copying. If nil, falls back to Text or Value + containsFold.
 
 	// Pinning
@@ -445,11 +445,11 @@ func columnsFromSlice[T any](rows []T) []Column[T] {
 		}
 
 		col := Column[T]{
-			ColumnID:    fieldName,
-			HeaderName:  fieldName,
-			Value: getter,
-			Sortable:    true,
-			Filterable:  true,
+			ColumnID:   fieldName,
+			HeaderName: fieldName,
+			Value:      getter,
+			Sortable:   true,
+			Filterable: true,
 		}
 		applyTypeDefaults(&col, category, collectDistinctValues(getter, rows))
 		cols = append(cols, col)

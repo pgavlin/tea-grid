@@ -79,13 +79,13 @@ type Model[T any] struct {
 	quickFilterWords         []string      // cached split of quickFilterText, updated on text change
 	quickFilterSeq           uint64        // bumped on each keystroke, used to discard stale debounce ticks
 	quickFilterDebounceDelay time.Duration // delay before recomputing after keystroke (default 100ms, 0 = immediate)
-	filterEditColIdx    int             // -1 = no filter editor active
-	externalFilter      func(T) bool
+	filterEditColIdx         int           // -1 = no filter editor active
+	externalFilter           func(T) bool
 	// Cached list of column indices with active filters (rebuilt at start of each recompute)
 	activeFilters []int
 	// Filter result cache
-	filterDirty           bool
-	cachedFiltered        []*data.RowNode[T]
+	filterDirty            bool
+	cachedFiltered         []*data.RowNode[T]
 	cachedFilterEditColIdx int // filterEditColIdx when cachedFiltered was built
 
 	// Grouping

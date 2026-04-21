@@ -7176,17 +7176,17 @@ func TestRender_MultiLineCellRenderer_WithBorder(t *testing.T) {
 		{
 			ColumnID:   "Name",
 			HeaderName: "Name",
-			Value: func(r TestRow) any { return r.Name },
+			Value:      func(r TestRow) any { return r.Name },
 			Width:      10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\n(%s)", ctx.Value, "info")
 			}),
 		},
 		{
-			ColumnID:    "Dept",
-			HeaderName:  "Dept",
-			Value: func(r TestRow) any { return r.Department },
-			Width:       10,
+			ColumnID:   "Dept",
+			HeaderName: "Dept",
+			Value:      func(r TestRow) any { return r.Department },
+			Width:      10,
 		},
 	}
 	s := DefaultStyles()
@@ -7224,17 +7224,17 @@ func TestRender_MultiLineCellRenderer_NoBorder(t *testing.T) {
 		{
 			ColumnID:   "Name",
 			HeaderName: "Name",
-			Value: func(r TestRow) any { return r.Name },
+			Value:      func(r TestRow) any { return r.Name },
 			Width:      10,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
 				return fmt.Sprintf("%s\nline2", ctx.Value)
 			}),
 		},
 		{
-			ColumnID:    "Dept",
-			HeaderName:  "Dept",
-			Value: func(r TestRow) any { return r.Department },
-			Width:       10,
+			ColumnID:   "Dept",
+			HeaderName: "Dept",
+			Value:      func(r TestRow) any { return r.Department },
+			Width:      10,
 		},
 	}
 	s := DefaultStyles()
@@ -7260,7 +7260,7 @@ func TestRender_MultiLineCellRenderer_PinnedColumns(t *testing.T) {
 		{
 			ColumnID:   "Name",
 			HeaderName: "Name",
-			Value: func(r TestRow) any { return r.Name },
+			Value:      func(r TestRow) any { return r.Name },
 			Width:      10,
 			Pinned:     data.PinLeft,
 			CellRenderer: data.CellRendererFunc[TestRow](func(ctx data.CellContext[TestRow]) string {
@@ -7268,17 +7268,17 @@ func TestRender_MultiLineCellRenderer_PinnedColumns(t *testing.T) {
 			}),
 		},
 		{
-			ColumnID:    "Dept",
-			HeaderName:  "Dept",
-			Value: func(r TestRow) any { return r.Department },
-			Width:       10,
+			ColumnID:   "Dept",
+			HeaderName: "Dept",
+			Value:      func(r TestRow) any { return r.Department },
+			Width:      10,
 		},
 		{
-			ColumnID:    "Active",
-			HeaderName:  "Active",
-			Value: func(r TestRow) any { return r.Active },
-			Width:       10,
-			Pinned:      data.PinRight,
+			ColumnID:   "Active",
+			HeaderName: "Active",
+			Value:      func(r TestRow) any { return r.Active },
+			Width:      10,
+			Pinned:     data.PinRight,
 		},
 	}
 	s := DefaultStyles()
