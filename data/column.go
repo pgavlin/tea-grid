@@ -46,10 +46,11 @@ type Column[T any] struct {
 	Compare        func(*T, *T) int               // Compares two rows for sorting. If nil, falls back to defaultCompare(Value(a), Value(b)).
 
 	// Sizing
-	Width    int // Fixed width in terminal columns. 0 = auto.
-	MinWidth int // Minimum width (default: 4).
-	MaxWidth int // Maximum width. 0 = unconstrained.
-	Flex     int // Flex weight for distributing remaining space. 0 = no flex.
+	Width    int  // Fixed width in terminal columns. 0 = auto.
+	MinWidth int  // Minimum width (default: 4).
+	MaxWidth int  // Maximum width. 0 = unconstrained.
+	Flex     int  // Flex weight for distributing remaining space. 0 = no flex.
+	AutoFit  bool // Size to widest rendered content (header + rows), clamped to [MinWidth, MaxWidth]. Ignored when Width > 0. Takes precedence over Flex. Overridden by AutoSizeColumn(s).
 
 	// Sorting
 	Sortable   bool               // Default: true.
