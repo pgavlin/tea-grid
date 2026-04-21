@@ -8023,3 +8023,34 @@ func TestKeyMap_AutoSize_NotDispatchedInEditMode(t *testing.T) {
 		t.Error("'w' in edit mode must not trigger AutoSize")
 	}
 }
+
+
+func TestHasActiveFilters(t *testing.T) {
+	cols := testCols()
+	cols[0].Filter = filter.NewTextFilter()
+	m := newTestGrid(WithColumns[TestRow](cols))
+
+	if m.hasActiveFilters() {
+		t.Error("expected hasActiveFilters=false on fresh grid")
+	}
+
+	// Quick filter text alone counts as active.
+	m.SetQuickFilter("hello")
+	if !m.hasActiveFilters() {
+		t.Error("expected hasActiveFilters=true with quick filter text")
+	}
+	m.SetQuickFilter("")
+
+	// Inactive column filter (no text set) does not count.
+	if m.hasActiveFilters() {
+		t.Error("expected hasActiveFilters=false with empty column filter")
+	}
+
+	// Active column filter counts.
+	tf := filter.NewTextFilter()
+	tf.SetText("Carol")
+	m.SetColumnFilter("Name", tf)
+	if !m.hasActiveFilters() {
+		t.Error("expected hasActiveFilters=true with active column filter")
+	}
+}

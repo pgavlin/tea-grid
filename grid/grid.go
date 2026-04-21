@@ -585,6 +585,21 @@ func (m *Model[T]) ClearFilters() {
 	m.recomputeDisplayRows()
 }
 
+// hasActiveFilters reports whether any column filter is active or the quick
+// filter text is non-empty. Used by the ClearFilters key binding to skip the
+// recompute when there is nothing to clear.
+func (m *Model[T]) hasActiveFilters() bool {
+	if m.quickFilterText != "" {
+		return true
+	}
+	for i := range m.cols {
+		if m.cols[i].Filter != nil && m.cols[i].Filter.Active() {
+			return true
+		}
+	}
+	return false
+}
+
 // --- Grouping ---
 
 // ExpandGroup expands the group with the given key.
