@@ -7712,3 +7712,55 @@ func TestComputeColWidths_AutoFit_RecomputesOnRemoveRow(t *testing.T) {
 		t.Errorf("after RemoveRow width = %d, want 2", got)
 	}
 }
+
+// -----------------------------------------------------------------------
+// manualWidths override precedence
+// -----------------------------------------------------------------------
+
+func TestComputeColWidths_ManualOverride_WinsOverWidth(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, Width: 50},
+		{ColumnID: "Dept", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, MinWidth: 1, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	m.manualWidths = map[string]int{"Name": 7}
+	m.computeColWidths()
+	if m.colWidths[0] != 7 {
+		t.Errorf("override width = %d, want 7 (override should win over Width=50)", m.colWidths[0])
+	}
+}
+
+func TestComputeColWidths_ManualOverride_WinsOverAutoFit(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, AutoFit: true},
+		{ColumnID: "Dept", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, MinWidth: 1, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	m.manualWidths = map[string]int{"Name": 9}
+	m.computeColWidths()
+	if m.colWidths[0] != 9 {
+		t.Errorf("override width = %d, want 9 (override should win over AutoFit)", m.colWidths[0])
+	}
+}
+
+func TestComputeColWidths_ManualOverride_WinsOverFlex(t *testing.T) {
+	cols := []data.Column[TestRow]{
+		{ColumnID: "Name", HeaderName: "Name", Value: func(r TestRow) any { return r.Name }, MinWidth: 1, Flex: 3},
+		{ColumnID: "Dept", HeaderName: "Dept", Value: func(r TestRow) any { return r.Department }, MinWidth: 1, Flex: 1},
+	}
+	s := DefaultStyles()
+	s.BorderColumn = false
+	m := newTestGrid(WithColumns[TestRow](cols), WithStyles[TestRow](s))
+	m.manualWidths = map[string]int{"Name": 6}
+	m.computeColWidths()
+	if m.colWidths[0] != 6 {
+		t.Errorf("override width = %d, want 6", m.colWidths[0])
+	}
+	if m.colWidths[1] != 80-6 {
+		t.Errorf("Dept column = %d, want %d", m.colWidths[1], 80-6)
+	}
+}

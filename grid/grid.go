@@ -1299,6 +1299,11 @@ func (m *Model[T]) computeColWidths() {
 	var flexCols []colInfo
 	for _, idx := range visibleCols {
 		col := m.cols[idx]
+		if w, ok := m.manualWidths[col.ColumnID]; ok {
+			m.colWidths[idx] = w
+			remaining -= w
+			continue
+		}
 		switch {
 		case col.Width > 0:
 			m.colWidths[idx] = col.Width
