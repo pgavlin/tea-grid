@@ -178,6 +178,28 @@ Built-in renderer changes (`data/cell_builtin.go`):
 
 Internal model state: `manualWidths map[string]int` on `Model[T]`. Keyed by `ColumnID`. Written by `AutoSizeColumn(s)`; read by `computeColWidths` as the first rung of precedence; pruned by `SetColumns` to drop entries whose `ColumnID` is no longer present.
 
+### KeyMap additions
+
+Two new fields on `KeyMap` in `grid/keymap.go`, with defaults matching the existing lowercase-current / shift-broader pattern (e.g. `s`/`S` for sort, `R`/`C` for row/column select):
+
+```go
+type KeyMap struct {
+    // ...existing fields...
+
+    AutoSizeColumn  key.Binding // Fit the focused column to content.
+    AutoSizeColumns key.Binding // Fit all visible columns to content.
+}
+```
+
+Defaults in `DefaultKeyMap()`:
+
+- `AutoSizeColumn`: `w` (help: "fit column width")
+- `AutoSizeColumns`: `W` (help: "fit all column widths")
+
+`ResetColumnWidth(s)` have no default binding. Consumers that want a reset key wire their own; an accidental `w` is cheap to re-press.
+
+Dispatch in `grid/update.go:handleKeyMsg`: call `m.AutoSizeColumn(col.ColumnID)` for the focused column on `AutoSizeColumn`; call `m.AutoSizeColumns()` on `AutoSizeColumns`. Neither runs in edit / filter-edit / quick-filter mode (standard gating).
+
 ## Layout algorithm integration
 
 In `grid.go:computeColWidths`, the current partition is:
@@ -208,7 +230,8 @@ No `MaxMeasureRows` cap, no row sampling. YAGNI until a profile shows it matters
 - `NaturalWidthRenderer[T]`: godoc explaining when to implement it (any renderer that consumes `ctx.Width` to size its output, or that decorates its input so the text-fallback chain would under-measure it).
 - Built-in renderers: note in godoc which ones implement `NaturalWidthRenderer`.
 - `Model[T].AutoSizeColumn(s)` and `ResetColumnWidth(s)`: godoc describing the sticky-override semantics, that measurement uses displayed rows, and how to combine with declarative `AutoFit`.
-- README/CLAUDE.md sizing section: add `AutoFit` and the four imperative methods, with precedence order.
+- `KeyMap.AutoSizeColumn` / `AutoSizeColumns`: godoc noting the defaults (`w` / `W`) and that reset is intentionally unbound.
+- README/CLAUDE.md sizing section: add `AutoFit`, the four imperative methods, and the key bindings, with precedence order.
 
 ## Testing
 
@@ -241,12 +264,15 @@ No `MaxMeasureRows` cap, no row sampling. YAGNI until a profile shows it matters
 - `TestSetColumns_PrunesOverrides`: set override on column "foo", then `SetColumns` to a set without "foo"; `manualWidths["foo"]` is dropped.
 - `TestAutoSizeColumns_RespectsMinMaxWidth`: override is clamped to `[MinWidth, MaxWidth]` just like declarative `AutoFit`.
 - `TestAutoSizeColumns_NoRows`: call with no rows; widths equal header widths (clamped).
+- `TestKeyMap_AutoSizeColumn_FitsFocusedColumn`: focus column "foo", press `w`; only `foo`'s width changes.
+- `TestKeyMap_AutoSizeColumns_FitsAll`: press `W`; every visible column's width updates.
+- `TestKeyMap_AutoSize_GatedByMode`: in edit mode / filter-edit mode / quick-filter mode, `w` and `W` are not dispatched (they behave as ordinary input or are swallowed by the active mode, matching the existing gating pattern).
 
 ## Out of scope
 
 - Three-way mode (`off | row-sample | all-rows`). YAGNI.
 - `MaxMeasureRows` cap. YAGNI.
-- Default key binding for `AutoSizeColumns` (consumers wire their own; the grid ships the method). Can be added to `KeyMap` later if there's demand.
+- Default key binding for `ResetColumnWidth(s)` (consumers wire their own; the reset API ships but is unbound by default).
 - Per-column auto-fit that accounts for group summary rows. Dynamic and rare; revisit if asked.
 
 ## Alternatives considered
