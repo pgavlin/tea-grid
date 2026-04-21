@@ -8160,3 +8160,21 @@ func TestClearFilters_EscNoopWhenNothingActive(t *testing.T) {
 		t.Error("expected selection still inactive")
 	}
 }
+
+func TestFullHelp_IncludesClearFilters(t *testing.T) {
+	m := newTestGrid()
+	groups := m.FullHelp()
+
+	found := false
+	for _, group := range groups {
+		for _, b := range group {
+			if key.Matches(tea.KeyPressMsg{Code: tea.KeyEscape}, b) &&
+				b.Help().Desc == "clear filters" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Error("expected FullHelp to include ClearFilters (esc) binding")
+	}
+}
