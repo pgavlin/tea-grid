@@ -67,9 +67,10 @@ func (r TimeRenderer[T]) Render(ctx CellContext[T]) string {
 
 // BarRenderer renders a horizontal bar proportional to value.
 type BarRenderer[T any] struct {
-	MaxValue float64
-	BarChar  string
-	Style    lipgloss.Style
+	MaxValue       float64
+	BarChar        string
+	Style          lipgloss.Style
+	PreferredWidth int // Natural width for AutoFit. Default: 10.
 }
 
 func (r BarRenderer[T]) Render(ctx CellContext[T]) string {
@@ -97,6 +98,14 @@ func (r BarRenderer[T]) Render(ctx CellContext[T]) string {
 		bar = r.Style.Render(bar)
 	}
 	return TruncateOrPad(bar, ctx.Width)
+}
+
+// NaturalWidth reports the preferred width for AutoFit.
+func (r BarRenderer[T]) NaturalWidth(ctx CellContext[T]) int {
+	if r.PreferredWidth > 0 {
+		return r.PreferredWidth
+	}
+	return 10
 }
 
 // SparklineRenderer renders an inline sparkline for numeric series.
@@ -139,6 +148,15 @@ func (r SparklineRenderer[T]) Render(ctx CellContext[T]) string {
 	return TruncateOrPad(sb.String(), ctx.Width)
 }
 
+// NaturalWidth reports the number of points in the series, falling back to
+// 10 when the value is not a []float64.
+func (r SparklineRenderer[T]) NaturalWidth(ctx CellContext[T]) int {
+	if values, ok := ctx.Value.([]float64); ok {
+		return len(values)
+	}
+	return 10
+}
+
 // BoolRenderer renders checkmark/cross glyphs for boolean values.
 type BoolRenderer[T any] struct {
 	TrueGlyph  string
@@ -166,9 +184,10 @@ func (r BoolRenderer[T]) Render(ctx CellContext[T]) string {
 
 // ProgressRenderer renders a mini progress bar within the cell.
 type ProgressRenderer[T any] struct {
-	MaxValue   float64
-	FilledChar string
-	EmptyChar  string
+	MaxValue       float64
+	FilledChar     string
+	EmptyChar      string
+	PreferredWidth int // Natural width for AutoFit. Default: 10.
 }
 
 func (r ProgressRenderer[T]) Render(ctx CellContext[T]) string {
@@ -197,6 +216,14 @@ func (r ProgressRenderer[T]) Render(ctx CellContext[T]) string {
 	filledWidth := int(float64(ctx.Width) * ratio)
 	emptyWidth := ctx.Width - filledWidth
 	return strings.Repeat(filled, filledWidth) + strings.Repeat(empty, emptyWidth)
+}
+
+// NaturalWidth reports the preferred width for AutoFit.
+func (r ProgressRenderer[T]) NaturalWidth(ctx CellContext[T]) int {
+	if r.PreferredWidth > 0 {
+		return r.PreferredWidth
+	}
+	return 10
 }
 
 // --- Built-in Editors ---

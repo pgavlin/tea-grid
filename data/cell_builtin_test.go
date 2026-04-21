@@ -569,3 +569,52 @@ func TestBoolEditorToggleUpDown(t *testing.T) {
 		t.Errorf("KeyDown toggle: expected false, got %v", e.Value())
 	}
 }
+
+// --- NaturalWidthRenderer on built-in renderers ---
+
+func TestBarRenderer_NaturalWidth_Default(t *testing.T) {
+	r := BarRenderer[int]{MaxValue: 100}
+	var _ NaturalWidthRenderer[int] = r
+	if got := r.NaturalWidth(CellContext[int]{}); got != 10 {
+		t.Errorf("default PreferredWidth = %d, want 10", got)
+	}
+}
+
+func TestBarRenderer_NaturalWidth_Configured(t *testing.T) {
+	r := BarRenderer[int]{MaxValue: 100, PreferredWidth: 25}
+	if got := r.NaturalWidth(CellContext[int]{}); got != 25 {
+		t.Errorf("NaturalWidth = %d, want 25", got)
+	}
+}
+
+func TestProgressRenderer_NaturalWidth_Default(t *testing.T) {
+	r := ProgressRenderer[int]{MaxValue: 100}
+	var _ NaturalWidthRenderer[int] = r
+	if got := r.NaturalWidth(CellContext[int]{}); got != 10 {
+		t.Errorf("default PreferredWidth = %d, want 10", got)
+	}
+}
+
+func TestProgressRenderer_NaturalWidth_Configured(t *testing.T) {
+	r := ProgressRenderer[int]{MaxValue: 100, PreferredWidth: 15}
+	if got := r.NaturalWidth(CellContext[int]{}); got != 15 {
+		t.Errorf("NaturalWidth = %d, want 15", got)
+	}
+}
+
+func TestSparklineRenderer_NaturalWidth_FromSlice(t *testing.T) {
+	r := SparklineRenderer[int]{}
+	var _ NaturalWidthRenderer[int] = r
+	ctx := CellContext[int]{Value: []float64{1, 2, 3, 4, 5}}
+	if got := r.NaturalWidth(ctx); got != 5 {
+		t.Errorf("NaturalWidth = %d, want 5", got)
+	}
+}
+
+func TestSparklineRenderer_NaturalWidth_NonSlice(t *testing.T) {
+	r := SparklineRenderer[int]{}
+	ctx := CellContext[int]{Value: 42}
+	if got := r.NaturalWidth(ctx); got != 10 {
+		t.Errorf("non-slice default = %d, want 10", got)
+	}
+}
