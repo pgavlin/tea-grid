@@ -13,26 +13,32 @@ This is standard grid behavior and should live in the library.
 
 ## Proposal
 
-Add a declarative `AutoFit bool` field on `Column[T]`. When set, the grid measures the widest rendered content across the raw row set plus header, clamps to `[MinWidth, MaxWidth]`, and uses that as the column's width.
+Two additions, one declarative and one imperative:
+
+**Declarative.** A `AutoFit bool` field on `Column[T]`. When set, the grid measures the widest rendered content across the *raw* row set plus header, clamps to `[MinWidth, MaxWidth]`, and uses that as the column's width. Recomputed on data-set changes; stable under filter/sort/scroll.
+
+**Imperative.** Four methods on `Model[T]` — `AutoSizeColumns()`, `AutoSizeColumn(colID)`, `ResetColumnWidths()`, `ResetColumnWidth(colID)` — that measure the currently *displayed* rows (post-filter, post-sort) and set widths as sticky per-column overrides. Overrides persist across subsequent data mutations until explicitly cleared.
 
 ```go
 type Column[T any] struct {
     // ...existing fields...
 
-    // AutoFit sizes the column to the widest rendered content, clamped to
-    // [MinWidth, MaxWidth]. Ignored when Width > 0. Takes precedence over Flex.
+    // AutoFit sizes the column to the widest rendered content across raw rows,
+    // clamped to [MinWidth, MaxWidth]. Ignored when Width > 0. Takes precedence
+    // over Flex. Overridden by any width set via AutoSizeColumn(s).
     AutoFit bool
 }
 ```
 
 ### Precedence
 
-When more than one sizing field is set, precedence is:
+When more than one sizing path applies, precedence is:
 
-1. `Width > 0` → fixed width, ignore `AutoFit` and `Flex`.
-2. `AutoFit = true` → content-measured, ignore `Flex`.
-3. `Flex > 0` → share of remaining space as today.
-4. Otherwise fall through to the current default (flex = 1 in `computeColWidths`).
+1. **Sticky override** (set by `AutoSizeColumn(s)`, cleared by `ResetColumnWidth(s)`) — wins over everything.
+2. `Width > 0` → fixed width, ignore `AutoFit` and `Flex`.
+3. `AutoFit = true` → content-measured against raw rows, ignore `Flex`.
+4. `Flex > 0` → share of remaining space as today.
+5. Otherwise fall through to the current default (flex = 1 in `computeColWidths`).
 
 ## Measurement
 
@@ -104,9 +110,11 @@ If a cell's rendered content exceeds the clamped column width at draw time, the 
 
 ## When measurement runs
 
+### Declarative (`AutoFit`)
+
 Measurement runs from `computeColWidths` whenever it is called. Today that's `New()`, `SetColumns()`, `SetWidth()`, and column-pin changes. Column widths don't currently depend on data, so `SetRows`, `InsertRow`, `RemoveRow`, and `UpdateRow` only call `recomputeDisplayRows`, not `computeColWidths`.
 
-For AutoFit, data-mutating setters must also trigger `computeColWidths`:
+For `AutoFit`, data-mutating setters must also trigger `computeColWidths`:
 
 - `SetRows` → call `computeColWidths` after `recomputeDisplayRows`.
 - `InsertRow`, `RemoveRow`, `UpdateRow` → same.
@@ -116,6 +124,21 @@ To avoid paying the measurement cost on every row mutation when no column is aut
 Measurement does **not** run on filter, sort, scroll, selection, or cell edit. Those operations leave the column width stable, matching AG Grid's "don't churn during interaction" behavior.
 
 Rationale: filtering to narrow widths would cause columns to jitter as the user types in a filter box. Measuring against the raw row set yields a stable upper bound bounded by `MaxWidth`, which is what users expect from "fit to content."
+
+### Imperative (`AutoSizeColumn(s)`)
+
+Runs only when the consumer calls the method. Each call:
+
+1. Measures the target column(s) against `m.displayRows` (post-filter, post-sort, including expanded group rows).
+2. Uses the same NaturalWidth / text-fallback chain as declarative `AutoFit`.
+3. Writes the clamped result into `m.manualWidths[colID]`.
+4. Triggers `computeColWidths` to repaint.
+
+`AutoSizeColumns()` measures every non-hidden column; `AutoSizeColumn(colID)` measures one. A `colID` that doesn't match any column is silently ignored (following existing pattern in `PinColumn`).
+
+Subsequent filter/sort/scroll/`SetRows`/`InsertRow`/`RemoveRow`/`UpdateRow`/`SetWidth` calls preserve the override. Only `ResetColumnWidth(s)` or `SetColumns` (for removed IDs) clear it.
+
+Measurement against displayed rows rather than raw rows is the entire point of the imperative path — the user is asking "fit to what's on screen right now."
 
 ## Public API additions
 
@@ -128,13 +151,32 @@ type NaturalWidthRenderer[T any] interface {
 
 // In Column[T]:
 AutoFit bool
+
+// In package grid, on Model[T]:
+
+// AutoSizeColumns re-measures every non-hidden column against the currently
+// displayed rows (post-filter, post-sort) and stores the clamped widths as
+// sticky overrides. Overrides win over Width, AutoFit, and Flex until cleared
+// by ResetColumnWidth(s).
+func (m *Model[T]) AutoSizeColumns()
+
+// AutoSizeColumn re-measures a single column the same way. A colID that
+// doesn't match any column is ignored.
+func (m *Model[T]) AutoSizeColumn(colID string)
+
+// ResetColumnWidths clears all sticky width overrides. Columns revert to
+// their declared sizing (Width / AutoFit / Flex).
+func (m *Model[T]) ResetColumnWidths()
+
+// ResetColumnWidth clears the sticky override for one column.
+func (m *Model[T]) ResetColumnWidth(colID string)
 ```
 
 Built-in renderer changes (`data/cell_builtin.go`):
 - `BarRenderer` and `ProgressRenderer` gain a `PreferredWidth int` field and a `NaturalWidth` method.
 - `SparklineRenderer` gains a `NaturalWidth` method.
 
-No new grid-level options, methods, or messages. Everything hangs off the existing `computeColWidths` call sites.
+Internal model state: `manualWidths map[string]int` on `Model[T]`. Keyed by `ColumnID`. Written by `AutoSizeColumn(s)`; read by `computeColWidths` as the first rung of precedence; pruned by `SetColumns` to drop entries whose `ColumnID` is no longer present.
 
 ## Layout algorithm integration
 
@@ -145,15 +187,18 @@ In `grid.go:computeColWidths`, the current partition is:
 
 The new partition:
 
-1. Fixed-width columns (`Width > 0`).
-2. **Auto-fit columns (`AutoFit = true`)** — measured, clamped, subtract from `remaining`.
-3. Flex columns — current behavior on what's left.
+1. **Overridden columns** (in `manualWidths`) — use the stored width, subtract from `remaining`.
+2. Fixed-width columns (`Width > 0`).
+3. **Auto-fit columns (`AutoFit = true`)** — measured against raw rows, clamped, subtract from `remaining`.
+4. Flex columns — current behavior on what's left.
 
-If remaining space goes negative after step 2, auto-fit columns keep their measured widths; flex columns get their `MinWidth` and the grid overflows horizontally as it does today. No special crowding-out logic.
+If remaining space goes negative after step 3, auto-fit and overridden columns keep their widths; flex columns get their `MinWidth` and the grid overflows horizontally as it does today. No special crowding-out logic.
 
 ## Performance
 
-Measurement is O(N × M_autofit) where N is raw row count and M_autofit is the number of auto-fit columns. Each cell measurement is one function call (renderer or text fallback) plus one `lipgloss.Width`. Amortized across the existing `recomputeDisplayRows` cost (which is already O(N × M) for filter/sort), the overhead is modest.
+**Declarative `AutoFit`:** O(N × M_autofit) per re-layout, where N is raw row count and M_autofit is the number of auto-fit columns. Each cell measurement is one function call (renderer or text fallback) plus one `lipgloss.Width`. Amortized across the existing `recomputeDisplayRows` cost (which is already O(N × M) for filter/sort), the overhead is modest.
+
+**Imperative `AutoSizeColumn(s)`:** O(D × M_target) where D is the displayed row count and M_target is 1 (single column) or the visible column count (`AutoSizeColumns`). Called only on explicit user action, so cost is bounded by user frequency rather than data scale.
 
 No `MaxMeasureRows` cap, no row sampling. YAGNI until a profile shows it matters.
 
@@ -162,7 +207,8 @@ No `MaxMeasureRows` cap, no row sampling. YAGNI until a profile shows it matters
 - `Column[T].AutoFit`: godoc describing precedence, measurement chain, and `NaturalWidthRenderer` opt-in.
 - `NaturalWidthRenderer[T]`: godoc explaining when to implement it (any renderer that consumes `ctx.Width` to size its output, or that decorates its input so the text-fallback chain would under-measure it).
 - Built-in renderers: note in godoc which ones implement `NaturalWidthRenderer`.
-- README/CLAUDE.md sizing section: add `AutoFit` to the list of width modes with precedence order.
+- `Model[T].AutoSizeColumn(s)` and `ResetColumnWidth(s)`: godoc describing the sticky-override semantics, that measurement uses displayed rows, and how to combine with declarative `AutoFit`.
+- README/CLAUDE.md sizing section: add `AutoFit` and the four imperative methods, with precedence order.
 
 ## Testing
 
@@ -180,11 +226,27 @@ No `MaxMeasureRows` cap, no row sampling. YAGNI until a profile shows it matters
 - `TestComputeColWidths_AutoFit_SpanningCellsIgnored`: cell with `ColumnSpan > 1` does not contribute to its column's measurement.
 - `TestComputeColWidths_AutoFit_HiddenColumn`: `Hide = true` + `AutoFit = true` → width 0, not measured.
 
+### Imperative API
+
+- `TestAutoSizeColumns_MeasuresDisplayedRows`: apply a filter that narrows rows, call `AutoSizeColumns`; widths match filtered content, not the raw row set.
+- `TestAutoSizeColumn_Single`: call `AutoSizeColumn("foo")`; only `foo` is resized, other columns unchanged.
+- `TestAutoSizeColumn_UnknownID`: call `AutoSizeColumn("nope")`; no-op, no panic.
+- `TestAutoSizeColumns_OverridesAutoFit`: column with `AutoFit = true`; after `AutoSizeColumns`, subsequent `SetRows` with wider content does **not** re-measure (override is sticky).
+- `TestAutoSizeColumns_OverridesWidth`: column with `Width = 50`; after `AutoSizeColumns`, column renders at measured width, not 50.
+- `TestAutoSizeColumns_OverridesFlex`: column with `Flex = 3`; after `AutoSizeColumns`, column stops participating in flex distribution.
+- `TestResetColumnWidth_RevertsToDeclared`: call `AutoSizeColumn("foo")` then `ResetColumnWidth("foo")`; column returns to its declared `Width`/`AutoFit`/`Flex` behavior on next layout.
+- `TestResetColumnWidths_ClearsAll`: multiple overrides set; `ResetColumnWidths` clears them all.
+- `TestAutoSize_StickyAcrossSetRows`: call `AutoSizeColumns`, then `SetRows` with different data; override widths persist.
+- `TestAutoSize_StickyAcrossFilterSort`: call `AutoSizeColumns`, filter, sort; override widths persist.
+- `TestSetColumns_PrunesOverrides`: set override on column "foo", then `SetColumns` to a set without "foo"; `manualWidths["foo"]` is dropped.
+- `TestAutoSizeColumns_RespectsMinMaxWidth`: override is clamped to `[MinWidth, MaxWidth]` just like declarative `AutoFit`.
+- `TestAutoSizeColumns_NoRows`: call with no rows; widths equal header widths (clamped).
+
 ## Out of scope
 
 - Three-way mode (`off | row-sample | all-rows`). YAGNI.
 - `MaxMeasureRows` cap. YAGNI.
-- User-driven auto-fit trigger (AG Grid–style double-click header separator or an `AutoSizeColumns()` API). Can be added later without breaking the declarative flag.
+- Default key binding for `AutoSizeColumns` (consumers wire their own; the grid ships the method). Can be added to `KeyMap` later if there's demand.
 - Per-column auto-fit that accounts for group summary rows. Dynamic and rare; revisit if asked.
 
 ## Alternatives considered
@@ -192,6 +254,6 @@ No `MaxMeasureRows` cap, no row sampling. YAGNI until a profile shows it matters
 1. **Do it in the consumer.** Every downstream caller ends up writing the same ~30-line measure-and-cap helper and rederives widths on every model rebuild.
 2. **Overload `Width: -1` to mean "auto."** Hides intent; hurts discoverability.
 3. **A separate `AutoColumn[T any]` factory type.** Doubles the column API surface for a single bit of behavior.
-4. **AG Grid–style explicit trigger only (no declarative flag).** Forces policy back onto the consumer; loses the set-and-forget ergonomics that are the point of this feature. Can coexist with the flag later if someone wants it.
+4. **AG Grid–style explicit trigger only (no declarative flag).** Forces policy back onto the consumer; loses the set-and-forget ergonomics. The final design ships both, since they serve different use cases (stable declarative widths vs. "fit to what I'm looking at").
 5. **Escape-hatch `Measure func(T) string` on `Column`.** A second extension point for the same job as `NaturalWidthRenderer`, and in the wrong place: measurement knowledge belongs with the renderer, not bolted onto the column alongside the renderer that would duplicate it.
 6. **Measure only virtually-rendered rows (AG Grid's model).** Smaller `O()` but produces columns whose widths change when the user scrolls to data that was outside the viewport at measurement time. Confusing; rejected.
