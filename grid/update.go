@@ -191,8 +191,15 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 			return SelectionChangedMsg[T]{Regions: m.Selection()}
 		}
 
-	case key.Matches(msg, m.KeyMap.DeselectAll):
-		m.ClearSelection()
+	case key.Matches(msg, m.KeyMap.DeselectAll), key.Matches(msg, m.KeyMap.ClearFilters):
+		if m.sel.Active() {
+			m.ClearSelection()
+			return m, nil
+		}
+		if m.hasActiveFilters() {
+			m.ClearFilters()
+			return m, func() tea.Msg { return FiltersClearedMsg{} }
+		}
 		return m, nil
 
 	// Shift+nav selection expansion

@@ -8054,3 +8054,109 @@ func TestHasActiveFilters(t *testing.T) {
 		t.Error("expected hasActiveFilters=true with active column filter")
 	}
 }
+
+func TestClearFilters_EscClearsSelectionFirst(t *testing.T) {
+	cols := testCols()
+	cols[0].Filter = filter.NewTextFilter()
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithSelection[TestRow](selection.SelectMulti),
+	)
+
+	// Set up: active filter + active selection.
+	tf := filter.NewTextFilter()
+	tf.SetText("Carol")
+	m.SetColumnFilter("Name", tf)
+	m.SelectAllRows()
+	if !m.sel.Active() {
+		t.Fatal("precondition: expected selection to be active")
+	}
+	if !m.hasActiveFilters() {
+		t.Fatal("precondition: expected filter to be active")
+	}
+
+	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if m.sel.Active() {
+		t.Error("expected selection cleared by first esc")
+	}
+	if !m.hasActiveFilters() {
+		t.Error("expected filter to remain active after first esc")
+	}
+}
+
+func TestClearFilters_EscClearsColumnFilter(t *testing.T) {
+	cols := testCols()
+	cols[0].Filter = filter.NewTextFilter()
+	m := newTestGrid(WithColumns[TestRow](cols))
+
+	tf := filter.NewTextFilter()
+	tf.SetText("Carol")
+	m.SetColumnFilter("Name", tf)
+	if !m.hasActiveFilters() {
+		t.Fatal("precondition: expected filter to be active")
+	}
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if m.hasActiveFilters() {
+		t.Error("expected filters cleared by esc")
+	}
+	if cmd == nil {
+		t.Fatal("expected FiltersClearedMsg command")
+	}
+	if _, ok := cmd().(FiltersClearedMsg); !ok {
+		t.Errorf("expected FiltersClearedMsg, got %T", cmd())
+	}
+}
+
+func TestClearFilters_EscClearsQuickFilterText(t *testing.T) {
+	m := newTestGrid(WithQuickFilter[TestRow](true))
+
+	// Confirmed quick filter: text persists, mode is no longer active.
+	m.SetQuickFilter("Carol")
+	if m.quickFilterActive {
+		t.Fatal("precondition: quickFilterActive must be false (confirmed text)")
+	}
+	if !m.hasActiveFilters() {
+		t.Fatal("precondition: expected quick filter text to count as active")
+	}
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if m.quickFilterText != "" {
+		t.Errorf("expected quickFilterText cleared, got %q", m.quickFilterText)
+	}
+	if cmd == nil {
+		t.Fatal("expected FiltersClearedMsg command")
+	}
+	if _, ok := cmd().(FiltersClearedMsg); !ok {
+		t.Errorf("expected FiltersClearedMsg, got %T", cmd())
+	}
+}
+
+func TestClearFilters_EscNoopWhenNothingActive(t *testing.T) {
+	m := newTestGrid()
+
+	if m.sel.Active() {
+		t.Fatal("precondition: selection must be inactive")
+	}
+	if m.hasActiveFilters() {
+		t.Fatal("precondition: filters must be inactive")
+	}
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if cmd != nil {
+		t.Errorf("expected nil command for no-op esc, got %T", cmd())
+	}
+	if m.hasActiveFilters() {
+		t.Error("expected filters still inactive")
+	}
+	if m.sel.Active() {
+		t.Error("expected selection still inactive")
+	}
+}
