@@ -728,6 +728,7 @@ func (m Model[T]) FullHelp() [][]key.Binding {
 		{m.KeyMap.Up, m.KeyMap.Down, m.KeyMap.Left, m.KeyMap.Right},
 		{m.KeyMap.PageUp, m.KeyMap.PageDown, m.KeyMap.Home, m.KeyMap.End},
 		{m.KeyMap.Select, m.KeyMap.SelectAll, m.KeyMap.QuickFilter},
+		{m.KeyMap.AutoSizeColumn, m.KeyMap.AutoSizeColumns},
 		{m.KeyMap.Help},
 	}
 }

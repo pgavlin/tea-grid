@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -2490,6 +2491,19 @@ func TestFullHelp_ReturnsBindingGroups(t *testing.T) {
 	groups := m.FullHelp()
 	if len(groups) == 0 {
 		t.Error("expected non-empty full help binding groups")
+	}
+
+	// AutoSize bindings should be listed.
+	found := false
+	for _, group := range groups {
+		for _, b := range group {
+			if key.Matches(tea.KeyPressMsg{Code: 'w', Text: "w"}, b) {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Error("expected FullHelp to include AutoSizeColumn (w) binding")
 	}
 }
 
