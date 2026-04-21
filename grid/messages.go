@@ -74,6 +74,10 @@ type QuickFilterChangedMsg struct {
 	Text string
 }
 
+// FiltersClearedMsg is emitted when the user clears all column filters and
+// the quick filter via the ClearFilters key binding.
+type FiltersClearedMsg struct{}
+
 // CellEditingStartedMsg is emitted when cell editing begins.
 type CellEditingStartedMsg struct {
 	Position CellPosition
