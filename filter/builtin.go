@@ -104,6 +104,33 @@ func (f *TextFilter) Clear() {
 	f.SetText("")
 }
 
+// Clause implements RoundTrippable. Returns the substring as a single
+// value. Regex mode is lossy: returns ok=false so the query bar can
+// annotate it instead of trying to render it textually.
+func (f *TextFilter) Clause() (values []string, negate bool, ok bool) {
+	if !f.Active() {
+		return nil, false, false
+	}
+	if f.regex {
+		return nil, false, false
+	}
+	return []string{f.editor.Text()}, false, true
+}
+
+// SetClause implements RoundTrippable. Resets regex mode and applies
+// the value as substring text. Rejects negation and multi-value lists.
+func (f *TextFilter) SetClause(values []string, negate bool) error {
+	if negate {
+		return fmt.Errorf("TextFilter does not support negation")
+	}
+	if len(values) != 1 {
+		return fmt.Errorf("TextFilter expects exactly one value, got %d", len(values))
+	}
+	f.regex = false
+	f.SetText(values[0])
+	return nil
+}
+
 // --- NumberFilter ---
 
 // NumberFilter performs comparison operations on numeric values.

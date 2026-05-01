@@ -17,3 +17,8 @@ type RoundTrippable interface {
 	SetClause(values []string, negate bool) error
 	Clause() (values []string, negate bool, ok bool)
 }
+
+// Compile-time interface assertions for built-in filters.
+var (
+	_ RoundTrippable = (*TextFilter)(nil)
+)
