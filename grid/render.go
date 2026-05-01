@@ -96,20 +96,23 @@ func (m Model[T]) View() string {
 
 // renderQueryBar renders the query bar above the headers. Visible
 // when the bar is enabled and there is something to show — otherwise
-// queryBarVisible() returns false and View skips this section. Shows
-// the canonical text (or the editor's current value while editing),
-// followed by an annotation listing columns whose filter state can
-// not be expressed in the bar.
+// queryBarVisible() returns false and View skips this section. While
+// editing, the bar renders the lineedit (cursor visible, supports
+// arrow keys, mid-string insertion, etc.); otherwise it shows the
+// canonical text. Lossy annotations and parse errors are appended
+// after the body in both modes.
 func (m Model[T]) renderQueryBar() string {
 	label := "/ "
-	var content string
+	var body string
 	if m.queryBarActive {
-		content = m.queryBar.EditorText()
+		editorWidth := m.width - lipgloss.Width(label) - m.styles.QueryBar.GetHorizontalFrameSize()
+		if editorWidth < 1 {
+			editorWidth = 1
+		}
+		body = label + m.queryBar.Editor().RenderLine(editorWidth, "")
 	} else {
-		content = m.queryBar.Text()
+		body = label + m.queryBar.Text()
 	}
-
-	body := label + content
 
 	lossy := m.queryBar.Lossy()
 	if len(lossy) > 0 {
