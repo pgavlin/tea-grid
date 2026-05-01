@@ -1604,7 +1604,6 @@ func TestRender_GroupRowAggregationCustomFunc(t *testing.T) {
 	}
 }
 
-
 // -----------------------------------------------------------------------
 // 8m. Public API
 // -----------------------------------------------------------------------
@@ -4580,7 +4579,6 @@ func TestHandleKeyMsg_ToggleGroupColumn(t *testing.T) {
 	}
 }
 
-
 func TestHandleKeyMsg_GroupExpandGroup(t *testing.T) {
 	m := newTestGrid(
 		WithGrouping[TestRow]("Department"),
@@ -4669,7 +4667,6 @@ func TestHandleEditKeyMsg_ValidationFailure(t *testing.T) {
 // update.go:376 - handleQuickFilterKeyMsg: Backspace when empty, Enter to confirm,
 //   Esc with empty text
 // -----------------------------------------------------------------------
-
 
 // -----------------------------------------------------------------------
 // update.go:413 - handleFilterEditKeyMsg: colIdx out of range early return
@@ -5740,7 +5737,6 @@ func TestToggleGroupColumn_ColOutOfRange(t *testing.T) {
 	}
 }
 
-
 // -----------------------------------------------------------------------
 // update.go:209-236 - Header row: ToggleSort (Enter on header),
 // ToggleMultiSort (Shift+Enter on header), and fall-through return.
@@ -5884,7 +5880,6 @@ func TestEditKeyMsg_NoValueSetter(t *testing.T) {
 		}
 	}
 }
-
 
 // -----------------------------------------------------------------------
 // update.go:456 - startFilterEdit: colIdx < 0

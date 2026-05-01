@@ -79,7 +79,6 @@ type Model[T any] struct {
 	queryBarActive           bool            // user is editing the bar's textinput
 	quickFilterText          string          // bare-term portion (drives passesQuickFilter)
 	quickFilterWords         []string        // cached split of quickFilterText
-	quickFilterSeq           uint64          // bumped on each keystroke; reserved for live-prefix follow-up
 	quickFilterDebounceDelay time.Duration   // reserved for live-prefix follow-up
 	filterEditColIdx         int             // -1 = no filter editor active
 	externalFilter           func(T) bool
