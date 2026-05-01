@@ -5,7 +5,7 @@ An AG Grid-inspired data grid component for [Bubble Tea](https://github.com/char
 ## Features
 
 - **Sorting** -- single and multi-column, ascending/descending, custom comparators
-- **Filtering** -- quick filter, per-column filters (text, number, set, bool, time)
+- **Filtering** -- per-column filters (text, number, set, bool, time, multiset) and a GitHub-style query bar with round-trip between bar text and column filter state
 - **Selection** -- single/multi row, column, and rectangular cell selection
 - **Cell editing** -- built-in text, number, bool, select, and time editors
 - **Column/row pinning** -- pin columns left/right, rows top/bottom
@@ -152,7 +152,7 @@ g := grid.New(
     grid.WithHeight(40),
     grid.WithFocused[Employee](true),
     grid.WithSelection[Employee](selection.SelectMulti),
-    grid.WithQuickFilter[Employee](true),
+    grid.WithQueryBar[Employee](),
     grid.WithEditable[Employee](true),
     grid.WithGrouping[Employee]("Department"),
     grid.WithMultiSort[Employee](true),
@@ -191,7 +191,7 @@ Default bindings (vim-style, configurable via `grid.WithKeyMap`):
 | `space` | Toggle row selection |
 | `shift+arrows` | Expand rectangular selection |
 | `s` | Sort by focused column |
-| `/` | Quick filter |
+| `/` | Open query bar |
 | `ctrl+f` | Column filter |
 | `enter`/`F2` | Edit cell |
 | `G` | Toggle group by column |
