@@ -7957,8 +7957,8 @@ func TestQueryBar_LossyAnnotation(t *testing.T) {
 	tf.SetText("Al.*")
 	g.invalidateQueryBar()
 	lossy := g.queryBar.Lossy()
-	if len(lossy) != 1 || lossy[0] != "Name" {
-		t.Errorf("Lossy() = %v, want [Name]", lossy)
+	if len(lossy) != 1 || lossy[0] != "name" {
+		t.Errorf("Lossy() = %v, want [name] (display name)", lossy)
 	}
 }
 

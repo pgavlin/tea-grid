@@ -580,13 +580,24 @@ func (f *SetFilter) Clause() (values []string, negate bool, ok bool) {
 
 // SetClause implements RoundTrippable. With negate=false, includes
 // exactly the listed values and excludes the rest. With negate=true,
-// includes everything except the listed values. Values not in
-// allValues are ignored (treated as "not included" — see Clause's
-// godoc).
+// includes everything except the listed values. Matching is
+// case-insensitive against allValues, so a user-typed "open"
+// resolves to an allValues entry "Open"; the canonical case (from
+// allValues) is what flows through Matches and what Clause emits on
+// round-trip. Values not in allValues are ignored (treated as "not
+// included" — see Clause's godoc).
 func (f *SetFilter) SetClause(values []string, negate bool) error {
+	// Build a lowercased index of allValues so user input case does
+	// not have to match the canonical case.
+	lowerToOriginal := make(map[string]string, len(f.allValues))
+	for _, v := range f.allValues {
+		lowerToOriginal[strings.ToLower(v)] = v
+	}
 	want := make(map[string]bool, len(values))
 	for _, v := range values {
-		want[v] = true
+		if orig, ok := lowerToOriginal[strings.ToLower(v)]; ok {
+			want[orig] = true
+		}
 	}
 	f.excludedCount = 0
 	for _, v := range f.allValues {

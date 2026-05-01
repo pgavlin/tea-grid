@@ -28,17 +28,26 @@ func Rerender[T any](cols []data.Column[T], bareTerms string) (text string, loss
 		if c.Filter == nil || !c.Filter.Active() {
 			continue
 		}
+		display := displayFieldName(c)
+		// Columns that BuildAutoVocab would skip (hidden or unfilterable)
+		// are not addressable from the bar — surface them as lossy so the
+		// user knows filtering is happening, but do not emit a clause they
+		// could not edit.
+		if c.Hide || !c.Filterable {
+			lossy = append(lossy, display)
+			continue
+		}
 		rt, ok := c.Filter.(filter.RoundTrippable)
 		if !ok {
-			lossy = append(lossy, c.ColumnID)
+			lossy = append(lossy, display)
 			continue
 		}
 		values, negate, ok := rt.Clause()
 		if !ok {
-			lossy = append(lossy, c.ColumnID)
+			lossy = append(lossy, display)
 			continue
 		}
-		clauses = append(clauses, formatClause(displayFieldName(c), values, negate, isMultiClause(c.Filter)))
+		clauses = append(clauses, formatClause(display, values, negate, isMultiClause(c.Filter)))
 	}
 	parts := clauses
 	if bareTerms != "" {

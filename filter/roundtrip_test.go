@@ -156,6 +156,24 @@ func TestSetFilter_SetClauseExclude(t *testing.T) {
 	}
 }
 
+func TestSetFilter_SetClauseCaseInsensitive(t *testing.T) {
+	// User-typed lowercase value should match capitalized allValues.
+	f := NewSetFilter("Open", "Closed", "Draft")
+	if err := f.SetClause([]string{"open"}, false); err != nil {
+		t.Fatalf("SetClause: %v", err)
+	}
+	if !f.Matches("Open") {
+		t.Errorf("Matches(Open) = false after SetClause([open]); case-insensitive lookup failed")
+	}
+	if f.Matches("Closed") || f.Matches("Draft") {
+		t.Errorf("non-included values should not match")
+	}
+	values, _, ok := f.Clause()
+	if !ok || len(values) != 1 || values[0] != "Open" {
+		t.Errorf("Clause() = (%v, ok=%v), want ([Open], true) — canonical case", values, ok)
+	}
+}
+
 func TestSetFilter_SetClauseRoundTrip(t *testing.T) {
 	cases := []struct {
 		all    []string
