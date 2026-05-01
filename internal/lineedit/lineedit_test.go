@@ -756,3 +756,61 @@ func TestRenderLineDim_AppliesFaintInRange(t *testing.T) {
 		t.Errorf("output missing faintOff (\\x1b[22m): %q", out)
 	}
 }
+
+func TestKillWordLeft_AtZero(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello")
+	if m.KillWordLeft() {
+		t.Errorf("KillWordLeft at cursor=0 returned true, want false")
+	}
+}
+
+func TestKillWordLeft_NoChange(t *testing.T) {
+	m := &Model{}
+	m.SetText("   ") // only whitespace
+	m.SetCursor(0)
+	if m.KillWordLeft() {
+		t.Errorf("KillWordLeft on whitespace-only at 0 returned true")
+	}
+}
+
+func TestKillWordRight_AtEnd(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello")
+	m.CursorToEnd()
+	if m.KillWordRight() {
+		t.Errorf("KillWordRight at end returned true, want false")
+	}
+}
+
+func TestKillWordRight_TrailingWhitespaceOnly(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello   ")
+	m.SetCursor(5) // after "hello"
+	if !m.KillWordRight() {
+		t.Errorf("KillWordRight with trailing whitespace returned false")
+	}
+	if m.Text() != "hello" {
+		t.Errorf("Text = %q, want %q", m.Text(), "hello")
+	}
+}
+
+func TestRenderLineDim_DimAtCursor(t *testing.T) {
+	// When the cursor sits inside the dim range, both reverse and faint
+	// codes should appear in the output.
+	m := &Model{}
+	m.SetText("state:Open")
+	m.SetCursor(7) // inside "Open"
+	out := m.RenderLineDim(15, "", 6, 10)
+	if !strings.Contains(out, "\x1b[2m") || !strings.Contains(out, "\x1b[7m") {
+		t.Errorf("output missing faint or reverse codes: %q", out)
+	}
+}
+
+func TestRenderLineDim_ZeroWidth(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello")
+	if got := m.RenderLineDim(0, "", 0, 5); got != "" {
+		t.Errorf("RenderLineDim(0) = %q, want empty", got)
+	}
+}

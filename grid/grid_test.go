@@ -12,6 +12,7 @@ import (
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
+	"github.com/pgavlin/tea-grid/searchquery"
 	"github.com/pgavlin/tea-grid/selection"
 	gridsort "github.com/pgavlin/tea-grid/sort"
 )
@@ -7997,5 +7998,100 @@ func TestQueryBar_ClearFiltersClearsLossy(t *testing.T) {
 	g.ClearFilters()
 	if tf.Active() {
 		t.Errorf("ClearFilters did not clear lossy filter")
+	}
+}
+
+func TestQueryBar_RenderCollapsedWhenEmpty(t *testing.T) {
+	g := newQueryBarGrid()
+	out := g.View()
+	// Collapsed bar has no "/ " label and no "press / to filter".
+	if strings.Contains(out, "press / to filter") {
+		t.Errorf("collapsed bar should not render placeholder")
+	}
+}
+
+func TestQueryBar_RenderActiveShowsLabel(t *testing.T) {
+	g := newQueryBarGrid()
+	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	out := g.View()
+	if !strings.Contains(out, "/ ") {
+		t.Errorf("active bar should show '/ ' label; got %q", out)
+	}
+}
+
+func TestQueryBar_RenderLossyAnnotation(t *testing.T) {
+	g := newQueryBarGrid()
+	tf := g.cols[0].Filter.(*filter.TextFilter)
+	tf.SetRegex(true)
+	tf.SetText("Al.*")
+	g.invalidateQueryBar()
+	out := g.View()
+	if !strings.Contains(out, "hidden filter") {
+		t.Errorf("lossy filter not surfaced in bar render: %q", out)
+	}
+}
+
+func TestQueryBar_RenderParseError(t *testing.T) {
+	g := newQueryBarGrid()
+	g.queryBar.SetParseErr("boom")
+	g.queryBar.SetText("anything") // make the bar visible
+	out := g.View()
+	if !strings.Contains(out, "boom") {
+		t.Errorf("parse error not surfaced in bar render: %q", out)
+	}
+}
+
+func TestWithQueryBarVocabulary(t *testing.T) {
+	v := searchquery.NewVocabulary([]searchquery.Field{{Name: "custom"}})
+	g := New(
+		WithColumns[TestRow](testCols()),
+		WithRows[TestRow](testData()),
+		WithQueryBar[TestRow](),
+		WithQueryBarVocabulary[TestRow](v),
+	)
+	if g.queryBar.Vocab() != v {
+		t.Errorf("WithQueryBarVocabulary did not become Vocab()")
+	}
+}
+
+func TestWithQuickFilterDebounce_SetsField(t *testing.T) {
+	// The option is reserved (inert) but should still set the field.
+	g := New(
+		WithColumns[TestRow](testCols()),
+		WithRows[TestRow](testData()),
+		WithQuickFilterDebounce[TestRow](42*time.Millisecond),
+	)
+	if g.quickFilterDebounceDelay != 42*time.Millisecond {
+		t.Errorf("debounce delay = %v, want 42ms", g.quickFilterDebounceDelay)
+	}
+}
+
+func TestPublicAPI_FocusedRowData(t *testing.T) {
+	m := newTestGrid()
+	m.SetFocusedCell(CellPosition{Row: 0, Col: 0})
+	row, ok := m.FocusedRowData()
+	if !ok {
+		t.Fatal("FocusedRowData ok=false on row 0")
+	}
+	if row.Name == "" {
+		t.Errorf("FocusedRowData returned zero row")
+	}
+}
+
+func TestPublicAPI_FocusedRowDataHeader(t *testing.T) {
+	m := newTestGrid()
+	m.SetFocusedCell(CellPosition{Row: -1, Col: 0})
+	if _, ok := m.FocusedRowData(); ok {
+		t.Errorf("FocusedRowData ok=true on header, want false")
+	}
+}
+
+func TestPublicAPI_ScrollToRowByID(t *testing.T) {
+	m := newTestGrid(WithRowID(func(r TestRow) string { return r.Name }))
+	if !m.ScrollToRowByID("Carol") {
+		t.Errorf("ScrollToRowByID(Carol) = false; row should exist")
+	}
+	if m.ScrollToRowByID("nope") {
+		t.Errorf("ScrollToRowByID(nope) = true; row should not exist")
 	}
 }

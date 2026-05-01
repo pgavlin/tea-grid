@@ -194,3 +194,46 @@ func TestState_CompletionRange(t *testing.T) {
 		t.Errorf("CompletionRange ok=true after edit")
 	}
 }
+
+func TestState_EditorText(t *testing.T) {
+	s := New(searchquery.NewVocabulary(nil))
+	s.Enable()
+	s.BeginEdit()
+	s.Editor().SetText("hello")
+	if got := s.EditorText(); got != "hello" {
+		t.Errorf("EditorText() = %q, want hello", got)
+	}
+}
+
+func TestState_ParseErr(t *testing.T) {
+	s := New(searchquery.NewVocabulary(nil))
+	if got := s.ParseErr(); got != "" {
+		t.Errorf("ParseErr() = %q, want empty", got)
+	}
+	s.SetParseErr("bad query")
+	if got := s.ParseErr(); got != "bad query" {
+		t.Errorf("ParseErr() = %q, want %q", got, "bad query")
+	}
+}
+
+func TestState_SetAutoVocabulary(t *testing.T) {
+	s := New(nil)
+	v := searchquery.NewVocabulary([]searchquery.Field{{Name: "x"}})
+	s.SetAutoVocabulary(v)
+	if s.Vocab() != v {
+		t.Errorf("SetAutoVocabulary did not become Vocab()")
+	}
+}
+
+func TestState_VocabPrefersOverride(t *testing.T) {
+	auto := searchquery.NewVocabulary([]searchquery.Field{{Name: "auto"}})
+	custom := searchquery.NewVocabulary([]searchquery.Field{{Name: "custom"}})
+	s := New(auto)
+	if s.Vocab() != auto {
+		t.Errorf("Vocab() should return auto when no override")
+	}
+	s.SetVocabulary(custom)
+	if s.Vocab() != custom {
+		t.Errorf("Vocab() should prefer override over auto")
+	}
+}

@@ -113,3 +113,27 @@ func TestParseTimeRange_DateTimeStripped(t *testing.T) {
 		t.Errorf("got %+v, want From=2025-01-01", r)
 	}
 }
+
+func TestParseTimeRange_Empty(t *testing.T) {
+	if _, err := ParseTimeRange(""); err == nil {
+		t.Errorf("empty input: err=nil, want error")
+	}
+}
+
+func TestParseTimeRange_InvalidComparators(t *testing.T) {
+	cases := []string{">notadate", ">=notadate", "<notadate", "<=notadate"}
+	for _, in := range cases {
+		if _, err := ParseTimeRange(in); err == nil {
+			t.Errorf("%s: err=nil, want error", in)
+		}
+	}
+}
+
+func TestParseTimeRange_InvalidRange(t *testing.T) {
+	cases := []string{"notadate..2026-01-01", "2026-01-01..notadate"}
+	for _, in := range cases {
+		if _, err := ParseTimeRange(in); err == nil {
+			t.Errorf("%s: err=nil, want error", in)
+		}
+	}
+}

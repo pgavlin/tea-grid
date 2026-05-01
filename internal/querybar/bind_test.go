@@ -336,3 +336,63 @@ func equalStringSets(a, b []string) bool {
 	}
 	return true
 }
+
+func TestApply_NonRoundTrippableFilterIgnored(t *testing.T) {
+	c := []data.Column[map[string]any]{
+		{ColumnID: "x", Filter: &nonRTFilter{}, Filterable: true},
+	}
+	v := searchquery.NewVocabulary([]searchquery.Field{{Name: "x"}})
+	ast, _ := searchquery.Parse("x:foo", v)
+	res := Apply(c, ast)
+	if len(res.Errors) != 0 {
+		t.Errorf("non-RoundTrippable filter should be silently skipped; got errors: %v", res.Errors)
+	}
+}
+
+func TestApply_MultiSetClauseError(t *testing.T) {
+	// MultiSet rejects negate; supply a negated clause and expect an error.
+	c := []data.Column[map[string]any]{
+		{ColumnID: "label", Filter: filter.NewMultiSetFilter(), Filterable: true},
+	}
+	v := BuildAutoVocab(c)
+	ast, _ := searchquery.Parse("-label:bug", v)
+	res := Apply(c, ast)
+	if len(res.Errors) != 1 {
+		t.Errorf("Errors = %v, want 1", res.Errors)
+	}
+}
+
+func TestRerender_NonRoundTrippableActiveFilterIsLossy(t *testing.T) {
+	c := []data.Column[map[string]any]{
+		{ColumnID: "x", Filter: &activeNonRTFilter{}, Filterable: true},
+	}
+	_, lossy := Rerender(c, "")
+	if len(lossy) != 1 || lossy[0] != "x" {
+		t.Errorf("lossy = %v, want [x]", lossy)
+	}
+}
+
+// activeNonRTFilter is a Filter that does not implement RoundTrippable
+// and reports Active() = true. Used to exercise the Rerender lossy
+// path for non-RT filters.
+type activeNonRTFilter struct{ nonRTFilter }
+
+func (a *activeNonRTFilter) Active() bool { return true }
+
+func TestQuoteIfNeeded_Edges(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"", `""`},
+		{"plain", "plain"},
+		{"with space", `"with space"`},
+		{"with:colon", `"with:colon"`},
+		{"with,comma", `"with,comma"`},
+		{`with"quote`, `"with\"quote"`},
+		{`with\back`, "with\\back"},
+	}
+	for _, tc := range cases {
+		got := quoteIfNeeded(tc.in)
+		if got != tc.want {
+			t.Errorf("quoteIfNeeded(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

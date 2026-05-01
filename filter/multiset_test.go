@@ -171,3 +171,70 @@ func TestMultiSetFilter_SetClauseRejectsCommaList(t *testing.T) {
 		t.Errorf("SetClause(2 values): err=nil, want error")
 	}
 }
+
+func TestSetFilter_AllValues(t *testing.T) {
+	f := NewSetFilter("a", "b", "c")
+	got := f.AllValues()
+	if len(got) != 3 || got[0] != "a" || got[1] != "b" || got[2] != "c" {
+		t.Errorf("AllValues() = %v, want [a b c]", got)
+	}
+	got[0] = "MUTATED"
+	if f.AllValues()[0] != "a" {
+		t.Errorf("returned slice should be a copy")
+	}
+}
+
+func TestMultiSetFilter_BlurExitsEditing(t *testing.T) {
+	f := NewMultiSetFilter()
+	f.AddConstraint("bug")
+	g, _ := f.Update(FilterFocusMsg{Width: 40, MaxLines: 6})
+	f = g.(*MultiSetFilter)
+	if !f.editing {
+		t.Fatalf("expected editing=true after focus")
+	}
+	g, _ = f.Update(FilterBlurMsg{})
+	f = g.(*MultiSetFilter)
+	if f.editing {
+		t.Errorf("editing=true after blur, want false")
+	}
+}
+
+func TestMultiSetFilter_DeleteFocusedAtLastIndex(t *testing.T) {
+	f := NewMultiSetFilter()
+	f.AddConstraint("bug")
+	f.AddConstraint("urgent")
+	g, _ := f.Update(FilterFocusMsg{Width: 40, MaxLines: 6})
+	f = g.(*MultiSetFilter)
+	g, _ = f.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	f = g.(*MultiSetFilter)
+	// focused == 1; delete it; focus should retreat to 0.
+	g, _ = f.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	f = g.(*MultiSetFilter)
+	if f.focused != 0 {
+		t.Errorf("focused = %d after deleting last item, want 0", f.focused)
+	}
+	if cs := f.Constraints(); len(cs) != 1 || cs[0] != "bug" {
+		t.Errorf("Constraints = %v, want [bug]", cs)
+	}
+}
+
+func TestMultiSetFilter_DefaultMatcherSliceMiss(t *testing.T) {
+	f := NewMultiSetFilter()
+	f.AddConstraint("bug")
+	if f.Matches([]string{"feature"}) {
+		t.Errorf("Matches([feature]) = true, want false")
+	}
+	if f.Matches(42) {
+		t.Errorf("Matches(int) = true, want false (unsupported type)")
+	}
+}
+
+func TestMultiSetFilter_KeyIgnoredWhenNotEditing(t *testing.T) {
+	f := NewMultiSetFilter()
+	f.AddConstraint("bug")
+	// editing=false; keys should be ignored.
+	g, _ := f.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	if g.(*MultiSetFilter).Active() != true {
+		t.Errorf("constraint should not be deleted when not editing")
+	}
+}
