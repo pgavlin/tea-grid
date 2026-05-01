@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/data"
+	"github.com/pgavlin/tea-grid/filter"
 )
 
 var updateGolden = flag.Bool("update-golden", false, "update golden files")
@@ -233,4 +235,96 @@ func TestGolden_MultiLineRow_EvenOddBg(t *testing.T) {
 		WithFocused[TestRow](true),
 	)
 	goldenTest(t, "multiline_even_odd_bg", m.View())
+}
+
+// queryBarCols returns a small column set with a SetFilter (state) and a
+// TextFilter (title) suitable for query-bar golden tests.
+func queryBarCols() []data.Column[TestRow] {
+	return []data.Column[TestRow]{
+		{
+			ColumnID:   "Name",
+			HeaderName: "Name",
+			Value:      func(r TestRow) any { return r.Name },
+			Width:      12,
+			Filter:     filter.NewTextFilter(),
+			Filterable: true,
+		},
+		{
+			ColumnID:   "Department",
+			HeaderName: "Department",
+			Value:      func(r TestRow) any { return r.Department },
+			Width:      14,
+			Filter:     filter.NewSetFilter("Eng", "Sales", "Marketing"),
+			Filterable: true,
+		},
+	}
+}
+
+func newQueryBarGolden(t *testing.T, opts ...Option[TestRow]) Model[TestRow] {
+	t.Helper()
+	defaults := []Option[TestRow]{
+		WithColumns[TestRow](queryBarCols()),
+		WithRows[TestRow]([]TestRow{
+			{"Alice", "Eng", 95000, true},
+			{"Bob", "Sales", 75000, false},
+		}),
+		WithRowID[TestRow](func(r TestRow) string { return r.Name }),
+		WithWidth[TestRow](40),
+		WithHeight[TestRow](8),
+		WithStyles[TestRow](plainStyles()),
+		WithFocused[TestRow](true),
+		WithQueryBar[TestRow](),
+	}
+	return New(append(defaults, opts...)...)
+}
+
+func TestGolden_QueryBar_Collapsed(t *testing.T) {
+	// Bar enabled but no filters and not editing → collapsed (no row).
+	m := newQueryBarGolden(t)
+	goldenTest(t, "querybar_collapsed", m.View())
+}
+
+func TestGolden_QueryBar_Active(t *testing.T) {
+	// User pressed '/' to open the bar; empty editor with cursor.
+	m := newQueryBarGolden(t)
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	goldenTest(t, "querybar_active_empty", m.View())
+}
+
+func TestGolden_QueryBar_ActiveWithText(t *testing.T) {
+	m := newQueryBarGolden(t)
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "Department:Eng" {
+		m, _ = m.Update(tea.KeyPressMsg{Code: rune(r), Text: string(r)})
+	}
+	goldenTest(t, "querybar_active_with_text", m.View())
+}
+
+func TestGolden_QueryBar_FilterActiveBarInactive(t *testing.T) {
+	// Programmatic filter set; bar shows canonical text without cursor.
+	m := newQueryBarGolden(t)
+	sf := m.cols[1].Filter.(*filter.SetFilter)
+	sf.Exclude("Sales")
+	sf.Exclude("Marketing")
+	m.invalidateQueryBar()
+	goldenTest(t, "querybar_filter_active_bar_inactive", m.View())
+}
+
+func TestGolden_QueryBar_LossyAnnotation(t *testing.T) {
+	m := newQueryBarGolden(t)
+	tf := m.cols[0].Filter.(*filter.TextFilter)
+	tf.SetRegex(true)
+	tf.SetText("Al.*")
+	m.invalidateQueryBar()
+	goldenTest(t, "querybar_lossy_annotation", m.View())
+}
+
+func TestGolden_QueryBar_TabCompletion(t *testing.T) {
+	m := newQueryBarGolden(t)
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "Department:E" {
+		m, _ = m.Update(tea.KeyPressMsg{Code: rune(r), Text: string(r)})
+	}
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	goldenTest(t, "querybar_tab_completion", m.View())
 }

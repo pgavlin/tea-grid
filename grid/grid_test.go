@@ -8095,3 +8095,15 @@ func TestPublicAPI_ScrollToRowByID(t *testing.T) {
 		t.Errorf("ScrollToRowByID(nope) = true; row should not exist")
 	}
 }
+
+func TestPluralS(t *testing.T) {
+	if got := pluralS(1); got != "" {
+		t.Errorf("pluralS(1) = %q, want empty", got)
+	}
+	if got := pluralS(2); got != "s" {
+		t.Errorf("pluralS(2) = %q, want s", got)
+	}
+	if got := pluralS(0); got != "s" {
+		t.Errorf("pluralS(0) = %q, want s", got)
+	}
+}
