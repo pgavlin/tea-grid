@@ -21,4 +21,5 @@ type RoundTrippable interface {
 // Compile-time interface assertions for built-in filters.
 var (
 	_ RoundTrippable = (*TextFilter)(nil)
+	_ RoundTrippable = (*NumberFilter)(nil)
 )

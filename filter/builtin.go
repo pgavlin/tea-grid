@@ -270,6 +270,37 @@ func (f *NumberFilter) Clear() {
 	f.SetText("")
 }
 
+// Clause implements RoundTrippable. Returns the editor text verbatim;
+// it is already in the canonical form NumberFilter accepts.
+func (f *NumberFilter) Clause() (values []string, negate bool, ok bool) {
+	if !f.Active() {
+		return nil, false, false
+	}
+	return []string{f.editor.Text()}, false, true
+}
+
+// SetClause implements RoundTrippable. The single value is parsed via
+// the existing SetText path; an unparseable value returns an error and
+// leaves prior state intact.
+func (f *NumberFilter) SetClause(values []string, negate bool) error {
+	if negate {
+		return fmt.Errorf("NumberFilter does not support negation")
+	}
+	if len(values) != 1 {
+		return fmt.Errorf("NumberFilter expects exactly one value, got %d", len(values))
+	}
+	prev := f.editor.Text()
+	f.SetText(values[0])
+	// parseText leaves op="" and isRange=false when it could not
+	// extract any predicate. Active() only checks editor text, so we
+	// inspect the parsed state directly.
+	if values[0] != "" && f.op == "" && !f.isRange {
+		f.SetText(prev)
+		return fmt.Errorf("NumberFilter: could not parse %q", values[0])
+	}
+	return nil
+}
+
 // --- SetFilter ---
 
 // SetFilter includes/excludes from a set of distinct values.
