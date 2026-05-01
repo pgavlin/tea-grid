@@ -624,6 +624,20 @@ func (m *Model[T]) hasActiveFilters() bool {
 	return false
 }
 
+// queryBarVisible reports whether the query bar should occupy a row in
+// the rendered output. The bar collapses to nothing when not focused
+// and there is nothing to show — no canonical text, no lossy filters,
+// no parse error.
+func (m *Model[T]) queryBarVisible() bool {
+	if m.queryBar == nil {
+		return false
+	}
+	if m.queryBarActive {
+		return true
+	}
+	return m.queryBar.Text() != "" || len(m.queryBar.Lossy()) > 0 || m.queryBar.ParseErr() != ""
+}
+
 // invalidateQueryBar re-renders the bar's text and lossy set from the
 // current filter state. Called from every site that mutates filter or
 // quick-filter state. No-op when the bar is not enabled.
@@ -921,7 +935,7 @@ func (m *Model[T]) updateViewportSize() {
 	}
 
 	filterHeight := 0
-	if m.queryBar != nil {
+	if m.queryBar != nil && m.queryBarVisible() {
 		filterHeight = 1
 	}
 	if m.filterEditColIdx >= 0 && m.filterEditColIdx < len(m.cols) {

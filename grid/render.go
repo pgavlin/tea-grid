@@ -21,8 +21,9 @@ func (m Model[T]) View() string {
 
 	var sections []string
 
-	// Query bar (always visible when enabled; editing state changes appearance)
-	if m.queryBar != nil {
+	// Query bar (visible when enabled and either editing, has text, has lossy
+	// filters, or has a parse error — otherwise collapses to nothing).
+	if m.queryBarVisible() {
 		sections = append(sections, m.renderQueryBar())
 	}
 
@@ -93,10 +94,12 @@ func (m Model[T]) View() string {
 	return result
 }
 
-// renderQueryBar renders the query bar above the headers. Always
-// visible when the bar is enabled. Shows the canonical text (or the
-// editor's current value while editing), followed by an annotation
-// listing columns whose filter state can not be expressed in the bar.
+// renderQueryBar renders the query bar above the headers. Visible
+// when the bar is enabled and there is something to show — otherwise
+// queryBarVisible() returns false and View skips this section. Shows
+// the canonical text (or the editor's current value while editing),
+// followed by an annotation listing columns whose filter state can
+// not be expressed in the bar.
 func (m Model[T]) renderQueryBar() string {
 	label := "/ "
 	var content string
@@ -104,9 +107,6 @@ func (m Model[T]) renderQueryBar() string {
 		content = m.queryBar.EditorText()
 	} else {
 		content = m.queryBar.Text()
-	}
-	if content == "" && !m.queryBarActive {
-		content = "press / to filter"
 	}
 
 	body := label + content
