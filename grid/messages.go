@@ -69,8 +69,10 @@ type FilterChangedMsg struct {
 	Active   bool
 }
 
-// QuickFilterChangedMsg is emitted when the quick filter text changes.
-type QuickFilterChangedMsg struct {
+// QueryBarChangedMsg is emitted when the query bar text changes
+// (after a submit or on a programmatic SetText). Text is the canonical
+// bar text — clauses + bare terms.
+type QueryBarChangedMsg struct {
 	Text string
 }
 

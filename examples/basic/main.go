@@ -59,7 +59,7 @@ func main() {
 		grid.WithColumns(cols),
 		grid.WithRows(rows),
 		grid.WithRowID(func(e Employee) string { return e.Name }),
-		grid.WithQuickFilter[Employee](true),
+		grid.WithQueryBar[Employee](),
 		grid.WithFocused[Employee](true),
 	)
 

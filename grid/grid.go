@@ -18,6 +18,8 @@ import (
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/grouping"
 	"github.com/pgavlin/tea-grid/internal/conv"
+	"github.com/pgavlin/tea-grid/internal/querybar"
+	"github.com/pgavlin/tea-grid/searchquery"
 	"github.com/pgavlin/tea-grid/selection"
 	gridsort "github.com/pgavlin/tea-grid/sort"
 )
@@ -73,13 +75,12 @@ type Model[T any] struct {
 	postSort  func([]*data.RowNode[T]) []*data.RowNode[T]
 
 	// Filtering
-	quickFilterEnabled       bool
-	quickFilterText          string
-	quickFilterActive        bool
-	quickFilterWords         []string      // cached split of quickFilterText, updated on text change
-	quickFilterSeq           uint64        // bumped on each keystroke, used to discard stale debounce ticks
-	quickFilterDebounceDelay time.Duration // delay before recomputing after keystroke (default 100ms, 0 = immediate)
-	filterEditColIdx         int           // -1 = no filter editor active
+	queryBar                 *querybar.State // nil unless WithQueryBar applied
+	queryBarActive           bool            // user is editing the bar's textinput
+	quickFilterText          string          // bare-term portion (drives passesQuickFilter)
+	quickFilterWords         []string        // cached split of quickFilterText
+	quickFilterDebounceDelay time.Duration   // reserved for live-prefix follow-up
+	filterEditColIdx         int             // -1 = no filter editor active
 	externalFilter           func(T) bool
 	// Cached list of column indices with active filters (rebuilt at start of each recompute)
 	activeFilters []int
@@ -194,6 +195,15 @@ func New[T any](opts ...Option[T]) Model[T] {
 	}
 	m.pendingColumnPins = nil
 
+	// Build the query-bar's auto-vocabulary now that columns are set.
+	if m.queryBar != nil {
+		m.queryBar.SetAutoVocabulary(querybar.BuildAutoVocab(m.cols))
+		// Apply any initial bar text by submitting it through Apply.
+		if m.queryBar.Text() != "" {
+			m.applyQueryBarSubmit()
+		}
+	}
+
 	// Build static pinned row nodes once (so IDs are stable)
 	m.buildStaticPinnedNodes()
 
@@ -223,6 +233,7 @@ func (m *Model[T]) SetRows(rows []T) {
 	if m.hasAutoFit {
 		m.computeColWidths()
 	}
+	m.invalidateQueryBar()
 }
 
 // Rows returns the raw row data.
@@ -256,6 +267,11 @@ func (m *Model[T]) SetColumns(cols []data.Column[T]) {
 	m.refreshHasAutoFit()
 	m.recomputeDisplayRows()
 	m.computeColWidths()
+
+	if m.queryBar != nil {
+		m.queryBar.SetAutoVocabulary(querybar.BuildAutoVocab(m.cols))
+		m.invalidateQueryBar()
+	}
 }
 
 // Columns returns the column definitions.
@@ -274,6 +290,7 @@ func (m *Model[T]) UpdateRow(id string, d T) {
 			if m.hasAutoFit {
 				m.computeColWidths()
 			}
+			m.invalidateQueryBar()
 			return
 		}
 	}
@@ -294,6 +311,7 @@ func (m *Model[T]) InsertRow(index int, d T) {
 	if m.hasAutoFit {
 		m.computeColWidths()
 	}
+	m.invalidateQueryBar()
 }
 
 // RemoveRow removes the row with the given ID.
@@ -308,6 +326,7 @@ func (m *Model[T]) RemoveRow(id string) {
 			if m.hasAutoFit {
 				m.computeColWidths()
 			}
+			m.invalidateQueryBar()
 			return
 		}
 	}
@@ -549,6 +568,7 @@ func (m *Model[T]) SetQuickFilter(text string) {
 	m.dirty = true
 	m.filterDirty = true
 	m.recomputeDisplayRows()
+	m.invalidateQueryBar()
 }
 
 // updateQuickFilterWords recomputes the cached word list from quickFilterText.
@@ -568,6 +588,7 @@ func (m *Model[T]) SetColumnFilter(colID string, f filter.Filter) {
 			m.dirty = true
 			m.filterDirty = true
 			m.recomputeDisplayRows()
+			m.invalidateQueryBar()
 			return
 		}
 	}
@@ -578,11 +599,14 @@ func (m *Model[T]) ClearFilters() {
 	m.quickFilterText = ""
 	m.updateQuickFilterWords()
 	for i := range m.cols {
-		m.cols[i].Filter = nil
+		if m.cols[i].Filter != nil {
+			m.cols[i].Filter.Clear()
+		}
 	}
 	m.dirty = true
 	m.filterDirty = true
 	m.recomputeDisplayRows()
+	m.invalidateQueryBar()
 }
 
 // hasActiveFilters reports whether any column filter is active or the quick
@@ -598,6 +622,46 @@ func (m *Model[T]) hasActiveFilters() bool {
 		}
 	}
 	return false
+}
+
+// invalidateQueryBar re-renders the bar's text and lossy set from the
+// current filter state. Called from every site that mutates filter or
+// quick-filter state. No-op when the bar is not enabled.
+func (m *Model[T]) invalidateQueryBar() {
+	if m.queryBar == nil || m.queryBar.Editing() {
+		return
+	}
+	text, lossy := querybar.Rerender(m.cols, m.quickFilterText)
+	m.queryBar.SetText(text)
+	m.queryBar.SetLossy(lossy)
+}
+
+// applyQueryBarSubmit parses the bar's text and pushes it into the
+// column filters via querybar.Apply. Called on Enter in bar mode and
+// at New() if WithQueryBarText was used.
+func (m *Model[T]) applyQueryBarSubmit() {
+	text := m.queryBar.EditorText()
+	if text == "" {
+		text = m.queryBar.Text()
+	}
+	ast, err := searchquery.Parse(text, m.queryBar.Vocab())
+	if err != nil {
+		m.queryBar.SetParseErr(err.Error())
+		return
+	}
+	m.queryBar.SetParseErr("")
+	res := querybar.Apply(m.cols, ast)
+	if len(res.Errors) > 0 {
+		m.queryBar.SetParseErr(strings.Join(res.Errors, "; "))
+	}
+	m.quickFilterText = res.BareTerms
+	m.updateQuickFilterWords()
+	m.dirty = true
+	m.filterDirty = true
+	// Re-render bar from canonical filter state.
+	text2, lossy := querybar.Rerender(m.cols, m.quickFilterText)
+	m.queryBar.SetText(text2)
+	m.queryBar.SetLossy(lossy)
 }
 
 // --- Grouping ---
@@ -656,7 +720,7 @@ func (m Model[T]) FocusedRowData() (T, bool) {
 // (column filter editor or quick filter). When true, the grid is consuming
 // keys like Escape internally, and parent models should not handle them.
 func (m Model[T]) Filtering() bool {
-	return m.filterEditColIdx >= 0 || m.quickFilterActive
+	return m.filterEditColIdx >= 0 || m.queryBarActive
 }
 
 // ScrollToRowByID scrolls to and focuses the row with the given ID.
@@ -742,7 +806,7 @@ func (m Model[T]) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{m.KeyMap.Up, m.KeyMap.Down, m.KeyMap.Left, m.KeyMap.Right},
 		{m.KeyMap.PageUp, m.KeyMap.PageDown, m.KeyMap.Home, m.KeyMap.End},
-		{m.KeyMap.Select, m.KeyMap.SelectAll, m.KeyMap.QuickFilter, m.KeyMap.ClearFilters},
+		{m.KeyMap.Select, m.KeyMap.SelectAll, m.KeyMap.QueryBar, m.KeyMap.ClearFilters},
 		{m.KeyMap.AutoSizeColumn, m.KeyMap.AutoSizeColumns},
 		{m.KeyMap.Help},
 	}
@@ -857,7 +921,7 @@ func (m *Model[T]) updateViewportSize() {
 	}
 
 	filterHeight := 0
-	if m.quickFilterActive {
+	if m.queryBar != nil {
 		filterHeight = 1
 	}
 	if m.filterEditColIdx >= 0 && m.filterEditColIdx < len(m.cols) {

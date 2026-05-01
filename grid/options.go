@@ -5,6 +5,8 @@ import (
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
+	"github.com/pgavlin/tea-grid/internal/querybar"
+	"github.com/pgavlin/tea-grid/searchquery"
 	"github.com/pgavlin/tea-grid/selection"
 	"github.com/pgavlin/tea-grid/sort"
 )
@@ -90,15 +92,11 @@ func WithEditable[T any](enabled bool) Option[T] {
 	}
 }
 
-// WithQuickFilter enables/disables the quick filter bar.
-func WithQuickFilter[T any](enabled bool) Option[T] {
-	return func(m *Model[T]) {
-		m.quickFilterEnabled = enabled
-	}
-}
-
 // WithQuickFilterDebounce sets the delay before recomputing after a quick
 // filter keystroke. Default is 100ms. Set to 0 to disable debouncing.
+//
+// Reserved for the live-bare-prefix follow-up; inert in the v1
+// Enter-only query bar.
 func WithQuickFilterDebounce[T any](d time.Duration) Option[T] {
 	return func(m *Model[T]) {
 		m.quickFilterDebounceDelay = d
@@ -213,12 +211,42 @@ func WithColumnPin[T any](colID string, dir data.Pin) Option[T] {
 	}
 }
 
-// WithQuickFilterText sets the initial quick filter text.
-// Use alongside WithQuickFilter(true) to enable the quick filter UI.
-func WithQuickFilterText[T any](text string) Option[T] {
+// WithQueryBar enables the GitHub-style query bar. The bar is rendered
+// above the headers and serves as both editing surface and canonical
+// view of current filter state. Field/value clauses route to per-column
+// filters via the RoundTrippable interface; bare terms feed the
+// existing quick-filter substring matcher.
+func WithQueryBar[T any]() Option[T] {
 	return func(m *Model[T]) {
-		m.quickFilterText = text
-		m.updateQuickFilterWords()
+		m.queryBar = querybar.New(nil)
+		m.queryBar.Enable()
+	}
+}
+
+// WithQueryBarText sets the initial bar text; parsed and applied on
+// grid setup against the (possibly auto-derived) vocabulary.
+func WithQueryBarText[T any](text string) Option[T] {
+	return func(m *Model[T]) {
+		if m.queryBar == nil {
+			m.queryBar = querybar.New(nil)
+			m.queryBar.Enable()
+		}
+		m.queryBar.SetText(text)
+		m.queryBar.Editor().SetText(text)
+	}
+}
+
+// WithQueryBarVocabulary supplies an explicit vocabulary that shadows
+// the column-derived one. Required for parse-time rewrites (is:open →
+// state:open) and for queryable fields that do not correspond to a
+// single column.
+func WithQueryBarVocabulary[T any](v *searchquery.Vocabulary) Option[T] {
+	return func(m *Model[T]) {
+		if m.queryBar == nil {
+			m.queryBar = querybar.New(nil)
+			m.queryBar.Enable()
+		}
+		m.queryBar.SetVocabulary(v)
 	}
 }
 

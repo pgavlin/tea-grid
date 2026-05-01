@@ -30,6 +30,16 @@ type multiType struct {
 
 // --- Constants ---
 
+func TestColumn_QueryAliases(t *testing.T) {
+	col := Column[map[string]any]{
+		ColumnID:     "state",
+		QueryAliases: []string{"status", "st"},
+	}
+	if len(col.QueryAliases) != 2 || col.QueryAliases[0] != "status" {
+		t.Errorf("QueryAliases = %v, want [status st]", col.QueryAliases)
+	}
+}
+
 func TestPinConstants(t *testing.T) {
 	if PinNone == PinLeft || PinNone == PinRight || PinLeft == PinRight {
 		t.Fatal("Pin constants must be distinct")

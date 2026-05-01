@@ -162,7 +162,7 @@ func BenchmarkRecomputeDisplayRows_WithQuickFilter(b *testing.B) {
 		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
 			rows := makeBenchRows(n)
 			m := newBenchGrid(rows,
-				WithQuickFilterText[benchRow]("engineering"),
+				WithQueryBarText[benchRow]("engineering"),
 			)
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -218,7 +218,7 @@ func BenchmarkRecomputeDisplayRows_Full(b *testing.B) {
 			tf.SetText("eng")
 			m := newBenchGrid(rows,
 				WithColumnFilter[benchRow]("Department", tf),
-				WithQuickFilterText[benchRow]("person"),
+				WithQueryBarText[benchRow]("person"),
 				WithDefaultSort[benchRow]([]gridsort.SortCriterion{
 					{ColumnID: "Salary", Direction: data.SortAsc},
 				}),
@@ -244,7 +244,7 @@ func BenchmarkRecomputeDisplayRows_SortChangeOnly(b *testing.B) {
 			tf.SetText("eng")
 			m := newBenchGrid(rows,
 				WithColumnFilter[benchRow]("Department", tf),
-				WithQuickFilterText[benchRow]("person"),
+				WithQueryBarText[benchRow]("person"),
 				WithDefaultSort[benchRow]([]gridsort.SortCriterion{
 					{ColumnID: "Salary", Direction: data.SortAsc},
 				}),
@@ -272,7 +272,7 @@ func BenchmarkRecomputeDisplayRows_QuickFilter_MultiWord(b *testing.B) {
 		b.Run(fmt.Sprintf("words=%q", words), func(b *testing.B) {
 			rows := makeBenchRows(100_000)
 			m := newBenchGrid(rows,
-				WithQuickFilterText[benchRow](words),
+				WithQueryBarText[benchRow](words),
 			)
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -497,7 +497,7 @@ func BenchmarkRecomputeDisplayRows_QuickFilter_Cold(b *testing.B) {
 		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
 			rows := makeBenchRows(n)
 			m := newBenchGrid(rows,
-				WithQuickFilterText[benchRow]("engineering"),
+				WithQueryBarText[benchRow]("engineering"),
 			)
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -529,7 +529,7 @@ func BenchmarkRecomputeDisplayRows_QuickFilter_Cold_WithMatch(b *testing.B) {
 			rows := makeBenchRows(n)
 			m := newBenchGrid(rows,
 				WithColumns[benchRow](benchColsWithQuickFilterMatch()),
-				WithQuickFilterText[benchRow]("engineering"),
+				WithQueryBarText[benchRow]("engineering"),
 			)
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -550,7 +550,7 @@ func BenchmarkRecomputeDisplayRows_Full_Cold(b *testing.B) {
 			tf.SetText("eng")
 			m := newBenchGrid(rows,
 				WithColumnFilter[benchRow]("Department", tf),
-				WithQuickFilterText[benchRow]("person"),
+				WithQueryBarText[benchRow]("person"),
 				WithDefaultSort[benchRow]([]gridsort.SortCriterion{
 					{ColumnID: "Salary", Direction: data.SortAsc},
 				}),
@@ -742,16 +742,13 @@ func BenchmarkUpdate_SortToggle(b *testing.B) {
 	}
 }
 
-func BenchmarkUpdate_QuickFilterKeystroke(b *testing.B) {
+func BenchmarkUpdate_QueryBarKeystroke(b *testing.B) {
 	for _, n := range []int{1_000, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("rows=%d", n), func(b *testing.B) {
 			rows := makeBenchRows(n)
-			m := newBenchGrid(rows,
-				WithQuickFilter[benchRow](true),
-				WithQuickFilterDebounce[benchRow](0), // disable debounce to avoid goroutine leak
-			)
-			// Activate quick filter mode
-			m.quickFilterActive = true
+			m := newBenchGrid(rows, WithQueryBar[benchRow]())
+			m.queryBarActive = true
+			m.queryBar.BeginEdit()
 			key := tea.KeyPressMsg{Code: 'e', Text: "e"}
 			b.ResetTimer()
 			b.ReportAllocs()

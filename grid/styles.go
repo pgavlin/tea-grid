@@ -43,9 +43,11 @@ type Styles struct {
 	BorderColumn bool            // Show border between columns.
 
 	// Filtering
-	FilterInput  lipgloss.Style // Quick filter input.
-	FilterMatch  lipgloss.Style // Highlighted matching text.
-	FilterActive string         // Active filter indicator in header (default: "⫧").
+	FilterInput   lipgloss.Style // Quick filter input.
+	FilterMatch   lipgloss.Style // Highlighted matching text.
+	FilterActive  string         // Active filter indicator in header (default: "⫧").
+	QueryBar      lipgloss.Style // Query bar input.
+	QueryBarLossy lipgloss.Style // Style for the lossy-filter annotation in the bar.
 
 	// Editing
 	EditorInput lipgloss.Style // Cell editor input.
@@ -114,6 +116,12 @@ func DefaultStyles() Styles {
 			Background(lipgloss.Color("178")).
 			Foreground(lipgloss.Color("0")),
 		FilterActive: "⫧",
+		QueryBar: lipgloss.NewStyle().
+			Padding(0, 1).
+			Background(lipgloss.Color("236")),
+		QueryBarLossy: lipgloss.NewStyle().
+			Faint(true).
+			Foreground(lipgloss.Color("245")),
 
 		EditorInput: lipgloss.NewStyle().
 			Background(lipgloss.Color("62")).

@@ -60,6 +60,7 @@ type Column[T any] struct {
 	Filterable       bool                            // Default: true.
 	Filter           filter.Filter                   // Column filter.
 	QuickFilterMatch func(data *T, word string) bool // Reports whether this column matches a quick filter word. Takes *T to avoid copying. If nil, falls back to Text or Value + containsFold.
+	QueryAliases     []string                        // Additional names this column responds to in the query bar (e.g., ["status", "st"] for a "state" column).
 
 	// Pinning
 	Pinned     Pin  // Left, Right, or None.

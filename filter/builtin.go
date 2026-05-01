@@ -104,6 +104,33 @@ func (f *TextFilter) Clear() {
 	f.SetText("")
 }
 
+// Clause implements RoundTrippable. Returns the substring as a single
+// value. Regex mode is lossy: returns ok=false so the query bar can
+// annotate it instead of trying to render it textually.
+func (f *TextFilter) Clause() (values []string, negate bool, ok bool) {
+	if !f.Active() {
+		return nil, false, false
+	}
+	if f.regex {
+		return nil, false, false
+	}
+	return []string{f.editor.Text()}, false, true
+}
+
+// SetClause implements RoundTrippable. Resets regex mode and applies
+// the value as substring text. Rejects negation and multi-value lists.
+func (f *TextFilter) SetClause(values []string, negate bool) error {
+	if negate {
+		return fmt.Errorf("TextFilter does not support negation")
+	}
+	if len(values) != 1 {
+		return fmt.Errorf("TextFilter expects exactly one value, got %d", len(values))
+	}
+	f.regex = false
+	f.SetText(values[0])
+	return nil
+}
+
 // --- NumberFilter ---
 
 // NumberFilter performs comparison operations on numeric values.
@@ -241,6 +268,37 @@ func (f *NumberFilter) Active() bool {
 
 func (f *NumberFilter) Clear() {
 	f.SetText("")
+}
+
+// Clause implements RoundTrippable. Returns the editor text verbatim;
+// it is already in the canonical form NumberFilter accepts.
+func (f *NumberFilter) Clause() (values []string, negate bool, ok bool) {
+	if !f.Active() {
+		return nil, false, false
+	}
+	return []string{f.editor.Text()}, false, true
+}
+
+// SetClause implements RoundTrippable. The single value is parsed via
+// the existing SetText path; an unparseable value returns an error and
+// leaves prior state intact.
+func (f *NumberFilter) SetClause(values []string, negate bool) error {
+	if negate {
+		return fmt.Errorf("NumberFilter does not support negation")
+	}
+	if len(values) != 1 {
+		return fmt.Errorf("NumberFilter expects exactly one value, got %d", len(values))
+	}
+	prev := f.editor.Text()
+	f.SetText(values[0])
+	// parseText leaves op="" and isRange=false when it could not
+	// extract any predicate. Active() only checks editor text, so we
+	// inspect the parsed state directly.
+	if values[0] != "" && f.op == "" && !f.isRange {
+		f.SetText(prev)
+		return fmt.Errorf("NumberFilter: could not parse %q", values[0])
+	}
+	return nil
 }
 
 // --- SetFilter ---
@@ -490,6 +548,62 @@ func (f *SetFilter) Clear() {
 	f.IncludeAll()
 }
 
+// Clause implements RoundTrippable. Returns the included subset by
+// default; once more than half of allValues is included, returns the
+// excluded subset with negate=true to keep the bar text small.
+//
+// New values that appear in row data after a clause was applied are
+// treated as "not included" — consistent with current Include/SetValues
+// semantics. Documented in the package README.
+func (f *SetFilter) Clause() (values []string, negate bool, ok bool) {
+	if !f.Active() {
+		return nil, false, false
+	}
+	includedCount := len(f.values) - f.excludedCount
+	if includedCount*2 > len(f.values) {
+		var excluded []string
+		for _, v := range f.allValues {
+			if !f.values[v] {
+				excluded = append(excluded, v)
+			}
+		}
+		return excluded, true, true
+	}
+	var included []string
+	for _, v := range f.allValues {
+		if f.values[v] {
+			included = append(included, v)
+		}
+	}
+	return included, false, true
+}
+
+// SetClause implements RoundTrippable. With negate=false, includes
+// exactly the listed values and excludes the rest. With negate=true,
+// includes everything except the listed values. Values not in
+// allValues are ignored (treated as "not included" — see Clause's
+// godoc).
+func (f *SetFilter) SetClause(values []string, negate bool) error {
+	want := make(map[string]bool, len(values))
+	for _, v := range values {
+		want[v] = true
+	}
+	f.excludedCount = 0
+	for _, v := range f.allValues {
+		var included bool
+		if negate {
+			included = !want[v]
+		} else {
+			included = want[v]
+		}
+		f.values[v] = included
+		if !included {
+			f.excludedCount++
+		}
+	}
+	return nil
+}
+
 // --- BoolFilter ---
 
 // BoolFilter filters true/false/any values.
@@ -578,6 +692,38 @@ func (f *BoolFilter) Active() bool {
 
 func (f *BoolFilter) Clear() {
 	f.state = 0
+}
+
+// Clause implements RoundTrippable.
+func (f *BoolFilter) Clause() (values []string, negate bool, ok bool) {
+	switch f.state {
+	case 1:
+		return []string{"true"}, false, true
+	case 2:
+		return []string{"false"}, false, true
+	default:
+		return nil, false, false
+	}
+}
+
+// SetClause implements RoundTrippable. Accepts "true", "false", "1",
+// or "0" (case-insensitive).
+func (f *BoolFilter) SetClause(values []string, negate bool) error {
+	if negate {
+		return fmt.Errorf("BoolFilter does not support negation")
+	}
+	if len(values) != 1 {
+		return fmt.Errorf("BoolFilter expects exactly one value, got %d", len(values))
+	}
+	switch strings.ToLower(values[0]) {
+	case "true", "1":
+		f.state = 1
+	case "false", "0":
+		f.state = 2
+	default:
+		return fmt.Errorf("BoolFilter: unrecognized value %q", values[0])
+	}
+	return nil
 }
 
 // --- TimeFilter ---
@@ -711,4 +857,32 @@ func (f *TimeFilter) Active() bool {
 
 func (f *TimeFilter) Clear() {
 	f.SetText("")
+}
+
+// Clause implements RoundTrippable. Returns the editor text verbatim;
+// it is already in the canonical form TimeFilter accepts.
+func (f *TimeFilter) Clause() (values []string, negate bool, ok bool) {
+	if !f.Active() {
+		return nil, false, false
+	}
+	return []string{f.editor.Text()}, false, true
+}
+
+// SetClause implements RoundTrippable. Parses via the existing SetText
+// path; if parsing yields no bounds, restores prior text and returns
+// an error.
+func (f *TimeFilter) SetClause(values []string, negate bool) error {
+	if negate {
+		return fmt.Errorf("TimeFilter does not support negation")
+	}
+	if len(values) != 1 {
+		return fmt.Errorf("TimeFilter expects exactly one value, got %d", len(values))
+	}
+	prev := f.editor.Text()
+	f.SetText(values[0])
+	if !f.Active() && values[0] != "" {
+		f.SetText(prev)
+		return fmt.Errorf("TimeFilter: could not parse %q", values[0])
+	}
+	return nil
 }

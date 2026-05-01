@@ -21,9 +21,9 @@ func (m Model[T]) View() string {
 
 	var sections []string
 
-	// Quick filter bar
-	if m.quickFilterActive {
-		sections = append(sections, m.renderQuickFilter())
+	// Query bar (always visible when enabled; editing state changes appearance)
+	if m.queryBar != nil {
+		sections = append(sections, m.renderQueryBar())
 	}
 
 	// Column filter editor
@@ -93,15 +93,47 @@ func (m Model[T]) View() string {
 	return result
 }
 
-// renderQuickFilter renders the quick filter input bar.
-func (m Model[T]) renderQuickFilter() string {
-	label := "Filter: "
-	input := m.quickFilterText
-	if input == "" {
-		input = "Type to filter..."
+// renderQueryBar renders the query bar above the headers. Always
+// visible when the bar is enabled. Shows the canonical text (or the
+// editor's current value while editing), followed by an annotation
+// listing columns whose filter state can not be expressed in the bar.
+func (m Model[T]) renderQueryBar() string {
+	label := "/ "
+	var content string
+	if m.queryBarActive {
+		content = m.queryBar.EditorText()
+	} else {
+		content = m.queryBar.Text()
 	}
-	line := m.styles.FilterInput.Width(m.width).Render(label + input)
-	return line
+	if content == "" && !m.queryBarActive {
+		content = "press / to filter"
+	}
+
+	body := label + content
+
+	lossy := m.queryBar.Lossy()
+	if len(lossy) > 0 {
+		hint := ""
+		if !m.queryBarActive {
+			hint = " — esc to clear all"
+		}
+		annotation := fmt.Sprintf("  [+%d hidden filter%s: %s%s]",
+			len(lossy), pluralS(len(lossy)), strings.Join(lossy, ", "), hint)
+		body += m.styles.QueryBarLossy.Render(annotation)
+	}
+
+	if e := m.queryBar.ParseErr(); e != "" {
+		body += "  " + m.styles.QueryBarLossy.Render("("+e+")")
+	}
+
+	return m.styles.QueryBar.Width(m.width).Render(body)
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
 
 // renderFilterEditor renders the column filter editor above the header.
