@@ -8,6 +8,7 @@ import (
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
+	"github.com/pgavlin/tea-grid/internal/querybar"
 	"github.com/pgavlin/tea-grid/selection"
 )
 
@@ -394,11 +395,19 @@ func (m Model[T]) handleQueryBarKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) 
 		m.updateViewportSize()
 		text := m.queryBar.Text()
 		return m, func() tea.Msg { return QueryBarChangedMsg{Text: text} }
+
+	case tea.KeyTab:
+		cols := m.cols
+		m.queryBar.CompleteTab(func(text string, cursor int) ([]string, int, int) {
+			return querybar.Suggest(text, cursor, cols)
+		})
+		return m, nil
 	}
 
 	// Forward to the lineedit. We do not parse on every keystroke;
 	// bare-term application is also deferred to submit (Enter).
 	m.queryBar.Editor().HandleKeyMsg(msg)
+	m.queryBar.ResetCompletion()
 	return m, nil
 }
 

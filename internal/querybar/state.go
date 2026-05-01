@@ -37,6 +37,18 @@ type State struct {
 	// non-nil, it shadows auto.
 	auto   *searchquery.Vocabulary
 	custom *searchquery.Vocabulary
+
+	// Tab-completion cycle state. Cleared on any non-Tab edit.
+	// completionCandidates is the list of matches for the partial that
+	// was active when the cycle began; completionIndex is the position
+	// of the most-recently-inserted candidate; completionStart is the
+	// byte offset where the partial began; completionLastText is the
+	// editor text after the last candidate was inserted (used to detect
+	// whether the user has edited since).
+	completionCandidates []string
+	completionIndex      int
+	completionStart      int
+	completionLastText   string
 }
 
 // New returns a new State with the given auto-vocabulary. The bar is
@@ -123,4 +135,61 @@ func (s *State) Vocab() *searchquery.Vocabulary {
 		return s.custom
 	}
 	return s.auto
+}
+
+// CompleteTab advances the completion cycle by one. If a cycle is in
+// progress (the editor text matches what was left after the previous
+// Tab) the next candidate replaces the current one. Otherwise a fresh
+// cycle starts: candidates are computed via the supplied suggest fn
+// and the first match is inserted. Returns true if any candidate was
+// inserted.
+//
+// suggest is a closure that takes (text, cursor) and returns
+// (candidates, start, end). It is called only when starting a fresh
+// cycle. Supplying it as a closure keeps this package free of a
+// generic dependency on data.Column[T].
+func (s *State) CompleteTab(suggest func(text string, cursor int) (cands []string, start, end int)) bool {
+	if s.completionCandidates != nil && s.editor.Text() == s.completionLastText {
+		s.completionIndex = (s.completionIndex + 1) % len(s.completionCandidates)
+		s.applyCompletion()
+		return true
+	}
+	cands, start, end := suggest(s.editor.Text(), s.editor.Cursor())
+	if len(cands) == 0 {
+		s.ResetCompletion()
+		return false
+	}
+	s.completionCandidates = cands
+	s.completionIndex = 0
+	s.completionStart = start
+	t := s.editor.Text()
+	s.editor.SetText(t[:start] + cands[0] + t[end:])
+	s.editor.SetCursor(start + len(cands[0]))
+	s.completionLastText = s.editor.Text()
+	return true
+}
+
+// applyCompletion replaces the previously-inserted candidate (which
+// runs from completionStart to the cursor) with the candidate at
+// completionIndex.
+func (s *State) applyCompletion() {
+	prev := s.completionCandidates[(s.completionIndex-1+len(s.completionCandidates))%len(s.completionCandidates)]
+	next := s.completionCandidates[s.completionIndex]
+	t := s.editor.Text()
+	end := s.completionStart + len(prev)
+	if end > len(t) {
+		end = len(t)
+	}
+	s.editor.SetText(t[:s.completionStart] + next + t[end:])
+	s.editor.SetCursor(s.completionStart + len(next))
+	s.completionLastText = s.editor.Text()
+}
+
+// ResetCompletion clears the Tab-completion cycle state. Called by
+// the bar's key handler whenever a non-Tab key edits the buffer.
+func (s *State) ResetCompletion() {
+	s.completionCandidates = nil
+	s.completionIndex = 0
+	s.completionStart = 0
+	s.completionLastText = ""
 }

@@ -366,6 +366,14 @@ func (f *SetFilter) IncludeAll() {
 	f.excludedCount = 0
 }
 
+// AllValues returns the set of distinct values this filter knows
+// about, in their original case and order. The slice is a copy.
+func (f *SetFilter) AllValues() []string {
+	out := make([]string, len(f.allValues))
+	copy(out, f.allValues)
+	return out
+}
+
 func (f *SetFilter) Matches(value any) bool {
 	s := fmt.Sprintf("%v", value)
 	included, exists := f.values[s]

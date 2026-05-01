@@ -65,3 +65,102 @@ func TestState_VocabOverride(t *testing.T) {
 		t.Errorf("Vocab() did not return the override")
 	}
 }
+
+func TestState_CompleteTab_FreshAndCycle(t *testing.T) {
+	s := New(searchquery.NewVocabulary(nil))
+	s.Enable()
+	s.BeginEdit()
+	s.Editor().SetText("st")
+	s.Editor().CursorToEnd()
+
+	// Suggest returns three candidates for the same partial.
+	calls := 0
+	suggest := func(text string, cursor int) ([]string, int, int) {
+		calls++
+		return []string{"state", "status", "step"}, 0, 2
+	}
+
+	if !s.CompleteTab(suggest) {
+		t.Fatal("first CompleteTab returned false")
+	}
+	if got := s.Editor().Text(); got != "state" {
+		t.Errorf("after first Tab: text=%q, want state", got)
+	}
+
+	// Cycling: next Tab without an intervening edit advances index.
+	if !s.CompleteTab(suggest) {
+		t.Fatal("second CompleteTab returned false")
+	}
+	if got := s.Editor().Text(); got != "status" {
+		t.Errorf("after second Tab: text=%q, want status", got)
+	}
+	if calls != 1 {
+		t.Errorf("suggest called %d times, want 1 (cycle reuses candidates)", calls)
+	}
+
+	if !s.CompleteTab(suggest) {
+		t.Fatal("third CompleteTab returned false")
+	}
+	if got := s.Editor().Text(); got != "step" {
+		t.Errorf("after third Tab: text=%q, want step", got)
+	}
+
+	// Wrap-around back to first.
+	if !s.CompleteTab(suggest) {
+		t.Fatal("fourth CompleteTab returned false")
+	}
+	if got := s.Editor().Text(); got != "state" {
+		t.Errorf("after fourth Tab (wrap): text=%q, want state", got)
+	}
+}
+
+func TestState_CompleteTab_ResetOnEdit(t *testing.T) {
+	s := New(searchquery.NewVocabulary(nil))
+	s.Enable()
+	s.BeginEdit()
+	s.Editor().SetText("st")
+	s.Editor().CursorToEnd()
+
+	suggest := func(text string, cursor int) ([]string, int, int) {
+		return []string{"state", "status"}, 0, 2
+	}
+	s.CompleteTab(suggest)
+	if got := s.Editor().Text(); got != "state" {
+		t.Fatalf("text=%q, want state", got)
+	}
+
+	// Simulate user editing: this is what handleQueryBarKeyMsg does on
+	// any non-Tab key.
+	s.ResetCompletion()
+
+	// Next Tab from a different partial should not cycle the old set.
+	calls := 0
+	suggest2 := func(text string, cursor int) ([]string, int, int) {
+		calls++
+		return []string{"step"}, 0, 5
+	}
+	s.CompleteTab(suggest2)
+	if calls != 1 {
+		t.Errorf("after Reset, suggest called %d times, want 1 (fresh cycle)", calls)
+	}
+	if got := s.Editor().Text(); got != "step" {
+		t.Errorf("text=%q, want step", got)
+	}
+}
+
+func TestState_CompleteTab_NoCandidates(t *testing.T) {
+	s := New(searchquery.NewVocabulary(nil))
+	s.Enable()
+	s.BeginEdit()
+	s.Editor().SetText("xyz")
+	s.Editor().CursorToEnd()
+	suggest := func(text string, cursor int) ([]string, int, int) {
+		return nil, 0, 3
+	}
+	if s.CompleteTab(suggest) {
+		t.Errorf("CompleteTab returned true for empty candidates")
+	}
+	if got := s.Editor().Text(); got != "xyz" {
+		t.Errorf("text=%q, want xyz (unchanged)", got)
+	}
+}

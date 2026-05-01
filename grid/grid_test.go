@@ -7962,6 +7962,33 @@ func TestQueryBar_LossyAnnotation(t *testing.T) {
 	}
 }
 
+func TestQueryBar_TabCompletes(t *testing.T) {
+	g := newQueryBarGrid()
+	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "Department:E" {
+		g, _ = g.Update(tea.KeyPressMsg{Code: rune(r), Text: string(r)})
+	}
+	g, _ = g.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	if got := g.queryBar.EditorText(); got != "Department:Engineering" {
+		t.Errorf("after Tab: text=%q, want Department:Engineering", got)
+	}
+}
+
+func TestQueryBar_TabCycles(t *testing.T) {
+	g := newQueryBarGrid()
+	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "Department:" {
+		g, _ = g.Update(tea.KeyPressMsg{Code: rune(r), Text: string(r)})
+	}
+	g, _ = g.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	first := g.queryBar.EditorText()
+	g, _ = g.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	second := g.queryBar.EditorText()
+	if first == second {
+		t.Errorf("two Tabs produced the same text %q (no cycle)", first)
+	}
+}
+
 func TestQueryBar_ClearFiltersClearsLossy(t *testing.T) {
 	g := newQueryBarGrid()
 	tf := g.cols[0].Filter.(*filter.TextFilter)
