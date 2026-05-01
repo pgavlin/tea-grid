@@ -25,4 +25,5 @@ var (
 	_ RoundTrippable = (*SetFilter)(nil)
 	_ RoundTrippable = (*BoolFilter)(nil)
 	_ RoundTrippable = (*TimeFilter)(nil)
+	_ RoundTrippable = (*MultiSetFilter)(nil)
 )

@@ -130,3 +130,44 @@ func TestMultiSetFilter_ViewRendersConstraints(t *testing.T) {
 		t.Errorf("View() = %q, want it to contain bug and urgent", out)
 	}
 }
+
+func TestMultiSetFilter_ClauseInactive(t *testing.T) {
+	f := NewMultiSetFilter()
+	if _, _, ok := f.Clause(); ok {
+		t.Errorf("Clause() ok=true for empty filter")
+	}
+}
+
+func TestMultiSetFilter_ClauseOneValuePerConstraint(t *testing.T) {
+	f := NewMultiSetFilter()
+	f.AddConstraint("bug")
+	f.AddConstraint("urgent")
+	values, negate, ok := f.Clause()
+	if !ok || negate || len(values) != 2 {
+		t.Errorf("Clause() = (%v, negate=%v, ok=%v), want ([bug urgent], false, true)", values, negate, ok)
+	}
+	if values[0] != "bug" || values[1] != "urgent" {
+		t.Errorf("Clause values = %v, want [bug urgent]", values)
+	}
+}
+
+func TestMultiSetFilter_SetClauseAppends(t *testing.T) {
+	f := NewMultiSetFilter()
+	if err := f.SetClause([]string{"bug"}, false); err != nil {
+		t.Fatalf("SetClause: %v", err)
+	}
+	if err := f.SetClause([]string{"urgent"}, false); err != nil {
+		t.Fatalf("SetClause: %v", err)
+	}
+	cs := f.Constraints()
+	if len(cs) != 2 || cs[0] != "bug" || cs[1] != "urgent" {
+		t.Errorf("after two SetClause calls: %v, want [bug urgent]", cs)
+	}
+}
+
+func TestMultiSetFilter_SetClauseRejectsCommaList(t *testing.T) {
+	f := NewMultiSetFilter()
+	if err := f.SetClause([]string{"a", "b"}, false); err == nil {
+		t.Errorf("SetClause(2 values): err=nil, want error")
+	}
+}

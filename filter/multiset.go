@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -83,6 +84,32 @@ func (f *MultiSetFilter) Constraints() []string {
 func (f *MultiSetFilter) Clear() {
 	f.constraints = nil
 	f.focused = 0
+}
+
+// Clause implements RoundTrippable. Returns one value per constraint;
+// the bar serializes these as repeated `field:value` clauses (the AST
+// encoding of AND).
+func (f *MultiSetFilter) Clause() (values []string, negate bool, ok bool) {
+	if !f.Active() {
+		return nil, false, false
+	}
+	out := make([]string, len(f.constraints))
+	copy(out, f.constraints)
+	return out, false, true
+}
+
+// SetClause implements RoundTrippable. Each call appends one
+// constraint. v1 rejects multi-value (comma-list) clauses; users who
+// want OR-within-AND register the column with a SetFilter instead.
+func (f *MultiSetFilter) SetClause(values []string, negate bool) error {
+	if negate {
+		return fmt.Errorf("MultiSetFilter does not support negation")
+	}
+	if len(values) != 1 {
+		return fmt.Errorf("MultiSetFilter expects one value per clause, got %d", len(values))
+	}
+	f.AddConstraint(values[0])
+	return nil
 }
 
 // Matches reports whether rowValue satisfies every constraint.
