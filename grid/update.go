@@ -2,7 +2,6 @@ package grid
 
 import (
 	"fmt"
-	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -11,20 +10,6 @@ import (
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/selection"
 )
-
-// quickFilterDebounceMsg is sent after the debounce delay to trigger a
-// quick filter recompute. The seq field must match m.quickFilterSeq;
-// if it doesn't, a newer keystroke has superseded this tick.
-type quickFilterDebounceMsg struct {
-	seq uint64
-}
-
-func quickFilterDebounceCmd(seq uint64, delay time.Duration) tea.Cmd {
-	return func() tea.Msg {
-		time.Sleep(delay)
-		return quickFilterDebounceMsg{seq: seq}
-	}
-}
 
 // Update handles messages and returns the updated model.
 func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
@@ -37,15 +22,10 @@ func (m Model[T]) Update(msg tea.Msg) (Model[T], tea.Cmd) {
 			m, cmd = m.handleEditKeyMsg(msg)
 		} else if m.filterEditColIdx >= 0 {
 			m, cmd = m.handleFilterEditKeyMsg(msg)
-		} else if m.quickFilterActive {
-			m, cmd = m.handleQuickFilterKeyMsg(msg)
+		} else if m.queryBarActive {
+			m, cmd = m.handleQueryBarKeyMsg(msg)
 		} else {
 			m, cmd = m.handleKeyMsg(msg)
-		}
-	case quickFilterDebounceMsg:
-		if msg.seq == m.quickFilterSeq {
-			m.dirty = true
-			m.filterDirty = true
 		}
 	}
 
@@ -163,18 +143,15 @@ func (m Model[T]) handleKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 		m.ExpandAll()
 		return m, nil
 
-	// Quick filter
-	case key.Matches(msg, m.KeyMap.QuickFilter):
-		if m.quickFilterEnabled {
-			m.quickFilterActive = !m.quickFilterActive
-			if !m.quickFilterActive {
-				if m.quickFilterText != "" {
-					m.quickFilterText = ""
-					m.dirty = true
-					m.filterDirty = true
-					m.updateViewportSize()
-					return m, func() tea.Msg { return QuickFilterChangedMsg{Text: ""} }
-				}
+	// Query bar
+	case key.Matches(msg, m.KeyMap.QueryBar):
+		if m.queryBar != nil {
+			if m.queryBarActive {
+				m.queryBarActive = false
+				m.queryBar.EndEdit()
+			} else {
+				m.queryBarActive = true
+				m.queryBar.BeginEdit()
 			}
 			m.updateViewportSize()
 			return m, nil
@@ -394,69 +371,35 @@ func (m Model[T]) handleEditKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 	}
 }
 
-// handleQuickFilterKeyMsg handles key messages while the quick filter is active.
-func (m Model[T]) handleQuickFilterKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
+// handleQueryBarKeyMsg handles key messages while the query bar's
+// textinput is focused. Enter submits, Esc cancels, all other keys are
+// forwarded to the underlying lineedit.
+func (m Model[T]) handleQueryBarKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 	switch msg.Code {
 	case tea.KeyEscape:
-		m.quickFilterActive = false
-		if m.quickFilterText != "" {
-			m.quickFilterText = ""
-			m.updateQuickFilterWords()
-			m.dirty = true
-			m.filterDirty = true
-			m.updateViewportSize()
-			return m, func() tea.Msg { return QuickFilterChangedMsg{Text: ""} }
-		}
+		// Cancel: discard edits, re-render canonical text.
+		m.queryBarActive = false
+		m.queryBar.EndEdit()
+		m.invalidateQueryBar()
 		m.updateViewportSize()
 		return m, nil
-
-	case tea.KeyBackspace:
-		if len(m.quickFilterText) > 0 {
-			m.quickFilterText = m.quickFilterText[:len(m.quickFilterText)-1]
-			m.updateQuickFilterWords()
-			return m, m.quickFilterChanged()
-		}
-		return m, nil
-
-	case tea.KeySpace:
-		m.quickFilterText += " "
-		m.updateQuickFilterWords()
-		return m, m.quickFilterChanged()
 
 	case tea.KeyEnter:
-		// Confirm filter and apply immediately.
-		m.quickFilterActive = false
+		// Submit: parse + apply, then leave editing mode.
+		m.applyQueryBarSubmit()
+		m.queryBarActive = false
+		m.queryBar.EndEdit()
 		m.dirty = true
 		m.filterDirty = true
 		m.updateViewportSize()
-		return m, nil
-
-	default:
-		if len(msg.Text) > 0 {
-			m.quickFilterText += msg.Text
-			m.updateQuickFilterWords()
-			return m, m.quickFilterChanged()
-		}
+		text := m.queryBar.Text()
+		return m, func() tea.Msg { return QueryBarChangedMsg{Text: text} }
 	}
 
+	// Forward to the lineedit. We do not parse on every keystroke;
+	// bare-term application is also deferred to submit (Enter).
+	m.queryBar.Editor().HandleKeyMsg(msg)
 	return m, nil
-}
-
-// quickFilterChanged returns a command batch: the QuickFilterChangedMsg
-// (immediate) and a debounced recompute. If debounce is 0, the recompute
-// is triggered immediately instead.
-func (m *Model[T]) quickFilterChanged() tea.Cmd {
-	text := m.quickFilterText
-	notify := func() tea.Msg { return QuickFilterChangedMsg{Text: text} }
-
-	if m.quickFilterDebounceDelay <= 0 {
-		m.dirty = true
-		m.filterDirty = true
-		return notify
-	}
-
-	m.quickFilterSeq++
-	return tea.Batch(notify, quickFilterDebounceCmd(m.quickFilterSeq, m.quickFilterDebounceDelay))
 }
 
 // handleFilterEditKeyMsg handles key messages while the column filter editor is active.

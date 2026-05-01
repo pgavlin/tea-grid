@@ -50,7 +50,7 @@ type KeyMap struct {
 	CancelEdit  key.Binding
 
 	// Filtering
-	QuickFilter  key.Binding
+	QueryBar     key.Binding
 	ColumnFilter key.Binding
 	ClearFilters key.Binding
 
@@ -189,9 +189,9 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("esc"),
 			key.WithHelp("esc", "cancel"),
 		),
-		QuickFilter: key.NewBinding(
+		QueryBar: key.NewBinding(
 			key.WithKeys("/"),
-			key.WithHelp("/", "quick filter"),
+			key.WithHelp("/", "query"),
 		),
 		ColumnFilter: key.NewBinding(
 			key.WithKeys("ctrl+f"),
