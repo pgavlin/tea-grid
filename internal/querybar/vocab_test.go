@@ -95,6 +95,17 @@ func TestBuildAutoVocab_AliasesFromColumn(t *testing.T) {
 	}
 }
 
+func TestBuildAutoVocab_LowercaseAliasForCapitalizedID(t *testing.T) {
+	cols := []data.Column[map[string]any]{
+		{ColumnID: "State", Filter: filter.NewSetFilter("open", "closed"), Filterable: true},
+	}
+	v := BuildAutoVocab(cols)
+	canon, ok := v.Resolve("state")
+	if !ok || canon != "State" {
+		t.Errorf("Resolve(state) = (%q, %v), want (State, true) — auto lowercase alias", canon, ok)
+	}
+}
+
 func TestBuildAutoVocab_SkipsNonRoundTrippableFilters(t *testing.T) {
 	cols := []data.Column[map[string]any]{
 		{ColumnID: "x", Filter: &nonRTFilter{}, Filterable: true},

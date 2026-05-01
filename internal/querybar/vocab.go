@@ -5,6 +5,8 @@
 package querybar
 
 import (
+	"strings"
+
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
 	"github.com/pgavlin/tea-grid/searchquery"
@@ -13,8 +15,11 @@ import (
 // BuildAutoVocab derives a *searchquery.Vocabulary from the column set.
 // Every visible, filterable column with a RoundTrippable filter becomes
 // a queryable Field; field type is inferred from filter type; aliases
-// come from Column.QueryAliases. Columns with no filter, a non-
-// RoundTrippable filter, Hide=true, or Filterable=false are skipped.
+// come from Column.QueryAliases. A lowercase alias is also registered
+// for any column whose ColumnID has uppercase characters, so users can
+// type `state:open` against a `State` column without having to match
+// case. Columns with no filter, a non-RoundTrippable filter, Hide=true,
+// or Filterable=false are skipped.
 func BuildAutoVocab[T any](cols []data.Column[T]) *searchquery.Vocabulary {
 	var fields []searchquery.Field
 	for i := range cols {
@@ -25,9 +30,13 @@ func BuildAutoVocab[T any](cols []data.Column[T]) *searchquery.Vocabulary {
 		if _, ok := c.Filter.(filter.RoundTrippable); !ok {
 			continue
 		}
+		aliases := append([]string(nil), c.QueryAliases...)
+		if lower := strings.ToLower(c.ColumnID); lower != c.ColumnID {
+			aliases = append(aliases, lower)
+		}
 		fields = append(fields, searchquery.Field{
 			Name:        c.ColumnID,
-			Aliases:     append([]string(nil), c.QueryAliases...),
+			Aliases:     aliases,
 			Type:        inferFieldType(c.Filter),
 			AcceptsList: filterAcceptsList(c.Filter),
 		})
