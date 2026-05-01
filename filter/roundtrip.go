@@ -22,4 +22,5 @@ type RoundTrippable interface {
 var (
 	_ RoundTrippable = (*TextFilter)(nil)
 	_ RoundTrippable = (*NumberFilter)(nil)
+	_ RoundTrippable = (*SetFilter)(nil)
 )

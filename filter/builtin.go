@@ -548,6 +548,62 @@ func (f *SetFilter) Clear() {
 	f.IncludeAll()
 }
 
+// Clause implements RoundTrippable. Returns the included subset by
+// default; once more than half of allValues is included, returns the
+// excluded subset with negate=true to keep the bar text small.
+//
+// New values that appear in row data after a clause was applied are
+// treated as "not included" — consistent with current Include/SetValues
+// semantics. Documented in the package README.
+func (f *SetFilter) Clause() (values []string, negate bool, ok bool) {
+	if !f.Active() {
+		return nil, false, false
+	}
+	includedCount := len(f.values) - f.excludedCount
+	if includedCount*2 > len(f.values) {
+		var excluded []string
+		for _, v := range f.allValues {
+			if !f.values[v] {
+				excluded = append(excluded, v)
+			}
+		}
+		return excluded, true, true
+	}
+	var included []string
+	for _, v := range f.allValues {
+		if f.values[v] {
+			included = append(included, v)
+		}
+	}
+	return included, false, true
+}
+
+// SetClause implements RoundTrippable. With negate=false, includes
+// exactly the listed values and excludes the rest. With negate=true,
+// includes everything except the listed values. Values not in
+// allValues are ignored (treated as "not included" — see Clause's
+// godoc).
+func (f *SetFilter) SetClause(values []string, negate bool) error {
+	want := make(map[string]bool, len(values))
+	for _, v := range values {
+		want[v] = true
+	}
+	f.excludedCount = 0
+	for _, v := range f.allValues {
+		var included bool
+		if negate {
+			included = !want[v]
+		} else {
+			included = want[v]
+		}
+		f.values[v] = included
+		if !included {
+			f.excludedCount++
+		}
+	}
+	return nil
+}
+
 // --- BoolFilter ---
 
 // BoolFilter filters true/false/any values.
