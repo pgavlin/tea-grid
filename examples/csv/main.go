@@ -252,7 +252,7 @@ func main() {
 			return ""
 		}),
 		grid.WithSelection[Row](selection.SelectMulti),
-		grid.WithQuickFilter[Row](true),
+		grid.WithQueryBar[Row](),
 		grid.WithFocused[Row](true),
 		grid.WithMultiSort[Row](true),
 	)

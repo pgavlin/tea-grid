@@ -113,7 +113,7 @@ func main() {
 			return strconv.Itoa(r["__index__"].(int))
 		}),
 		grid.WithSelection[Row](selection.SelectMulti),
-		grid.WithQuickFilter[Row](true),
+		grid.WithQueryBar[Row](),
 		grid.WithFocused[Row](true),
 		grid.WithMultiSort[Row](true),
 	)

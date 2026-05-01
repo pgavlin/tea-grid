@@ -109,7 +109,7 @@ func main() {
 		grid.WithRows(rows),
 		grid.WithRowID(func(e Employee) string { return e.Name }),
 		grid.WithSelection[Employee](selection.SelectMulti),
-		grid.WithQuickFilter[Employee](true),
+		grid.WithQueryBar[Employee](),
 		grid.WithGrouping[Employee]("department"),
 		grid.WithGroupDefaultExpanded[Employee](-1),
 		grid.WithFocused[Employee](true),

@@ -109,7 +109,7 @@ func main() {
 		grid.WithRows(rows),
 		grid.WithRowID(nameGetter),
 		grid.WithSelection[Row](selection.SelectMulti),
-		grid.WithQuickFilter[Row](true),
+		grid.WithQueryBar[Row](),
 		grid.WithFocused[Row](true),
 		grid.WithMultiSort[Row](true),
 	)
