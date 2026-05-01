@@ -7945,8 +7945,8 @@ func TestQueryBar_FiltersToBarReflectsChanges(t *testing.T) {
 	g := newQueryBarGrid()
 	g.cols[0].Filter.(*filter.TextFilter).SetText("Alice")
 	g.invalidateQueryBar()
-	if got := g.queryBar.Text(); !strings.Contains(got, "Name:Alice") {
-		t.Errorf("bar text = %q, want it to contain Name:Alice", got)
+	if got := g.queryBar.Text(); !strings.Contains(got, "name:Alice") {
+		t.Errorf("bar text = %q, want it to contain name:Alice (lowercased display name)", got)
 	}
 }
 

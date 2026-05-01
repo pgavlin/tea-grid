@@ -17,6 +17,10 @@ import (
 //   - bareTerms: the residual quick-filter text (appended verbatim).
 //
 // Returns the joined text and the lossy column IDs (in column order).
+// Clauses are emitted using the column's display name (slugified
+// HeaderName when meaningful, else lowercased ColumnID, else the raw
+// ColumnID) so the bar round-trips back to the alias users actually
+// type rather than to a synthetic ID like "col2".
 func Rerender[T any](cols []data.Column[T], bareTerms string) (text string, lossy []string) {
 	var clauses []string
 	for i := range cols {
@@ -34,13 +38,27 @@ func Rerender[T any](cols []data.Column[T], bareTerms string) (text string, loss
 			lossy = append(lossy, c.ColumnID)
 			continue
 		}
-		clauses = append(clauses, formatClause(c.ColumnID, values, negate, isMultiClause(c.Filter)))
+		clauses = append(clauses, formatClause(displayFieldName(c), values, negate, isMultiClause(c.Filter)))
 	}
 	parts := clauses
 	if bareTerms != "" {
 		parts = append(parts, bareTerms)
 	}
 	return strings.Join(parts, " "), lossy
+}
+
+// displayFieldName picks the most user-friendly name for a column when
+// emitting a clause. Prefers a non-empty slugified HeaderName over the
+// raw ColumnID; falls back to a lowercased ColumnID when the ID itself
+// is mixed-case; finally falls back to the raw ColumnID.
+func displayFieldName[T any](c *data.Column[T]) string {
+	if slug := slugifyHeader(c.HeaderName); slug != "" && slug != c.ColumnID {
+		return slug
+	}
+	if lower := strings.ToLower(c.ColumnID); lower != c.ColumnID {
+		return lower
+	}
+	return c.ColumnID
 }
 
 // formatClause builds the textual form of a clause. For multi-clause

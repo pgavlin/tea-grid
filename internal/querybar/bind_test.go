@@ -66,6 +66,33 @@ func TestRerender_NumberFilterClauseFormat(t *testing.T) {
 	}
 }
 
+func TestRerender_PrefersHeaderNameSlug(t *testing.T) {
+	// Synthetic ColumnID + human HeaderName: clause should round-trip
+	// using the header slug, not the synthetic ID.
+	c := []data.Column[map[string]any]{
+		{ColumnID: "col2", HeaderName: "Population", Filter: filter.NewNumberFilter(), Filterable: true},
+	}
+	c[0].Filter.(*filter.NumberFilter).SetText(">5000000")
+	text, _ := Rerender(c, "")
+	if !strings.Contains(text, "population:>5000000") {
+		t.Errorf("text %q missing population:>5000000 (header-slug round-trip)", text)
+	}
+	if strings.Contains(text, "col2:") {
+		t.Errorf("text %q leaked synthetic ColumnID", text)
+	}
+}
+
+func TestRerender_PrefersLowercaseForCapitalizedID(t *testing.T) {
+	c := []data.Column[map[string]any]{
+		{ColumnID: "State", Filter: filter.NewSetFilter("open", "closed"), Filterable: true},
+	}
+	c[0].Filter.(*filter.SetFilter).Exclude("closed")
+	text, _ := Rerender(c, "")
+	if !strings.Contains(text, "state:open") {
+		t.Errorf("text %q missing state:open (lowercase round-trip)", text)
+	}
+}
+
 func TestRerender_SetFilterCommaList(t *testing.T) {
 	c := []data.Column[map[string]any]{
 		{ColumnID: "state", Filter: filter.NewSetFilter("a", "b", "c", "d"), Filterable: true},
