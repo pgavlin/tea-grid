@@ -23,4 +23,6 @@ var (
 	_ RoundTrippable = (*TextFilter)(nil)
 	_ RoundTrippable = (*NumberFilter)(nil)
 	_ RoundTrippable = (*SetFilter)(nil)
+	_ RoundTrippable = (*BoolFilter)(nil)
+	_ RoundTrippable = (*TimeFilter)(nil)
 )

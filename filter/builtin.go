@@ -694,6 +694,38 @@ func (f *BoolFilter) Clear() {
 	f.state = 0
 }
 
+// Clause implements RoundTrippable.
+func (f *BoolFilter) Clause() (values []string, negate bool, ok bool) {
+	switch f.state {
+	case 1:
+		return []string{"true"}, false, true
+	case 2:
+		return []string{"false"}, false, true
+	default:
+		return nil, false, false
+	}
+}
+
+// SetClause implements RoundTrippable. Accepts "true", "false", "1",
+// or "0" (case-insensitive).
+func (f *BoolFilter) SetClause(values []string, negate bool) error {
+	if negate {
+		return fmt.Errorf("BoolFilter does not support negation")
+	}
+	if len(values) != 1 {
+		return fmt.Errorf("BoolFilter expects exactly one value, got %d", len(values))
+	}
+	switch strings.ToLower(values[0]) {
+	case "true", "1":
+		f.state = 1
+	case "false", "0":
+		f.state = 2
+	default:
+		return fmt.Errorf("BoolFilter: unrecognized value %q", values[0])
+	}
+	return nil
+}
+
 // --- TimeFilter ---
 
 // TimeFilter filters time.Time values by a date/time range.
@@ -825,4 +857,32 @@ func (f *TimeFilter) Active() bool {
 
 func (f *TimeFilter) Clear() {
 	f.SetText("")
+}
+
+// Clause implements RoundTrippable. Returns the editor text verbatim;
+// it is already in the canonical form TimeFilter accepts.
+func (f *TimeFilter) Clause() (values []string, negate bool, ok bool) {
+	if !f.Active() {
+		return nil, false, false
+	}
+	return []string{f.editor.Text()}, false, true
+}
+
+// SetClause implements RoundTrippable. Parses via the existing SetText
+// path; if parsing yields no bounds, restores prior text and returns
+// an error.
+func (f *TimeFilter) SetClause(values []string, negate bool) error {
+	if negate {
+		return fmt.Errorf("TimeFilter does not support negation")
+	}
+	if len(values) != 1 {
+		return fmt.Errorf("TimeFilter expects exactly one value, got %d", len(values))
+	}
+	prev := f.editor.Text()
+	f.SetText(values[0])
+	if !f.Active() && values[0] != "" {
+		f.SetText(prev)
+		return fmt.Errorf("TimeFilter: could not parse %q", values[0])
+	}
+	return nil
 }

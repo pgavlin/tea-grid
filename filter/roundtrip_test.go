@@ -195,3 +195,96 @@ func equalStringSetsRT(a, b []string) bool {
 	}
 	return true
 }
+
+func TestBoolFilter_ClauseEmpty(t *testing.T) {
+	f := NewBoolFilter()
+	if _, _, ok := f.Clause(); ok {
+		t.Errorf("Clause() ok=true for any-state filter")
+	}
+}
+
+func TestBoolFilter_ClauseTrueOnly(t *testing.T) {
+	f := NewBoolFilter()
+	f.Toggle()
+	values, _, ok := f.Clause()
+	if !ok || len(values) != 1 || values[0] != "true" {
+		t.Errorf("Clause() = (%v, ok=%v), want ([true], true)", values, ok)
+	}
+}
+
+func TestBoolFilter_ClauseFalseOnly(t *testing.T) {
+	f := NewBoolFilter()
+	f.Toggle()
+	f.Toggle()
+	values, _, ok := f.Clause()
+	if !ok || len(values) != 1 || values[0] != "false" {
+		t.Errorf("Clause() = (%v, ok=%v), want ([false], true)", values, ok)
+	}
+}
+
+func TestBoolFilter_SetClauseRoundTrip(t *testing.T) {
+	for _, in := range []string{"true", "false", "1", "0"} {
+		f := NewBoolFilter()
+		if err := f.SetClause([]string{in}, false); err != nil {
+			t.Errorf("%s: SetClause: %v", in, err)
+			continue
+		}
+		if !f.Active() {
+			t.Errorf("%s: Active()=false after SetClause", in)
+		}
+	}
+}
+
+func TestBoolFilter_SetClauseRejectsBad(t *testing.T) {
+	f := NewBoolFilter()
+	if err := f.SetClause([]string{"maybe"}, false); err == nil {
+		t.Errorf("SetClause(maybe): err=nil, want error")
+	}
+}
+
+func TestTimeFilter_ClauseEmpty(t *testing.T) {
+	f := NewTimeFilter()
+	if _, _, ok := f.Clause(); ok {
+		t.Errorf("Clause() ok=true for empty filter")
+	}
+}
+
+func TestTimeFilter_ClauseDate(t *testing.T) {
+	f := NewTimeFilter()
+	f.SetText("2026-04-01")
+	values, _, ok := f.Clause()
+	if !ok || values[0] != "2026-04-01" {
+		t.Errorf("Clause() = (%v, ok=%v), want ([2026-04-01], true)", values, ok)
+	}
+}
+
+func TestTimeFilter_ClauseRange(t *testing.T) {
+	f := NewTimeFilter()
+	f.SetText("2026-01-01..2026-12-31")
+	values, _, ok := f.Clause()
+	if !ok || values[0] != "2026-01-01..2026-12-31" {
+		t.Errorf("Clause() values=%v ok=%v, want [2026-01-01..2026-12-31] true", values, ok)
+	}
+}
+
+func TestTimeFilter_SetClauseRoundTrip(t *testing.T) {
+	cases := []string{"2026-04-01", "2026-01-01..2026-12-31"}
+	for _, expr := range cases {
+		f := NewTimeFilter()
+		if err := f.SetClause([]string{expr}, false); err != nil {
+			t.Errorf("%s: SetClause: %v", expr, err)
+			continue
+		}
+		values, _, ok := f.Clause()
+		if !ok || values[0] != expr {
+			t.Errorf("round trip %s: got values=%v ok=%v", expr, values, ok)
+		}
+	}
+}
+
+func TestTimeFilter_SetClauseRejectsBad(t *testing.T) {
+	f := NewTimeFilter()
+	if err := f.SetClause([]string{"not-a-date"}, false); err == nil {
+		t.Errorf("SetClause(not-a-date): err=nil, want error")
+	}
+}
