@@ -1,10 +1,12 @@
 package querybar
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
+	"github.com/pgavlin/tea-grid/searchquery"
 )
 
 // Rerender renders the current filter state as bar text plus a list of
@@ -84,4 +86,129 @@ func quoteIfNeeded(v string) string {
 		}
 	}
 	return v
+}
+
+// ApplyResult reports the outcome of an Apply call.
+type ApplyResult struct {
+	// BareTerms is the residual bare-term string from the AST,
+	// suitable for the grid's existing quick-filter mechanism.
+	BareTerms string
+
+	// Errors lists per-clause errors. A non-empty Errors does not
+	// imply Apply rolled back; clauses that succeeded have already
+	// been applied.
+	Errors []string
+}
+
+// Apply pushes an AST into the column filters. For each clause:
+//
+//   - SetFilter: merge values across same-field clauses; one SetClause
+//     call with the merged values.
+//   - MultiSetFilter: clear prior constraints, then one SetClause per
+//     clause (each appends one constraint).
+//   - Scalar filters (Text/Number/Bool/Time): use the last clause for
+//     the field; record a warning if there were multiple.
+//
+// Columns whose filter is RoundTrippable and Active but NOT mentioned
+// in the AST are Cleared. Lossy filters (RoundTrippable.Clause returns
+// ok=false) are left alone — the bar can not represent them and we
+// take that as "the user is not editing them right now."
+//
+// Per-clause errors do not abort: good clauses apply, bad ones surface
+// in ApplyResult.Errors.
+func Apply[T any](cols []data.Column[T], ast searchquery.AST) ApplyResult {
+	res := ApplyResult{BareTerms: ast.Terms}
+
+	// Group clauses by canonical field.
+	grouped := make(map[string][]searchquery.Clause)
+	for _, cl := range ast.Clauses {
+		grouped[cl.Field] = append(grouped[cl.Field], cl)
+	}
+
+	// Index columns by ID for lookup, and remember which we touched.
+	colIdx := make(map[string]int, len(cols))
+	for i := range cols {
+		colIdx[cols[i].ColumnID] = i
+	}
+	mentioned := make(map[string]bool, len(grouped))
+
+	// Apply clauses.
+	for field, clauses := range grouped {
+		idx, ok := colIdx[field]
+		if !ok {
+			// Unknown field: parser keeps it; binder ignores.
+			continue
+		}
+		mentioned[field] = true
+		f := cols[idx].Filter
+		rt, ok := f.(filter.RoundTrippable)
+		if !ok {
+			continue
+		}
+
+		switch typed := f.(type) {
+		case *filter.MultiSetFilter:
+			typed.Clear()
+			for _, c := range clauses {
+				if err := rt.SetClause(c.Values, c.Negate); err != nil {
+					res.Errors = append(res.Errors, fmt.Sprintf("%s: %v", field, err))
+				}
+			}
+		case *filter.SetFilter:
+			merged := mergeValues(clauses)
+			negate := false
+			for _, c := range clauses {
+				if c.Negate {
+					negate = true
+					break
+				}
+			}
+			if err := rt.SetClause(merged, negate); err != nil {
+				res.Errors = append(res.Errors, fmt.Sprintf("%s: %v", field, err))
+			}
+		default:
+			last := clauses[len(clauses)-1]
+			if len(clauses) > 1 {
+				res.Errors = append(res.Errors,
+					fmt.Sprintf("%s: multiple clauses on scalar field; using last", field))
+			}
+			if err := rt.SetClause(last.Values, last.Negate); err != nil {
+				res.Errors = append(res.Errors, fmt.Sprintf("%s: %v", field, err))
+			}
+		}
+	}
+
+	// Clear active RoundTrippable filters not mentioned in the AST.
+	// Lossy filters (Clause ok=false) are left alone.
+	for i := range cols {
+		c := &cols[i]
+		if c.Filter == nil || !c.Filter.Active() {
+			continue
+		}
+		if mentioned[c.ColumnID] {
+			continue
+		}
+		rt, ok := c.Filter.(filter.RoundTrippable)
+		if !ok {
+			continue
+		}
+		_, _, clauseOk := rt.Clause()
+		if !clauseOk {
+			continue
+		}
+		c.Filter.Clear()
+	}
+
+	return res
+}
+
+// mergeValues collects all values across a set of clauses on the same
+// field. Duplicates are preserved; SetFilter's SetClause de-duplicates
+// implicitly via the include set.
+func mergeValues(clauses []searchquery.Clause) []string {
+	var out []string
+	for _, c := range clauses {
+		out = append(out, c.Values...)
+	}
+	return out
 }

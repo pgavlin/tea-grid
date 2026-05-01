@@ -6,6 +6,7 @@ import (
 
 	"github.com/pgavlin/tea-grid/data"
 	"github.com/pgavlin/tea-grid/filter"
+	"github.com/pgavlin/tea-grid/searchquery"
 )
 
 func cols2() []data.Column[map[string]any] {
@@ -108,5 +109,112 @@ func TestRerender_NonRoundTrippableFilterIsLossy(t *testing.T) {
 	_, lossy := Rerender(c, "")
 	if len(lossy) != 0 {
 		t.Errorf("inactive non-RT filter should not be lossy; got %v", lossy)
+	}
+}
+
+func vocab2() *searchquery.Vocabulary {
+	return BuildAutoVocab(cols2())
+}
+
+func TestApply_ScalarTextFilter(t *testing.T) {
+	c := cols2()
+	ast, _ := searchquery.Parse("title:memory", vocab2())
+	res := Apply(c, ast)
+	if res.BareTerms != "" {
+		t.Errorf("BareTerms = %q, want empty", res.BareTerms)
+	}
+	if len(res.Errors) != 0 {
+		t.Errorf("Errors = %v, want none", res.Errors)
+	}
+	tf := c[1].Filter.(*filter.TextFilter)
+	if !tf.Active() {
+		t.Errorf("TextFilter inactive after Apply")
+	}
+	values, _, _ := tf.Clause()
+	if len(values) != 1 || values[0] != "memory" {
+		t.Errorf("after Apply: values=%v, want [memory]", values)
+	}
+}
+
+func TestApply_SetFilterCommaList(t *testing.T) {
+	c := cols2()
+	ast, _ := searchquery.Parse("state:open,closed", vocab2())
+	Apply(c, ast)
+	sf := c[0].Filter.(*filter.SetFilter)
+	if !sf.Matches("open") || !sf.Matches("closed") {
+		t.Errorf("SetFilter should include open and closed")
+	}
+}
+
+func TestApply_BareTermsExtracted(t *testing.T) {
+	c := cols2()
+	ast, _ := searchquery.Parse("memory leak", vocab2())
+	res := Apply(c, ast)
+	if res.BareTerms != "memory leak" {
+		t.Errorf("BareTerms = %q, want %q", res.BareTerms, "memory leak")
+	}
+}
+
+func TestApply_ClearsFiltersNotMentioned(t *testing.T) {
+	c := cols2()
+	c[1].Filter.(*filter.TextFilter).SetText("old text")
+	ast, _ := searchquery.Parse("state:open", vocab2())
+	Apply(c, ast)
+	if c[1].Filter.(*filter.TextFilter).Active() {
+		t.Errorf("title TextFilter should be cleared (not in submitted query)")
+	}
+}
+
+func TestApply_LossyFilterLeftAlone(t *testing.T) {
+	c := cols2()
+	c[1].Filter.(*filter.TextFilter).SetRegex(true)
+	c[1].Filter.(*filter.TextFilter).SetText("foo.*")
+	ast, _ := searchquery.Parse("state:open", vocab2())
+	Apply(c, ast)
+	tf := c[1].Filter.(*filter.TextFilter)
+	if !tf.Active() {
+		t.Errorf("lossy TextFilter (regex) should not be cleared by Apply")
+	}
+}
+
+func TestApply_MultiSetClearsAndAccumulates(t *testing.T) {
+	c := []data.Column[map[string]any]{
+		{ColumnID: "label", Filter: filter.NewMultiSetFilter(), Filterable: true},
+	}
+	mf := c[0].Filter.(*filter.MultiSetFilter)
+	mf.AddConstraint("old")
+	v := BuildAutoVocab(c)
+	ast, _ := searchquery.Parse("label:bug label:urgent", v)
+	Apply(c, ast)
+	cs := mf.Constraints()
+	if len(cs) != 2 || cs[0] != "bug" || cs[1] != "urgent" {
+		t.Errorf("after Apply: %v, want [bug urgent] (old cleared, new appended)", cs)
+	}
+}
+
+func TestApply_PerClauseErrorContinues(t *testing.T) {
+	c := cols2()
+	ast, _ := searchquery.Parse("count:notanumber state:open", vocab2())
+	res := Apply(c, ast)
+	if len(res.Errors) != 1 {
+		t.Errorf("Errors = %v, want exactly one", res.Errors)
+	}
+	if !c[0].Filter.(*filter.SetFilter).Matches("open") {
+		t.Errorf("good clause did not apply despite bad sibling")
+	}
+	if c[2].Filter.(*filter.NumberFilter).Active() {
+		t.Errorf("bad clause should not have set NumberFilter active")
+	}
+}
+
+func TestApply_UnknownFieldIgnored(t *testing.T) {
+	c := cols2()
+	ast, _ := searchquery.Parse("nonexistent:foo state:open", vocab2())
+	res := Apply(c, ast)
+	if len(res.Errors) != 0 {
+		t.Errorf("unknown field should not produce error; got %v", res.Errors)
+	}
+	if !c[0].Filter.(*filter.SetFilter).Matches("open") {
+		t.Errorf("known clause did not apply alongside unknown")
 	}
 }
