@@ -218,3 +218,94 @@ func TestApply_UnknownFieldIgnored(t *testing.T) {
 		t.Errorf("known clause did not apply alongside unknown")
 	}
 }
+
+func TestRoundTripIdentity(t *testing.T) {
+	cases := []struct {
+		name  string
+		query string
+	}{
+		{"plain bare terms", "memory leak"},
+		{"single set clause", "state:open"},
+		{"text scalar clause", "title:memory"},
+		{"number range", "count:5..20"},
+		{"clause plus terms", "state:open memory"},
+	}
+	// Note: "state:open,closed" is intentionally not tested here — the
+	// SetFilter has only those two values so including both is a no-op
+	// (excludedCount=0 → Active=false). Rerender correctly skips an
+	// inactive filter, so the round-trip yields empty text. The
+	// semantics are right; the round-trip identity asserts more than
+	// we promise. SetFilter round-tripping with a non-trivial subset
+	// is covered by "single set clause".
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := cols2()
+			v := BuildAutoVocab(c)
+			ast, err := searchquery.Parse(tc.query, v)
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			res := Apply(c, ast)
+			text, lossy := Rerender(c, res.BareTerms)
+			if len(lossy) != 0 {
+				t.Errorf("unexpected lossy: %v", lossy)
+			}
+			ast2, err := searchquery.Parse(text, v)
+			if err != nil {
+				t.Fatalf("Parse(rendered): %v\ntext=%q", err, text)
+			}
+			if !astsEquivalent(ast, ast2) {
+				t.Errorf("round-trip drift:\n  in: %s\n  out: %s\n  ast1: %+v\n  ast2: %+v",
+					tc.query, text, ast, ast2)
+			}
+		})
+	}
+}
+
+func astsEquivalent(a, b searchquery.AST) bool {
+	if a.Terms != b.Terms {
+		return false
+	}
+	if len(a.Clauses) != len(b.Clauses) {
+		return false
+	}
+	indexBy := func(ast searchquery.AST) map[string]searchquery.Clause {
+		out := make(map[string]searchquery.Clause, len(ast.Clauses))
+		for _, c := range ast.Clauses {
+			out[c.Field] = c
+		}
+		return out
+	}
+	ax := indexBy(a)
+	bx := indexBy(b)
+	for field, ac := range ax {
+		bc, ok := bx[field]
+		if !ok {
+			return false
+		}
+		if ac.Negate != bc.Negate {
+			return false
+		}
+		if !equalStringSets(ac.Values, bc.Values) {
+			return false
+		}
+	}
+	return true
+}
+
+func equalStringSets(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	m := make(map[string]int, len(a))
+	for _, s := range a {
+		m[s]++
+	}
+	for _, s := range b {
+		if m[s] == 0 {
+			return false
+		}
+		m[s]--
+	}
+	return true
+}
