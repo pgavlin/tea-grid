@@ -158,10 +158,10 @@ func TestWithMultiSort(t *testing.T) {
 	}
 }
 
-func TestWithQuickFilter(t *testing.T) {
-	m := New(WithQuickFilter[TestRow](true))
-	if !m.quickFilterEnabled {
-		t.Error("expected quickFilterEnabled=true")
+func TestWithQueryBar(t *testing.T) {
+	m := New(WithQueryBar[TestRow]())
+	if m.queryBar == nil || !m.queryBar.Enabled() {
+		t.Error("expected query bar enabled after WithQueryBar")
 	}
 }
 
@@ -851,7 +851,7 @@ func TestDisplayRows_ColumnFilter(t *testing.T) {
 }
 
 func TestDisplayRows_QuickFilter(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
+	m := newTestGrid(WithQueryBar[TestRow]())
 	m.SetQuickFilter("alice")
 	m.recomputeDisplayRows()
 	if len(m.displayRows) != 1 {
@@ -1289,65 +1289,6 @@ func TestSort_UnsortableColumnIgnored(t *testing.T) {
 // 8i. Filter Integration
 // -----------------------------------------------------------------------
 
-func TestQuickFilter_SlashActivates(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	if m.quickFilterActive {
-		t.Error("expected quick filter inactive initially")
-	}
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	if !m.quickFilterActive {
-		t.Error("expected quick filter active after '/'")
-	}
-}
-
-func TestQuickFilter_RunesAddToFilterText(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'l', Text: "l"})
-	if m.quickFilterText != "al" {
-		t.Errorf("expected quickFilterText='al', got %q", m.quickFilterText)
-	}
-}
-
-func TestQuickFilter_EnterConfirms(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
-	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if m.quickFilterActive {
-		t.Error("expected quick filter deactivated after Enter")
-	}
-	if m.quickFilterText != "a" {
-		t.Errorf("expected quickFilterText='a' preserved after Enter, got %q", m.quickFilterText)
-	}
-}
-
-func TestQuickFilter_EscClearsAndCloses(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'x', Text: "x"})
-	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	if m.quickFilterActive {
-		t.Error("expected quick filter deactivated after Esc")
-	}
-	if m.quickFilterText != "" {
-		t.Errorf("expected quickFilterText cleared after Esc, got %q", m.quickFilterText)
-	}
-}
-
-func TestQuickFilter_FiltersResults(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true), WithQuickFilterDebounce[TestRow](0))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'e', Text: "e"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'n', Text: "n"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'g', Text: "g"})
-	// "eng" should match Engineering rows: Alice, Carol
-	if len(m.displayRows) != 2 {
-		t.Errorf("expected 2 rows matching 'eng', got %d", len(m.displayRows))
-	}
-}
-
 func TestColumnFilter_CtrlFRequiresFilterable(t *testing.T) {
 	cols := testCols()
 	// No Filter set on any column
@@ -1663,14 +1604,6 @@ func TestRender_GroupRowAggregationCustomFunc(t *testing.T) {
 	}
 }
 
-func TestRender_QuickFilterBarShownWhenActive(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	output := m.View()
-	if !strings.Contains(output, "Filter:") {
-		t.Error("expected 'Filter:' label in output when quick filter active")
-	}
-}
 
 // -----------------------------------------------------------------------
 // 8m. Public API
@@ -2432,25 +2365,11 @@ func TestSetWidthHeight_UpdatesDimensions(t *testing.T) {
 	}
 }
 
-func TestQuickFilter_DisabledIgnoresSlash(t *testing.T) {
-	m := newTestGrid() // quickFilterEnabled is false by default
+func TestQueryBar_DisabledIgnoresSlash(t *testing.T) {
+	m := newTestGrid() // bar is disabled by default
 	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	if m.quickFilterActive {
-		t.Error("expected quick filter not to activate when disabled")
-	}
-}
-
-func TestQuickFilter_BackspaceRemovesChar(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'b', Text: "b"})
-	if m.quickFilterText != "ab" {
-		t.Fatalf("expected 'ab', got %q", m.quickFilterText)
-	}
-	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
-	if m.quickFilterText != "a" {
-		t.Errorf("expected 'a' after backspace, got %q", m.quickFilterText)
+	if m.queryBarActive {
+		t.Error("expected query bar not to activate when disabled")
 	}
 }
 
@@ -4661,43 +4580,6 @@ func TestHandleKeyMsg_ToggleGroupColumn(t *testing.T) {
 	}
 }
 
-func TestHandleKeyMsg_QuickFilterToggleOnOff(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	// Toggle on
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	if !m.quickFilterActive {
-		t.Error("expected quick filter active after '/'")
-	}
-	// Type something and confirm so we leave filter mode with text preserved
-	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
-	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if m.quickFilterActive {
-		t.Error("expected quick filter inactive after Enter")
-	}
-	if m.quickFilterText != "a" {
-		t.Fatalf("expected quickFilterText='a', got %q", m.quickFilterText)
-	}
-
-	// Toggle on again from normal mode (quickFilterActive was false -> true)
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	if !m.quickFilterActive {
-		t.Error("expected quick filter re-activated")
-	}
-
-	// Test the toggle-off-with-clear path by directly setting the state:
-	// When quickFilterActive would be toggled OFF in handleKeyMsg and text is non-empty,
-	// the text should be cleared. We simulate this by directly calling handleKeyMsg
-	// with quickFilterActive=true (bypassing the Update routing).
-	m.quickFilterActive = true
-	m.quickFilterText = "test"
-	m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: '/', Text: "/"})
-	if m.quickFilterActive {
-		t.Error("expected quick filter deactivated after toggle off")
-	}
-	if m.quickFilterText != "" {
-		t.Errorf("expected quickFilterText cleared after toggle off, got %q", m.quickFilterText)
-	}
-}
 
 func TestHandleKeyMsg_GroupExpandGroup(t *testing.T) {
 	m := newTestGrid(
@@ -4788,46 +4670,6 @@ func TestHandleEditKeyMsg_ValidationFailure(t *testing.T) {
 //   Esc with empty text
 // -----------------------------------------------------------------------
 
-func TestQuickFilter_BackspaceWhenEmpty(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	// quickFilterText is empty, send backspace
-	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
-	if m.quickFilterText != "" {
-		t.Errorf("expected empty text after backspace on empty, got %q", m.quickFilterText)
-	}
-	// Should still be active
-	if !m.quickFilterActive {
-		t.Error("expected quick filter still active after backspace on empty")
-	}
-}
-
-func TestQuickFilter_EnterConfirmsFilter(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 't', Text: "t"})
-	m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if m.quickFilterActive {
-		t.Error("expected quick filter deactivated after Enter")
-	}
-	if m.quickFilterText != "t" {
-		t.Errorf("expected quickFilterText='t' preserved, got %q", m.quickFilterText)
-	}
-}
-
-func TestQuickFilter_EscWithEmptyText(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	// Text is empty, Esc should close without emitting filter change
-	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
-	if m.quickFilterActive {
-		t.Error("expected quick filter deactivated after Esc")
-	}
-	if cmd != nil {
-		t.Error("expected nil cmd when Esc with empty filter text")
-	}
-}
 
 // -----------------------------------------------------------------------
 // update.go:413 - handleFilterEditKeyMsg: colIdx out of range early return
@@ -5898,40 +5740,6 @@ func TestToggleGroupColumn_ColOutOfRange(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// update.go:154 - QuickFilter: toggle off when quickFilterActive is true
-// and quickFilterText is non-empty, going through handleKeyMsg's
-// QuickFilter branch (not the quickFilter active routing).
-// This is the path where '/' is pressed while quickFilterActive is already
-// true but we're in handleKeyMsg (quickFilterActive toggled off).
-// -----------------------------------------------------------------------
-
-// (Already covered by TestHandleKeyMsg_QuickFilterToggleOnOff which calls
-// handleKeyMsg directly. But let me verify the line 154 path.)
-
-func TestQuickFilter_ToggleOffWithTextViaHandleKeyMsg(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	// Set up the state: quickFilterActive=true, text non-empty
-	// But route through handleKeyMsg (not handleQuickFilterKeyMsg)
-	// This means we call handleKeyMsg directly with the '/' key.
-	m.quickFilterActive = true
-	m.quickFilterText = "hello"
-	var cmd tea.Cmd
-	m, cmd = m.handleKeyMsg(tea.KeyPressMsg{Code: '/', Text: "/"})
-	if m.quickFilterActive {
-		t.Error("expected quickFilterActive=false after toggle off")
-	}
-	if m.quickFilterText != "" {
-		t.Errorf("expected quickFilterText cleared, got %q", m.quickFilterText)
-	}
-	if cmd == nil {
-		t.Fatal("expected QuickFilterChangedMsg command when text was cleared")
-	}
-	msg := cmd()
-	if _, ok := msg.(QuickFilterChangedMsg); !ok {
-		t.Errorf("expected QuickFilterChangedMsg, got %T", msg)
-	}
-}
 
 // -----------------------------------------------------------------------
 // update.go:209-236 - Header row: ToggleSort (Enter on header),
@@ -6077,92 +5885,6 @@ func TestEditKeyMsg_NoValueSetter(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// update.go:384 - handleQuickFilterKeyMsg: Esc when quickFilterText != ""
-// (emits QuickFilterChangedMsg)
-// -----------------------------------------------------------------------
-
-func TestQuickFilterKeyMsg_EscWithText(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'b', Text: "b"})
-	// Now Esc should clear text and emit QuickFilterChangedMsg
-	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
-	if m.quickFilterText != "" {
-		t.Errorf("expected empty text after Esc, got %q", m.quickFilterText)
-	}
-	if cmd == nil {
-		t.Fatal("expected QuickFilterChangedMsg command after Esc with text")
-	}
-	msg := cmd()
-	if _, ok := msg.(QuickFilterChangedMsg); !ok {
-		t.Errorf("expected QuickFilterChangedMsg, got %T", msg)
-	}
-}
-
-// -----------------------------------------------------------------------
-// update.go:393 - handleQuickFilterKeyMsg: backspace with text emits msg
-// -----------------------------------------------------------------------
-
-func TestQuickFilterKeyMsg_BackspaceEmitsMsg(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true), WithQuickFilterDebounce[TestRow](0))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'a', Text: "a"})
-	m = sendKey(m, tea.KeyPressMsg{Code: 'b', Text: "b"})
-	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
-	if m.quickFilterText != "a" {
-		t.Errorf("expected 'a' after backspace, got %q", m.quickFilterText)
-	}
-	if cmd == nil {
-		t.Fatal("expected QuickFilterChangedMsg command after backspace")
-	}
-	msg := cmd()
-	if _, ok := msg.(QuickFilterChangedMsg); !ok {
-		t.Errorf("expected QuickFilterChangedMsg, got %T", msg)
-	}
-}
-
-// -----------------------------------------------------------------------
-// update.go:400 - handleQuickFilterKeyMsg: runes emits msg
-// -----------------------------------------------------------------------
-
-func TestQuickFilterKeyMsg_RunesEmitsMsg(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true), WithQuickFilterDebounce[TestRow](0))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	var cmd tea.Cmd
-	m, cmd = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
-	if m.quickFilterText != "z" {
-		t.Errorf("expected 'z', got %q", m.quickFilterText)
-	}
-	if cmd == nil {
-		t.Fatal("expected QuickFilterChangedMsg command after typing rune")
-	}
-	msg := cmd()
-	if _, ok := msg.(QuickFilterChangedMsg); !ok {
-		t.Errorf("expected QuickFilterChangedMsg, got %T", msg)
-	}
-}
-
-// -----------------------------------------------------------------------
-// update.go:409 - handleQuickFilterKeyMsg: unhandled key type falls through
-// -----------------------------------------------------------------------
-
-func TestQuickFilterKeyMsg_UnhandledKeyType(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
-	m = sendKey(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	// Send a key type that is not Esc, Backspace, Runes, or Enter (e.g., Tab)
-	m2, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
-	if cmd != nil {
-		t.Error("expected nil cmd for unhandled key in quick filter")
-	}
-	// Quick filter should still be active
-	if !m2.quickFilterActive {
-		t.Error("expected quick filter still active after unhandled key")
-	}
-}
 
 // -----------------------------------------------------------------------
 // update.go:456 - startFilterEdit: colIdx < 0
@@ -6872,7 +6594,7 @@ func TestWithColumnPin_MultipleColumns(t *testing.T) {
 
 func TestWithQuickFilterText_FiltersRows(t *testing.T) {
 	m := newTestGrid(
-		WithQuickFilterText[TestRow]("Engineering"),
+		WithQueryBarText[TestRow]("Engineering"),
 	)
 	// Only Engineering rows: Alice, Carol
 	if len(m.displayRows) != 2 {
@@ -6887,8 +6609,8 @@ func TestWithQuickFilterText_FiltersRows(t *testing.T) {
 
 func TestWithQuickFilterText_WithQuickFilterEnabled(t *testing.T) {
 	m := newTestGrid(
-		WithQuickFilter[TestRow](true),
-		WithQuickFilterText[TestRow]("Sales"),
+		WithQueryBar[TestRow](),
+		WithQueryBarText[TestRow]("Sales"),
 	)
 	// Only Sales rows: Bob, Eve
 	if len(m.displayRows) != 2 {
@@ -8111,12 +7833,12 @@ func TestClearFilters_EscClearsColumnFilter(t *testing.T) {
 }
 
 func TestClearFilters_EscClearsQuickFilterText(t *testing.T) {
-	m := newTestGrid(WithQuickFilter[TestRow](true))
+	m := newTestGrid(WithQueryBar[TestRow]())
 
-	// Confirmed quick filter: text persists, mode is no longer active.
+	// Confirmed quick filter: text persists, bar is not in edit mode.
 	m.SetQuickFilter("Carol")
-	if m.quickFilterActive {
-		t.Fatal("precondition: quickFilterActive must be false (confirmed text)")
+	if m.queryBarActive {
+		t.Fatal("precondition: queryBarActive must be false (confirmed text)")
 	}
 	if !m.hasActiveFilters() {
 		t.Fatal("precondition: expected quick filter text to count as active")
