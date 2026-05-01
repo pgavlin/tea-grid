@@ -1,7 +1,12 @@
 package filter
 
 import (
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/pgavlin/tea-grid/internal/lineedit"
 )
 
 // MultiSetFilter matches a value against a set of constraints with AND
@@ -95,9 +100,80 @@ func (f *MultiSetFilter) Active() bool {
 	return len(f.constraints) > 0
 }
 
-// View, Update implemented in subsequent tasks.
-func (f *MultiSetFilter) View() string                         { return "" }
-func (f *MultiSetFilter) Update(msg tea.Msg) (Filter, tea.Cmd) { return f, nil }
+// View renders the constraint list with row focus and a footer hint.
+// Empty when the popup is not in editing mode.
+func (f *MultiSetFilter) View() string {
+	if !f.editing {
+		return ""
+	}
+	var lines []string
+	for i, c := range f.constraints {
+		entry := "× " + c
+		if f.width > 0 {
+			entry = lineedit.TruncateOrPad(entry, f.width)
+		}
+		if i == f.focused {
+			entry = lipgloss.NewStyle().Reverse(true).Render(entry)
+		}
+		lines = append(lines, entry)
+	}
+	footer := "d delete · esc close · / edit"
+	if f.width > 0 {
+		footer = lineedit.TruncateOrPad(footer, f.width)
+	}
+	lines = append(lines, footer)
+	if f.maxLines > 0 && len(lines) > f.maxLines {
+		lines = lines[:f.maxLines]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// Update handles popup interactions: focus navigation and constraint
+// deletion.
+func (f *MultiSetFilter) Update(msg tea.Msg) (Filter, tea.Cmd) {
+	switch msg := msg.(type) {
+	case FilterFocusMsg:
+		f.editing = true
+		f.width = msg.Width
+		f.maxLines = msg.MaxLines
+		f.focused = 0
+		return f, nil
+	case FilterBlurMsg:
+		f.editing = false
+		return f, nil
+	case tea.KeyPressMsg:
+		if !f.editing {
+			return f, nil
+		}
+		switch msg.Code {
+		case tea.KeyUp:
+			if f.focused > 0 {
+				f.focused--
+			}
+		case tea.KeyDown:
+			if f.focused < len(f.constraints)-1 {
+				f.focused++
+			}
+		case tea.KeyBackspace:
+			f.deleteFocused()
+		default:
+			if msg.Text == "d" {
+				f.deleteFocused()
+			}
+		}
+	}
+	return f, nil
+}
+
+func (f *MultiSetFilter) deleteFocused() {
+	if f.focused < 0 || f.focused >= len(f.constraints) {
+		return
+	}
+	f.constraints = append(f.constraints[:f.focused], f.constraints[f.focused+1:]...)
+	if f.focused >= len(f.constraints) && f.focused > 0 {
+		f.focused--
+	}
+}
 
 // defaultMultiSetMatcher handles the common case: rowValue is []string,
 // constraint matches when the slice contains the constraint.

@@ -1,6 +1,11 @@
 package filter
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 func TestMultiSetFilter_EmptyInactive(t *testing.T) {
 	f := NewMultiSetFilter()
@@ -67,5 +72,61 @@ func TestMultiSetFilter_MatchesCustom(t *testing.T) {
 	}
 	if f.Matches("bar") {
 		t.Errorf("Matches(bar) = true, want false")
+	}
+}
+
+func TestMultiSetFilter_FocusEditing(t *testing.T) {
+	f := NewMultiSetFilter()
+	f.AddConstraint("bug")
+	f.AddConstraint("urgent")
+
+	g, _ := f.Update(FilterFocusMsg{Width: 40, MaxLines: 6})
+	f = g.(*MultiSetFilter)
+	if !f.editing {
+		t.Errorf("editing=false after FilterFocusMsg")
+	}
+	if f.focused != 0 {
+		t.Errorf("focused=%d after focus, want 0", f.focused)
+	}
+
+	g, _ = f.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	f = g.(*MultiSetFilter)
+	if f.focused != 1 {
+		t.Errorf("focused=%d after Down, want 1", f.focused)
+	}
+
+	g, _ = f.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	f = g.(*MultiSetFilter)
+	g, _ = f.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	f = g.(*MultiSetFilter)
+	if f.focused != 0 {
+		t.Errorf("focused=%d after Up Up, want 0", f.focused)
+	}
+}
+
+func TestMultiSetFilter_DeleteFocusedConstraint(t *testing.T) {
+	f := NewMultiSetFilter()
+	f.AddConstraint("bug")
+	f.AddConstraint("urgent")
+	g, _ := f.Update(FilterFocusMsg{Width: 40, MaxLines: 6})
+	f = g.(*MultiSetFilter)
+
+	g, _ = f.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	f = g.(*MultiSetFilter)
+	cs := f.Constraints()
+	if len(cs) != 1 || cs[0] != "urgent" {
+		t.Errorf("after d on focus 0: %v, want [urgent]", cs)
+	}
+}
+
+func TestMultiSetFilter_ViewRendersConstraints(t *testing.T) {
+	f := NewMultiSetFilter()
+	f.AddConstraint("bug")
+	f.AddConstraint("urgent")
+	g, _ := f.Update(FilterFocusMsg{Width: 40, MaxLines: 6})
+	f = g.(*MultiSetFilter)
+	out := f.View()
+	if !strings.Contains(out, "bug") || !strings.Contains(out, "urgent") {
+		t.Errorf("View() = %q, want it to contain bug and urgent", out)
 	}
 }
