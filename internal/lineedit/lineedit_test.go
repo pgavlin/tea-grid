@@ -515,3 +515,220 @@ func TestTruncateOrPad_ExactFit(t *testing.T) {
 		t.Errorf("expected 'hello', got %q", result)
 	}
 }
+
+// --- readline editing operations ---
+
+func TestKillToEnd(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello world")
+	m.SetCursor(5)
+	if !m.KillToEnd() {
+		t.Errorf("KillToEnd returned false, want true")
+	}
+	if m.Text() != "hello" {
+		t.Errorf("Text() = %q, want %q", m.Text(), "hello")
+	}
+	if m.Cursor() != 5 {
+		t.Errorf("Cursor() = %d, want 5", m.Cursor())
+	}
+}
+
+func TestKillToEnd_AtEnd(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello")
+	m.CursorToEnd()
+	if m.KillToEnd() {
+		t.Errorf("KillToEnd at end returned true, want false (no-op)")
+	}
+}
+
+func TestKillToStart(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello world")
+	m.SetCursor(6)
+	if !m.KillToStart() {
+		t.Errorf("KillToStart returned false, want true")
+	}
+	if m.Text() != "world" {
+		t.Errorf("Text() = %q, want %q", m.Text(), "world")
+	}
+	if m.Cursor() != 0 {
+		t.Errorf("Cursor() = %d, want 0", m.Cursor())
+	}
+}
+
+func TestKillToStart_AtZero(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello")
+	if m.KillToStart() {
+		t.Errorf("KillToStart at 0 returned true, want false (no-op)")
+	}
+}
+
+func TestWordLeft(t *testing.T) {
+	m := &Model{}
+	m.SetText("state:open priority:>5")
+	m.CursorToEnd() // at 22
+
+	m.WordLeft()
+	if m.Cursor() != 11 { // start of "priority:>5"
+		t.Errorf("WordLeft: cursor=%d, want 11", m.Cursor())
+	}
+
+	m.WordLeft()
+	if m.Cursor() != 0 { // start of "state:open"
+		t.Errorf("WordLeft: cursor=%d, want 0", m.Cursor())
+	}
+
+	m.WordLeft()
+	if m.Cursor() != 0 {
+		t.Errorf("WordLeft at 0: cursor=%d, want 0 (no-op)", m.Cursor())
+	}
+}
+
+func TestWordRight(t *testing.T) {
+	m := &Model{}
+	m.SetText("state:open priority:>5")
+	// at 0
+	m.WordRight()
+	if m.Cursor() != 11 { // start of "priority:>5"
+		t.Errorf("WordRight: cursor=%d, want 11", m.Cursor())
+	}
+
+	m.WordRight()
+	if m.Cursor() != 22 { // end
+		t.Errorf("WordRight: cursor=%d, want 22 (end)", m.Cursor())
+	}
+
+	m.WordRight()
+	if m.Cursor() != 22 {
+		t.Errorf("WordRight at end: cursor=%d, want 22 (no-op)", m.Cursor())
+	}
+}
+
+func TestKillWordLeft(t *testing.T) {
+	m := &Model{}
+	m.SetText("state:open priority:>5")
+	m.CursorToEnd()
+	if !m.KillWordLeft() {
+		t.Errorf("KillWordLeft returned false")
+	}
+	if m.Text() != "state:open " {
+		t.Errorf("Text() = %q, want %q", m.Text(), "state:open ")
+	}
+	if m.Cursor() != 11 {
+		t.Errorf("Cursor() = %d, want 11", m.Cursor())
+	}
+}
+
+func TestKillWordRight(t *testing.T) {
+	m := &Model{}
+	m.SetText("state:open priority:>5")
+	// at 0
+	if !m.KillWordRight() {
+		t.Errorf("KillWordRight returned false")
+	}
+	if m.Text() != "priority:>5" {
+		t.Errorf("Text() = %q, want %q", m.Text(), "priority:>5")
+	}
+	if m.Cursor() != 0 {
+		t.Errorf("Cursor() = %d, want 0", m.Cursor())
+	}
+}
+
+func TestHandleKeyMsg_CtrlB_CtrlF(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello")
+	m.CursorToEnd()
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
+	if m.Cursor() != 4 {
+		t.Errorf("Ctrl+B: cursor=%d, want 4", m.Cursor())
+	}
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
+	if m.Cursor() != 5 {
+		t.Errorf("Ctrl+F: cursor=%d, want 5", m.Cursor())
+	}
+}
+
+func TestHandleKeyMsg_CtrlD(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello")
+	m.SetCursor(2)
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+	if m.Text() != "helo" {
+		t.Errorf("Ctrl+D: text=%q, want %q", m.Text(), "helo")
+	}
+}
+
+func TestHandleKeyMsg_CtrlH(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello")
+	m.CursorToEnd()
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: 'h', Mod: tea.ModCtrl})
+	if m.Text() != "hell" {
+		t.Errorf("Ctrl+H: text=%q, want %q", m.Text(), "hell")
+	}
+}
+
+func TestHandleKeyMsg_CtrlK(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello world")
+	m.SetCursor(5)
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: 'k', Mod: tea.ModCtrl})
+	if m.Text() != "hello" {
+		t.Errorf("Ctrl+K: text=%q, want %q", m.Text(), "hello")
+	}
+}
+
+func TestHandleKeyMsg_CtrlU(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello world")
+	m.SetCursor(6)
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+	if m.Text() != "world" {
+		t.Errorf("Ctrl+U: text=%q, want %q", m.Text(), "world")
+	}
+}
+
+func TestHandleKeyMsg_CtrlW(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello world")
+	m.CursorToEnd()
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
+	if m.Text() != "hello " {
+		t.Errorf("Ctrl+W: text=%q, want %q", m.Text(), "hello ")
+	}
+}
+
+func TestHandleKeyMsg_AltB_AltF(t *testing.T) {
+	m := &Model{}
+	m.SetText("foo bar baz")
+	m.CursorToEnd()
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: 'b', Mod: tea.ModAlt})
+	if m.Cursor() != 8 {
+		t.Errorf("Alt+B: cursor=%d, want 8", m.Cursor())
+	}
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: 'f', Mod: tea.ModAlt})
+	if m.Cursor() != 11 {
+		t.Errorf("Alt+F: cursor=%d, want 11", m.Cursor())
+	}
+}
+
+func TestHandleKeyMsg_AltD(t *testing.T) {
+	m := &Model{}
+	m.SetText("foo bar baz")
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: 'd', Mod: tea.ModAlt})
+	if m.Text() != "bar baz" {
+		t.Errorf("Alt+D: text=%q, want %q", m.Text(), "bar baz")
+	}
+}
+
+func TestHandleKeyMsg_AltBackspace(t *testing.T) {
+	m := &Model{}
+	m.SetText("foo bar baz")
+	m.CursorToEnd()
+	m.HandleKeyMsg(tea.KeyPressMsg{Code: tea.KeyBackspace, Mod: tea.ModAlt})
+	if m.Text() != "foo bar " {
+		t.Errorf("Alt+Backspace: text=%q, want %q", m.Text(), "foo bar ")
+	}
+}

@@ -80,10 +80,129 @@ func (m *Model) Home() { m.cursor = 0 }
 // End moves the cursor past the last character.
 func (m *Model) End() { m.cursor = len(m.text) }
 
+// KillToEnd deletes from the cursor to the end of the text. Returns
+// true if any characters were removed.
+func (m *Model) KillToEnd() bool {
+	if m.cursor >= len(m.text) {
+		return false
+	}
+	m.text = m.text[:m.cursor]
+	return true
+}
+
+// KillToStart deletes from the start of the text to the cursor.
+// Returns true if any characters were removed.
+func (m *Model) KillToStart() bool {
+	if m.cursor == 0 {
+		return false
+	}
+	m.text = m.text[m.cursor:]
+	m.cursor = 0
+	return true
+}
+
+// WordLeft moves the cursor to the start of the previous whitespace-
+// delimited word. If the cursor is mid-word it moves to the start of
+// the current word; otherwise it skips trailing whitespace and lands
+// at the start of the prior word.
+func (m *Model) WordLeft() {
+	if m.cursor == 0 {
+		return
+	}
+	i := m.cursor
+	for i > 0 && isWordSep(m.text[i-1]) {
+		i--
+	}
+	for i > 0 && !isWordSep(m.text[i-1]) {
+		i--
+	}
+	m.cursor = i
+}
+
+// WordRight moves the cursor to the start of the next whitespace-
+// delimited word, or to the end of the text if no further word exists.
+func (m *Model) WordRight() {
+	n := len(m.text)
+	if m.cursor >= n {
+		return
+	}
+	i := m.cursor
+	for i < n && !isWordSep(m.text[i]) {
+		i++
+	}
+	for i < n && isWordSep(m.text[i]) {
+		i++
+	}
+	m.cursor = i
+}
+
+// KillWordLeft deletes from the cursor to the start of the previous
+// whitespace-delimited word. Returns true if any characters were
+// removed.
+func (m *Model) KillWordLeft() bool {
+	if m.cursor == 0 {
+		return false
+	}
+	end := m.cursor
+	m.WordLeft()
+	if m.cursor == end {
+		return false
+	}
+	m.text = m.text[:m.cursor] + m.text[end:]
+	return true
+}
+
+// KillWordRight deletes from the cursor to the start of the next
+// whitespace-delimited word. Returns true if any characters were
+// removed.
+func (m *Model) KillWordRight() bool {
+	if m.cursor >= len(m.text) {
+		return false
+	}
+	start := m.cursor
+	end := m.cursor
+	n := len(m.text)
+	for end < n && !isWordSep(m.text[end]) {
+		end++
+	}
+	for end < n && isWordSep(m.text[end]) {
+		end++
+	}
+	if end == start {
+		return false
+	}
+	m.text = m.text[:start] + m.text[end:]
+	return true
+}
+
+// isWordSep reports whether b separates words for cursor-by-word
+// movement and word-kill operations. Whitespace is the only separator;
+// punctuation (`:`, `,`, `>`, `=`, etc.) is part of a word so that a
+// query token like `state:open` moves and kills as a unit.
+func isWordSep(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
+}
+
 // HandleKeyMsg dispatches a tea.KeyPressMsg to the appropriate editing operation.
 // It returns true if the key was handled (i.e. a text mutation or cursor move).
 func (m *Model) HandleKeyMsg(msg tea.KeyPressMsg) bool {
-	// Handle ctrl+key combinations first.
+	// Alt+key (Meta) combinations: word-level movement and editing.
+	if msg.Mod.Contains(tea.ModAlt) {
+		switch msg.Code {
+		case 'b':
+			m.WordLeft()
+			return true
+		case 'f':
+			m.WordRight()
+			return true
+		case 'd':
+			return m.KillWordRight()
+		case tea.KeyBackspace:
+			return m.KillWordLeft()
+		}
+	}
+
+	// Ctrl+key combinations: readline-style line editing.
 	if msg.Mod.Contains(tea.ModCtrl) {
 		switch msg.Code {
 		case 'a':
@@ -92,6 +211,22 @@ func (m *Model) HandleKeyMsg(msg tea.KeyPressMsg) bool {
 		case 'e':
 			m.End()
 			return true
+		case 'b':
+			m.Left()
+			return true
+		case 'f':
+			m.Right()
+			return true
+		case 'd':
+			return m.Delete()
+		case 'h':
+			return m.Backspace()
+		case 'k':
+			return m.KillToEnd()
+		case 'u':
+			return m.KillToStart()
+		case 'w':
+			return m.KillWordLeft()
 		}
 	}
 
