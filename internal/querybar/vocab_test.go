@@ -106,6 +106,51 @@ func TestBuildAutoVocab_LowercaseAliasForCapitalizedID(t *testing.T) {
 	}
 }
 
+func TestBuildAutoVocab_HeaderNameAlias(t *testing.T) {
+	// Synthetic ColumnID with a human-readable HeaderName: users should be
+	// able to query by the slugified header.
+	cols := []data.Column[map[string]any]{
+		{ColumnID: "col2", HeaderName: "Population", Filter: filter.NewNumberFilter(), Filterable: true},
+	}
+	v := BuildAutoVocab(cols)
+	canon, ok := v.Resolve("population")
+	if !ok || canon != "col2" {
+		t.Errorf("Resolve(population) = (%q, %v), want (col2, true) — header alias", canon, ok)
+	}
+}
+
+func TestBuildAutoVocab_HeaderNameSlugified(t *testing.T) {
+	cols := []data.Column[map[string]any]{
+		{ColumnID: "col0", HeaderName: "Country Name", Filter: filter.NewTextFilter(), Filterable: true},
+		{ColumnID: "col1", HeaderName: "GDP per capita ($)", Filter: filter.NewNumberFilter(), Filterable: true},
+	}
+	v := BuildAutoVocab(cols)
+	if canon, ok := v.Resolve("country_name"); !ok || canon != "col0" {
+		t.Errorf("Resolve(country_name) = (%q, %v), want (col0, true)", canon, ok)
+	}
+	if canon, ok := v.Resolve("gdp_per_capita"); !ok || canon != "col1" {
+		t.Errorf("Resolve(gdp_per_capita) = (%q, %v), want (col1, true)", canon, ok)
+	}
+}
+
+func TestSlugifyHeader(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"", ""},
+		{"Population", "population"},
+		{"Country Name", "country_name"},
+		{"GDP per capita ($)", "gdp_per_capita"},
+		{"___weird___", "weird"},
+		{"!@#$%", ""},
+		{"  spaces  ", "spaces"},
+	}
+	for _, tc := range cases {
+		got := slugifyHeader(tc.in)
+		if got != tc.want {
+			t.Errorf("slugifyHeader(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestBuildAutoVocab_SkipsNonRoundTrippableFilters(t *testing.T) {
 	cols := []data.Column[map[string]any]{
 		{ColumnID: "x", Filter: &nonRTFilter{}, Filterable: true},
