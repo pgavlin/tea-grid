@@ -267,7 +267,6 @@ func newModel(filename string) model {
 		}),
 		grid.WithEditable[*SpreadsheetRow](true),
 		grid.WithSelection[*SpreadsheetRow](selection.SelectMulti),
-		grid.WithQueryBar[*SpreadsheetRow](),
 		grid.WithFocused[*SpreadsheetRow](true),
 		grid.WithMultiSort[*SpreadsheetRow](true),
 	)
