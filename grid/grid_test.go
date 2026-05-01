@@ -7899,3 +7899,81 @@ func TestFullHelp_IncludesClearFilters(t *testing.T) {
 		t.Error("expected FullHelp to include ClearFilters (esc) binding")
 	}
 }
+
+// -----------------------------------------------------------------------
+// Query bar integration
+// -----------------------------------------------------------------------
+
+func newQueryBarGrid(opts ...Option[TestRow]) Model[TestRow] {
+	cols := testCols()
+	cols[0].Filter = filter.NewTextFilter()
+	cols[1].Filter = filter.NewSetFilter("Engineering", "Sales", "Marketing")
+	cols[2].Filter = filter.NewNumberFilter()
+	cols[3].Filter = filter.NewBoolFilter()
+	defaults := []Option[TestRow]{
+		WithColumns[TestRow](cols),
+		WithRows[TestRow](testData()),
+		WithRowID[TestRow](func(r TestRow) string { return r.Name }),
+		WithFocused[TestRow](true),
+		WithWidth[TestRow](80),
+		WithHeight[TestRow](20),
+		WithQueryBar[TestRow](),
+	}
+	return New(append(defaults, opts...)...)
+}
+
+func TestQueryBar_OpenAndCancel(t *testing.T) {
+	g := newQueryBarGrid()
+	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if !g.Filtering() {
+		t.Errorf("Filtering() = false after '/', want true")
+	}
+	g, _ = g.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if g.Filtering() {
+		t.Errorf("Filtering() = true after Esc, want false")
+	}
+}
+
+func TestQueryBar_SubmitAppliesFilter(t *testing.T) {
+	g := newQueryBarGrid()
+	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "Name:Alice" {
+		g, _ = g.Update(tea.KeyPressMsg{Code: rune(r), Text: string(r)})
+	}
+	g, _ = g.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if len(g.displayRows) != 1 || g.displayRows[0].Data.Name != "Alice" {
+		t.Errorf("after submit: %d rows, want 1 (Alice); got %v", len(g.displayRows), g.displayRows)
+	}
+}
+
+func TestQueryBar_FiltersToBarReflectsChanges(t *testing.T) {
+	g := newQueryBarGrid()
+	g.cols[0].Filter.(*filter.TextFilter).SetText("Alice")
+	g.invalidateQueryBar()
+	if got := g.queryBar.Text(); !strings.Contains(got, "Name:Alice") {
+		t.Errorf("bar text = %q, want it to contain Name:Alice", got)
+	}
+}
+
+func TestQueryBar_LossyAnnotation(t *testing.T) {
+	g := newQueryBarGrid()
+	tf := g.cols[0].Filter.(*filter.TextFilter)
+	tf.SetRegex(true)
+	tf.SetText("Al.*")
+	g.invalidateQueryBar()
+	lossy := g.queryBar.Lossy()
+	if len(lossy) != 1 || lossy[0] != "Name" {
+		t.Errorf("Lossy() = %v, want [Name]", lossy)
+	}
+}
+
+func TestQueryBar_ClearFiltersClearsLossy(t *testing.T) {
+	g := newQueryBarGrid()
+	tf := g.cols[0].Filter.(*filter.TextFilter)
+	tf.SetRegex(true)
+	tf.SetText("Al.*")
+	g.ClearFilters()
+	if tf.Active() {
+		t.Errorf("ClearFilters did not clear lossy filter")
+	}
+}
