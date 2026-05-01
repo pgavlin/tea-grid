@@ -732,3 +732,27 @@ func TestHandleKeyMsg_AltBackspace(t *testing.T) {
 		t.Errorf("Alt+Backspace: text=%q, want %q", m.Text(), "foo bar ")
 	}
 }
+
+func TestRenderLineDim_NoDim(t *testing.T) {
+	m := &Model{}
+	m.SetText("hello")
+	m.SetCursor(2)
+	plain := m.RenderLine(10, "")
+	dim := m.RenderLineDim(10, "", 0, 0)
+	if plain != dim {
+		t.Errorf("RenderLineDim with empty range != RenderLine\nplain=%q\ndim=%q", plain, dim)
+	}
+}
+
+func TestRenderLineDim_AppliesFaintInRange(t *testing.T) {
+	m := &Model{}
+	m.SetText("state:Open")
+	m.SetCursor(10)
+	out := m.RenderLineDim(15, "", 6, 10)
+	if !strings.Contains(out, "\x1b[2m") {
+		t.Errorf("output missing faintOn (\\x1b[2m): %q", out)
+	}
+	if !strings.Contains(out, "\x1b[22m") {
+		t.Errorf("output missing faintOff (\\x1b[22m): %q", out)
+	}
+}

@@ -109,7 +109,8 @@ func (m Model[T]) renderQueryBar() string {
 		if editorWidth < 1 {
 			editorWidth = 1
 		}
-		body = label + m.queryBar.Editor().RenderLine(editorWidth, "")
+		dimStart, dimEnd, _ := m.queryBar.CompletionRange()
+		body = label + m.queryBar.Editor().RenderLineDim(editorWidth, "", dimStart, dimEnd)
 	} else {
 		body = label + m.queryBar.Text()
 	}

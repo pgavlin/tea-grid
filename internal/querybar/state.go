@@ -193,3 +193,15 @@ func (s *State) ResetCompletion() {
 	s.completionStart = 0
 	s.completionLastText = ""
 }
+
+// CompletionRange returns the byte range of the most-recently-inserted
+// completion candidate in the editor text, suitable for dim styling
+// in the bar render. ok=false when no cycle is in progress or the
+// editor has been edited since the last completion was applied.
+func (s *State) CompletionRange() (start, end int, ok bool) {
+	if s.completionCandidates == nil || s.editor.Text() != s.completionLastText {
+		return 0, 0, false
+	}
+	cand := s.completionCandidates[s.completionIndex]
+	return s.completionStart, s.completionStart + len(cand), true
+}

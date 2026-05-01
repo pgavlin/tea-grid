@@ -259,10 +259,12 @@ func (m *Model) HandleKeyMsg(msg tea.KeyPressMsg) bool {
 	}
 }
 
-// ANSI escape sequences for reverse video.
+// ANSI escape sequences for reverse video and faint (dim) text.
 const (
 	reverseOn  = "\x1b[7m"
 	reverseOff = "\x1b[27m"
+	faintOn    = "\x1b[2m"
+	faintOff   = "\x1b[22m"
 )
 
 // RenderLine renders the text as a single-line viewport of the given width,
@@ -326,6 +328,77 @@ func (m *Model) RenderLine(width int, suffix string) string {
 	}
 
 	return rendered + suffix
+}
+
+// RenderLineDim is like RenderLine but additionally renders runes in
+// the half-open range [dimStart, dimEnd) with faint (dim) styling.
+// Useful for previewing tab-completion suggestions: the "added"
+// portion of the text appears visually distinct from what the user
+// typed. Pass dimStart >= dimEnd to disable the dim styling
+// (equivalent to RenderLine).
+func (m *Model) RenderLineDim(width int, suffix string, dimStart, dimEnd int) string {
+	if width <= 0 {
+		return ""
+	}
+	if dimStart >= dimEnd {
+		return m.RenderLine(width, suffix)
+	}
+
+	suffixRunes := []rune(suffix)
+	viewWidth := width - len(suffixRunes)
+	if viewWidth < 1 {
+		viewWidth = 1
+	}
+	runes := []rune(m.text)
+
+	start := 0
+	if m.cursor >= viewWidth {
+		start = m.cursor - viewWidth + 1
+	}
+	end := start + viewWidth
+	if end > len(runes)+1 {
+		end = len(runes) + 1
+	}
+
+	var b strings.Builder
+	inDim := false
+	for i := start; i < end; i++ {
+		var ch rune
+		if i < len(runes) {
+			ch = runes[i]
+		} else {
+			ch = ' '
+		}
+
+		isCursor := i == m.cursor
+		shouldDim := i >= dimStart && i < dimEnd
+
+		if shouldDim && !inDim {
+			b.WriteString(faintOn)
+			inDim = true
+		} else if !shouldDim && inDim {
+			b.WriteString(faintOff)
+			inDim = false
+		}
+
+		if isCursor {
+			b.WriteString(reverseOn)
+			b.WriteRune(ch)
+			b.WriteString(reverseOff)
+		} else {
+			b.WriteRune(ch)
+		}
+	}
+	if inDim {
+		b.WriteString(faintOff)
+	}
+
+	visible := end - start
+	if visible < viewWidth {
+		b.WriteString(strings.Repeat(" ", viewWidth-visible))
+	}
+	b.WriteString(suffix)
+	return b.String()
 }
 
 // TruncateOrPad truncates (with ellipsis) or right-pads s to exactly width runes.

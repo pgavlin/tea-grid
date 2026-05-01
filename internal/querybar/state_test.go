@@ -164,3 +164,33 @@ func TestState_CompleteTab_NoCandidates(t *testing.T) {
 		t.Errorf("text=%q, want xyz (unchanged)", got)
 	}
 }
+
+func TestState_CompletionRange(t *testing.T) {
+	s := New(searchquery.NewVocabulary(nil))
+	s.Enable()
+	s.BeginEdit()
+	s.Editor().SetText("st")
+	s.Editor().CursorToEnd()
+
+	if _, _, ok := s.CompletionRange(); ok {
+		t.Errorf("CompletionRange ok=true before any Tab")
+	}
+
+	suggest := func(text string, cursor int) ([]string, int, int) {
+		return []string{"state", "status"}, 0, 2
+	}
+	s.CompleteTab(suggest)
+	start, end, ok := s.CompletionRange()
+	if !ok {
+		t.Fatal("CompletionRange ok=false after Tab")
+	}
+	if start != 0 || end != 5 { // "state" is 5 bytes
+		t.Errorf("range = (%d, %d), want (0, 5)", start, end)
+	}
+
+	// Edit invalidates the range.
+	s.Editor().Insert("x")
+	if _, _, ok := s.CompletionRange(); ok {
+		t.Errorf("CompletionRange ok=true after edit")
+	}
+}
