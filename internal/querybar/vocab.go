@@ -12,6 +12,14 @@ import (
 	"github.com/pgavlin/tea-grid/searchquery"
 )
 
+// MetaFieldHas is the canonical name of the has: meta-field used for
+// presence checks. Each value names a column that must be non-empty.
+const MetaFieldHas = "has"
+
+// MetaFieldNo is the inverse of MetaFieldHas: each value names a
+// column that must be empty.
+const MetaFieldNo = "no"
+
 // BuildAutoVocab derives a *searchquery.Vocabulary from the column set.
 // Every visible, filterable column with a RoundTrippable filter becomes
 // a queryable Field; field type is inferred from filter type; aliases
@@ -61,6 +69,13 @@ func BuildAutoVocab[T any](cols []data.Column[T]) *searchquery.Vocabulary {
 			AcceptsList: filterAcceptsList(c.Filter),
 		})
 	}
+	// Register the has:/no: meta-fields so the parser resolves them
+	// (without these, `has:state` would parse with field="has" and the
+	// binder would never see it as a meta-clause).
+	fields = append(fields,
+		searchquery.Field{Name: MetaFieldHas, Type: searchquery.FieldString, AcceptsList: true},
+		searchquery.Field{Name: MetaFieldNo, Type: searchquery.FieldString, AcceptsList: true},
+	)
 	return searchquery.NewVocabulary(fields)
 }
 

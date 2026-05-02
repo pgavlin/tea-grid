@@ -81,7 +81,13 @@ type Model[T any] struct {
 	quickFilterWords         []string        // cached split of quickFilterText
 	quickFilterDebounceDelay time.Duration   // reserved for live-prefix follow-up
 	filterEditColIdx         int             // -1 = no filter editor active
-	externalFilter           func(T) bool
+
+	// Per-column presence requirements driven by has:/no: clauses.
+	// Keyed by canonical ColumnID; value true means "row must have a
+	// non-empty value in this column" (has:), false means "row must
+	// have an empty value" (no:). Empty/missing key means no constraint.
+	columnPresence map[string]bool
+	externalFilter func(T) bool
 	// Cached list of column indices with active filters (rebuilt at start of each recompute)
 	activeFilters []int
 	// Filter result cache
@@ -594,7 +600,8 @@ func (m *Model[T]) SetColumnFilter(colID string, f filter.Filter) {
 	}
 }
 
-// ClearFilters removes all quick and column filters.
+// ClearFilters removes all quick filters, column filters, and any
+// has:/no: presence constraints.
 func (m *Model[T]) ClearFilters() {
 	m.quickFilterText = ""
 	m.updateQuickFilterWords()
@@ -603,17 +610,22 @@ func (m *Model[T]) ClearFilters() {
 			m.cols[i].Filter.Clear()
 		}
 	}
+	m.columnPresence = nil
 	m.dirty = true
 	m.filterDirty = true
 	m.recomputeDisplayRows()
 	m.invalidateQueryBar()
 }
 
-// hasActiveFilters reports whether any column filter is active or the quick
-// filter text is non-empty. Used by the ClearFilters key binding to skip the
+// hasActiveFilters reports whether any column filter is active, the
+// quick filter text is non-empty, or there is a has:/no: presence
+// constraint. Used by the ClearFilters key binding to skip the
 // recompute when there is nothing to clear.
 func (m *Model[T]) hasActiveFilters() bool {
 	if m.quickFilterText != "" {
+		return true
+	}
+	if len(m.columnPresence) > 0 {
 		return true
 	}
 	for i := range m.cols {
@@ -651,9 +663,16 @@ func (m *Model[T]) invalidateQueryBar() {
 	if m.queryBar == nil || m.queryBar.Editing() {
 		return
 	}
-	text, lossy := querybar.Rerender(m.cols, m.quickFilterText)
+	text, lossy := querybar.RerenderWithPresence(m.cols, m.quickFilterText, m)
 	m.queryBar.SetText(text)
 	m.queryBar.SetLossy(lossy)
+}
+
+// EachPresence implements querybar.PresenceProvider.
+func (m *Model[T]) EachPresence(fn func(colID string, present bool)) {
+	for k, v := range m.columnPresence {
+		fn(k, v)
+	}
 }
 
 // applyQueryBarSubmit parses the bar's text and pushes it into the
@@ -670,7 +689,7 @@ func (m *Model[T]) applyQueryBarSubmit() {
 		return
 	}
 	m.queryBar.SetParseErr("")
-	res := querybar.Apply(m.cols, ast)
+	res := querybar.ApplyWithPresence(m.cols, ast, m)
 	if len(res.Errors) > 0 {
 		m.queryBar.SetParseErr(strings.Join(res.Errors, "; "))
 	}
@@ -679,7 +698,7 @@ func (m *Model[T]) applyQueryBarSubmit() {
 	m.dirty = true
 	m.filterDirty = true
 	// Re-render bar from canonical filter state.
-	text2, lossy := querybar.Rerender(m.cols, m.quickFilterText)
+	text2, lossy := querybar.RerenderWithPresence(m.cols, m.quickFilterText, m)
 	m.queryBar.SetText(text2)
 	m.queryBar.SetLossy(lossy)
 }
@@ -1036,6 +1055,9 @@ func (m *Model[T]) recomputeDisplayRows() {
 			if !m.passesColumnFilters(rn.Data) {
 				continue
 			}
+			if len(m.columnPresence) > 0 && !m.passesPresence(&rn.Data) {
+				continue
+			}
 			if len(m.quickFilterWords) > 0 && !m.passesQuickFilter(rn, m.quickFilterWords) {
 				continue
 			}
@@ -1119,6 +1141,63 @@ func (m *Model[T]) passesColumnFilters(data T) bool {
 		}
 	}
 	return true
+}
+
+// passesPresence enforces has:/no: clauses against a row. For each
+// entry in columnPresence, the column with that ID must satisfy the
+// constraint: presence=true → IsEmpty must return false; presence=false
+// → IsEmpty must return true. Unknown column IDs are ignored.
+func (m *Model[T]) passesPresence(row *T) bool {
+	for colID, mustBePresent := range m.columnPresence {
+		col := m.findCol(colID)
+		if col == nil {
+			continue
+		}
+		empty := data.ColumnIsEmpty(col, row)
+		if mustBePresent && empty {
+			return false
+		}
+		if !mustBePresent && !empty {
+			return false
+		}
+	}
+	return true
+}
+
+// SetColumnPresence requires that the named column be non-empty
+// (present=true) or empty (present=false) for a row to pass the
+// filter pipeline. Driven by has:/no: clauses; consumers may also
+// call this directly for programmatic presence filters.
+func (m *Model[T]) SetColumnPresence(colID string, present bool) {
+	if m.columnPresence == nil {
+		m.columnPresence = make(map[string]bool)
+	}
+	m.columnPresence[colID] = present
+	m.dirty = true
+	m.filterDirty = true
+	m.recomputeDisplayRows()
+	m.invalidateQueryBar()
+}
+
+// ClearColumnPresence removes any has:/no: constraint for the named
+// column. No-op when none was set.
+func (m *Model[T]) ClearColumnPresence(colID string) {
+	if _, ok := m.columnPresence[colID]; !ok {
+		return
+	}
+	delete(m.columnPresence, colID)
+	m.dirty = true
+	m.filterDirty = true
+	m.recomputeDisplayRows()
+	m.invalidateQueryBar()
+}
+
+// ColumnPresence reports the current has:/no: constraint for the
+// named column: (true, true) if has:, (false, true) if no:, (false,
+// false) if no constraint.
+func (m *Model[T]) ColumnPresence(colID string) (present, ok bool) {
+	present, ok = m.columnPresence[colID]
+	return
 }
 
 func (m *Model[T]) passesQuickFilter(rn *data.RowNode[T], words []string) bool {

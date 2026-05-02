@@ -1125,3 +1125,70 @@ func TestColumnsFromSliceNonSliceRow(t *testing.T) {
 		t.Fatalf("expected at least 1 column, got %d", len(cols))
 	}
 }
+
+func TestDefaultIsEmpty(t *testing.T) {
+	zeroTime := time.Time{}
+	someTime, _ := time.Parse("2006-01-02", "2026-04-01")
+	cases := []struct {
+		name  string
+		value any
+		empty bool
+	}{
+		{"nil", nil, true},
+		{"empty string", "", true},
+		{"non-empty string", "x", false},
+		{"int 0", 0, false},
+		{"int 5", 5, false},
+		{"false", false, false},
+		{"true", true, false},
+		{"zero time", zeroTime, true},
+		{"non-zero time", someTime, false},
+		{"nil *time.Time", (*time.Time)(nil), true},
+		{"nil string slice", []string(nil), true},
+		{"empty string slice", []string{}, true},
+		{"single empty-string slice", []string{""}, false},
+		{"populated slice", []string{"a"}, false},
+		{"empty map", map[string]int{}, true},
+		{"populated map", map[string]int{"k": 1}, false},
+		{"nil pointer", (*int)(nil), true},
+		{"non-nil pointer to zero int", func() *int { i := 0; return &i }(), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := DefaultIsEmpty(tc.value); got != tc.empty {
+				t.Errorf("DefaultIsEmpty(%#v) = %v, want %v", tc.value, got, tc.empty)
+			}
+		})
+	}
+}
+
+func TestColumnIsEmpty_UsesOverrideIfSet(t *testing.T) {
+	c := Column[int]{
+		ColumnID: "x",
+		Value:    func(i int) any { return i },
+		IsEmpty:  func(i *int) bool { return *i == -1 }, // sentinel
+	}
+	row := -1
+	if !ColumnIsEmpty(&c, &row) {
+		t.Errorf("override should treat -1 as empty")
+	}
+	row = 5
+	if ColumnIsEmpty(&c, &row) {
+		t.Errorf("override should treat 5 as non-empty")
+	}
+}
+
+func TestColumnIsEmpty_FallsBackToDefault(t *testing.T) {
+	c := Column[string]{
+		ColumnID: "x",
+		Value:    func(s string) any { return s },
+	}
+	empty := ""
+	if !ColumnIsEmpty(&c, &empty) {
+		t.Errorf("empty string should be empty under default rule")
+	}
+	full := "hello"
+	if ColumnIsEmpty(&c, &full) {
+		t.Errorf("non-empty string should not be empty under default rule")
+	}
+}

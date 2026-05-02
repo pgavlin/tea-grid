@@ -8164,3 +8164,148 @@ func TestQueryBar_PreFillsAfterColumnPopupConfirm(t *testing.T) {
 		t.Errorf("bar editor pre-fill = %q, want it to contain Engineering", got)
 	}
 }
+
+// presenceRow is used for has:/no: tests. Some fields are intentionally
+// left zero/empty to exercise IsEmpty.
+type presenceRow struct {
+	Name     string
+	Notes    string
+	Priority int
+}
+
+func presenceCols() []data.Column[presenceRow] {
+	return []data.Column[presenceRow]{
+		{
+			ColumnID: "name", Filter: filter.NewTextFilter(), Filterable: true,
+			Value: func(r presenceRow) any { return r.Name },
+		},
+		{
+			ColumnID: "notes", Filter: filter.NewTextFilter(), Filterable: true,
+			Value: func(r presenceRow) any { return r.Notes },
+		},
+		{
+			ColumnID: "priority", Filter: filter.NewNumberFilter(), Filterable: true,
+			Value: func(r presenceRow) any { return r.Priority },
+		},
+	}
+}
+
+func presenceData() []presenceRow {
+	return []presenceRow{
+		{Name: "Alice", Notes: "todo", Priority: 5},
+		{Name: "Bob", Notes: "", Priority: 3},
+		{Name: "Carol", Notes: "review", Priority: 0}, // 0 is non-empty (data)
+		{Name: "Dave", Notes: "", Priority: 0},
+	}
+}
+
+func TestQueryBar_HasFiltersOutEmptyCells(t *testing.T) {
+	g := New(
+		WithColumns(presenceCols()),
+		WithRows(presenceData()),
+		WithRowID(func(r presenceRow) string { return r.Name }),
+		WithFocused[presenceRow](true),
+		WithWidth[presenceRow](80),
+		WithHeight[presenceRow](20),
+		WithQueryBar[presenceRow](),
+	)
+	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "has:notes" {
+		g, _ = g.Update(tea.KeyPressMsg{Code: rune(r), Text: string(r)})
+	}
+	g, _ = g.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	got := make([]string, 0, len(g.displayRows))
+	for _, rn := range g.displayRows {
+		got = append(got, rn.Data.Name)
+	}
+	if len(got) != 2 || got[0] != "Alice" || got[1] != "Carol" {
+		t.Errorf("after has:notes: %v, want [Alice Carol]", got)
+	}
+}
+
+func TestQueryBar_NoFiltersOutNonEmptyCells(t *testing.T) {
+	g := New(
+		WithColumns(presenceCols()),
+		WithRows(presenceData()),
+		WithRowID(func(r presenceRow) string { return r.Name }),
+		WithFocused[presenceRow](true),
+		WithWidth[presenceRow](80),
+		WithHeight[presenceRow](20),
+		WithQueryBar[presenceRow](),
+	)
+	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "no:notes" {
+		g, _ = g.Update(tea.KeyPressMsg{Code: rune(r), Text: string(r)})
+	}
+	g, _ = g.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	got := make([]string, 0, len(g.displayRows))
+	for _, rn := range g.displayRows {
+		got = append(got, rn.Data.Name)
+	}
+	if len(got) != 2 || got[0] != "Bob" || got[1] != "Dave" {
+		t.Errorf("after no:notes: %v, want [Bob Dave]", got)
+	}
+}
+
+func TestQueryBar_HasNumericZeroIsNonEmpty(t *testing.T) {
+	// priority=0 should NOT be filtered out by has:priority.
+	g := New(
+		WithColumns(presenceCols()),
+		WithRows(presenceData()),
+		WithRowID(func(r presenceRow) string { return r.Name }),
+		WithFocused[presenceRow](true),
+		WithWidth[presenceRow](80),
+		WithHeight[presenceRow](20),
+		WithQueryBar[presenceRow](),
+	)
+	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "has:priority" {
+		g, _ = g.Update(tea.KeyPressMsg{Code: rune(r), Text: string(r)})
+	}
+	g, _ = g.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if len(g.displayRows) != len(presenceData()) {
+		t.Errorf("has:priority dropped rows; got %d, want %d (all rows have a priority value, including 0)",
+			len(g.displayRows), len(presenceData()))
+	}
+}
+
+func TestQueryBar_HasRoundTrip(t *testing.T) {
+	g := New(
+		WithColumns(presenceCols()),
+		WithRows(presenceData()),
+		WithRowID(func(r presenceRow) string { return r.Name }),
+		WithFocused[presenceRow](true),
+		WithWidth[presenceRow](80),
+		WithHeight[presenceRow](20),
+		WithQueryBar[presenceRow](),
+	)
+	g.SetColumnPresence("notes", true)
+	if got := g.queryBar.Text(); !strings.Contains(got, "has:notes") {
+		t.Errorf("bar text %q missing has:notes", got)
+	}
+	g.ClearColumnPresence("notes")
+	g.SetColumnPresence("notes", false)
+	if got := g.queryBar.Text(); !strings.Contains(got, "no:notes") {
+		t.Errorf("bar text %q missing no:notes", got)
+	}
+}
+
+func TestQueryBar_ClearFiltersClearsPresence(t *testing.T) {
+	g := New(
+		WithColumns(presenceCols()),
+		WithRows(presenceData()),
+		WithRowID(func(r presenceRow) string { return r.Name }),
+		WithFocused[presenceRow](true),
+		WithWidth[presenceRow](80),
+		WithHeight[presenceRow](20),
+		WithQueryBar[presenceRow](),
+	)
+	g.SetColumnPresence("notes", true)
+	if !g.hasActiveFilters() {
+		t.Fatal("precondition: presence should count as active")
+	}
+	g.ClearFilters()
+	if g.hasActiveFilters() {
+		t.Errorf("ClearFilters did not clear presence")
+	}
+}

@@ -63,6 +63,11 @@ func Suggest[T any](text string, cursor int, cols []data.Column[T]) (candidates 
 			valueStart = commaPos + 1
 		}
 		valuePartial := text[valueStart:cursor]
+		// has: and no: take column names as values; complete from the
+		// queryable field set rather than from a per-column filter.
+		if fieldName == MetaFieldHas || fieldName == MetaFieldNo {
+			return matchPrefix(fieldCandidates(cols), valuePartial), valueStart, cursor
+		}
 		col := lookupCol(cols, fieldName)
 		if col == nil {
 			return nil, cursor, cursor

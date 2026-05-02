@@ -396,3 +396,139 @@ func TestQuoteIfNeeded_Edges(t *testing.T) {
 		}
 	}
 }
+
+// fakePresence is a simple PresenceProvider+Mutator pair for tests.
+type fakePresence struct{ m map[string]bool }
+
+func newFakePresence() *fakePresence { return &fakePresence{m: make(map[string]bool)} }
+
+func (p *fakePresence) SetColumnPresence(colID string, present bool) { p.m[colID] = present }
+func (p *fakePresence) ClearColumnPresence(colID string)             { delete(p.m, colID) }
+func (p *fakePresence) EachPresence(fn func(colID string, present bool)) {
+	for k, v := range p.m {
+		fn(k, v)
+	}
+}
+
+func TestApplyWithPresence_HasClause(t *testing.T) {
+	c := cols2()
+	v := BuildAutoVocab(c)
+	p := newFakePresence()
+	ast, _ := searchquery.Parse("has:state", v)
+	res := ApplyWithPresence(c, ast, p)
+	if len(res.Errors) != 0 {
+		t.Errorf("Errors = %v", res.Errors)
+	}
+	if got, ok := p.m["state"]; !ok || !got {
+		t.Errorf("expected state→true; map=%v", p.m)
+	}
+}
+
+func TestApplyWithPresence_NoClause(t *testing.T) {
+	c := cols2()
+	v := BuildAutoVocab(c)
+	p := newFakePresence()
+	ast, _ := searchquery.Parse("no:title", v)
+	ApplyWithPresence(c, ast, p)
+	if got, ok := p.m["title"]; !ok || got {
+		t.Errorf("expected title→false; map=%v", p.m)
+	}
+}
+
+func TestApplyWithPresence_NegationFlipsHasNo(t *testing.T) {
+	c := cols2()
+	v := BuildAutoVocab(c)
+	p := newFakePresence()
+	ast, _ := searchquery.Parse("-has:state -no:title", v)
+	ApplyWithPresence(c, ast, p)
+	if p.m["state"] {
+		t.Errorf("-has:state should set state→false; map=%v", p.m)
+	}
+	if !p.m["title"] {
+		t.Errorf("-no:title should set title→true; map=%v", p.m)
+	}
+}
+
+func TestApplyWithPresence_CommaList(t *testing.T) {
+	c := cols2()
+	v := BuildAutoVocab(c)
+	p := newFakePresence()
+	ast, _ := searchquery.Parse("has:state,title", v)
+	ApplyWithPresence(c, ast, p)
+	if !p.m["state"] || !p.m["title"] {
+		t.Errorf("comma-list should set both; map=%v", p.m)
+	}
+}
+
+func TestApplyWithPresence_ClearsUnmentioned(t *testing.T) {
+	c := cols2()
+	v := BuildAutoVocab(c)
+	p := newFakePresence()
+	p.m["state"] = true
+	p.m["title"] = false
+	// New AST mentions only "count" — others should clear.
+	ast, _ := searchquery.Parse("has:count", v)
+	ApplyWithPresence(c, ast, p)
+	if _, ok := p.m["state"]; ok {
+		t.Errorf("state should be cleared; map=%v", p.m)
+	}
+	if _, ok := p.m["title"]; ok {
+		t.Errorf("title should be cleared; map=%v", p.m)
+	}
+	if !p.m["count"] {
+		t.Errorf("count should be set; map=%v", p.m)
+	}
+}
+
+func TestApplyWithPresence_UnknownColumnError(t *testing.T) {
+	c := cols2()
+	v := BuildAutoVocab(c)
+	p := newFakePresence()
+	ast, _ := searchquery.Parse("has:nonexistent", v)
+	res := ApplyWithPresence(c, ast, p)
+	if len(res.Errors) != 1 {
+		t.Errorf("Errors = %v, want 1", res.Errors)
+	}
+}
+
+func TestRerenderWithPresence_EmitsHasNo(t *testing.T) {
+	c := cols2()
+	p := newFakePresence()
+	p.m["state"] = true
+	p.m["title"] = false
+	text, _ := RerenderWithPresence(c, "", p)
+	if !strings.Contains(text, "has:state") {
+		t.Errorf("text %q missing has:state", text)
+	}
+	if !strings.Contains(text, "no:title") {
+		t.Errorf("text %q missing no:title", text)
+	}
+}
+
+func TestSuggest_HasValueIsColumnNames(t *testing.T) {
+	c := cols2()
+	cands, start, end := Suggest("has:s", 5, c)
+	if !contains(cands, "state") {
+		t.Errorf("Suggest(has:s) = %v, want it to contain state", cands)
+	}
+	if start != 4 || end != 5 {
+		t.Errorf("range = (%d, %d), want (4, 5)", start, end)
+	}
+}
+
+func TestSuggest_NoValueIsColumnNames(t *testing.T) {
+	c := cols2()
+	cands, _, _ := Suggest("no:t", 4, c)
+	if !contains(cands, "title") {
+		t.Errorf("Suggest(no:t) = %v, want it to contain title", cands)
+	}
+}
+
+func contains(s []string, want string) bool {
+	for _, v := range s {
+		if v == want {
+			return true
+		}
+	}
+	return false
+}

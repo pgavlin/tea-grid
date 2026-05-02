@@ -61,6 +61,7 @@ type Column[T any] struct {
 	Filter           filter.Filter                   // Column filter.
 	QuickFilterMatch func(data *T, word string) bool // Reports whether this column matches a quick filter word. Takes *T to avoid copying. If nil, falls back to Text or Value + containsFold.
 	QueryAliases     []string                        // Additional names this column responds to in the query bar (e.g., ["status", "st"] for a "state" column).
+	IsEmpty          func(data *T) bool              // Reports whether this column's value is "missing" for the row. Used by has:/no: clauses. If nil, falls back to DefaultIsEmpty(Value(*data)).
 
 	// Pinning
 	Pinned     Pin  // Left, Right, or None.
@@ -578,4 +579,50 @@ func parseTimeString(s string) (time.Time, bool) {
 		}
 	}
 	return time.Time{}, false
+}
+
+// DefaultIsEmpty returns true when v is conventionally "missing":
+// nil (literal or typed-nil-via-interface), the zero time.Time, an
+// empty string, or a zero-length slice/map. Numeric zero, false, and
+// non-nil pointers (even to zero values) are treated as data and
+// reported as non-empty.
+func DefaultIsEmpty(v any) bool {
+	if v == nil {
+		return true
+	}
+	if t, ok := v.(time.Time); ok {
+		return t.IsZero()
+	}
+	if t, ok := v.(*time.Time); ok {
+		return t == nil || t.IsZero()
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		return rv.IsNil()
+	case reflect.String:
+		return rv.Len() == 0
+	case reflect.Slice, reflect.Map:
+		return rv.IsNil() || rv.Len() == 0
+	}
+	return false
+}
+
+// columnIsEmpty reports whether the named column's value for this row
+// is empty, using the column's IsEmpty hook if set, otherwise the
+// default rule applied to Column.Value(row).
+func columnIsEmpty[T any](c *Column[T], row *T) bool {
+	if c.IsEmpty != nil {
+		return c.IsEmpty(row)
+	}
+	if c.Value == nil {
+		return true
+	}
+	return DefaultIsEmpty(c.Value(*row))
+}
+
+// ColumnIsEmpty is the exported wrapper for callers that need to test
+// emptiness against the same rule used by has:/no: clauses.
+func ColumnIsEmpty[T any](c *Column[T], row *T) bool {
+	return columnIsEmpty(c, row)
 }

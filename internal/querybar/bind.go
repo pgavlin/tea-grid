@@ -9,6 +9,43 @@ import (
 	"github.com/pgavlin/tea-grid/searchquery"
 )
 
+// RerenderWithPresence is Rerender with an additional PresenceProvider
+// for emitting has:/no: clauses. See Rerender for details.
+func RerenderWithPresence[T any](cols []data.Column[T], bareTerms string, presence PresenceProvider) (text string, lossy []string) {
+	text, lossy = Rerender(cols, bareTerms)
+	if presence == nil {
+		return text, lossy
+	}
+	colByID := make(map[string]*data.Column[T], len(cols))
+	for i := range cols {
+		colByID[cols[i].ColumnID] = &cols[i]
+	}
+	var hasVals, noVals []string
+	presence.EachPresence(func(colID string, present bool) {
+		// Use the column's display name when we know about it.
+		name := colID
+		if c, ok := colByID[colID]; ok {
+			name = displayFieldName(c)
+		}
+		if present {
+			hasVals = append(hasVals, name)
+		} else {
+			noVals = append(noVals, name)
+		}
+	})
+	parts := []string{}
+	if text != "" {
+		parts = append(parts, text)
+	}
+	if len(hasVals) > 0 {
+		parts = append(parts, formatClause(MetaFieldHas, hasVals, false, false))
+	}
+	if len(noVals) > 0 {
+		parts = append(parts, formatClause(MetaFieldNo, noVals, false, false))
+	}
+	return strings.Join(parts, " "), lossy
+}
+
 // Rerender renders the current filter state as bar text plus a list of
 // column IDs in lossy state. Inputs:
 //
@@ -21,6 +58,26 @@ import (
 // HeaderName when meaningful, else lowercased ColumnID, else the raw
 // ColumnID) so the bar round-trips back to the alias users actually
 // type rather than to a synthetic ID like "col2".
+//
+// Use RerenderWithPresence to also emit has:/no: meta-clauses; the
+// plain Rerender ignores those constraints.
+// PresenceProvider is the small accessor the bar uses to read the
+// grid's has:/no: state during Rerender. Implemented by grid.Model[T]
+// (passed through Rerender to keep this package generic-but-light).
+type PresenceProvider interface {
+	// EachPresence calls fn(colID, present) for every active has:/no:
+	// constraint. present=true → has:; present=false → no:.
+	EachPresence(fn func(colID string, present bool))
+}
+
+// PresenceMutator is the inverse of PresenceProvider: it lets the
+// binder write back has:/no: state during Apply. Implemented by
+// grid.Model[T].
+type PresenceMutator interface {
+	SetColumnPresence(colID string, present bool)
+	ClearColumnPresence(colID string)
+}
+
 func Rerender[T any](cols []data.Column[T], bareTerms string) (text string, lossy []string) {
 	var clauses []string
 	for i := range cols {
@@ -125,6 +182,60 @@ type ApplyResult struct {
 	// imply Apply rolled back; clauses that succeeded have already
 	// been applied.
 	Errors []string
+}
+
+// ApplyWithPresence is Apply with an additional PresenceMutator that
+// handles has:/no: meta-clauses. Resolves each value through the
+// column's display-name aliases before writing to the presence map.
+// All has:/no: constraints not present in this AST are cleared.
+func ApplyWithPresence[T any](cols []data.Column[T], ast searchquery.AST, presence PresenceMutator) ApplyResult {
+	if presence == nil {
+		return Apply(cols, ast)
+	}
+	// Split the AST into meta-clauses (has:, no:) and the rest.
+	var meta, rest []searchquery.Clause
+	for _, c := range ast.Clauses {
+		switch c.Field {
+		case MetaFieldHas, MetaFieldNo:
+			meta = append(meta, c)
+		default:
+			rest = append(rest, c)
+		}
+	}
+	res := Apply(cols, searchquery.AST{Clauses: rest, Terms: ast.Terms})
+
+	// Re-apply has:/no:. First collect every column referenced by an
+	// active filter or by a meta-clause so we know which presence
+	// entries to clear (anything not mentioned).
+	wanted := make(map[string]bool, 8)
+	for _, c := range meta {
+		// has:foo with negate inverts to no:; no:foo with negate inverts to has:.
+		present := (c.Field == MetaFieldHas) != c.Negate
+		for _, v := range c.Values {
+			col := lookupCol(cols, v)
+			if col == nil {
+				res.Errors = append(res.Errors, fmt.Sprintf("%s: unknown column %q", c.Field, v))
+				continue
+			}
+			wanted[col.ColumnID] = present
+		}
+	}
+	// Clear any presence not in `wanted`.
+	cleared := make(map[string]struct{}, 4)
+	if pp, ok := presence.(PresenceProvider); ok {
+		pp.EachPresence(func(colID string, _ bool) {
+			if _, keep := wanted[colID]; !keep {
+				cleared[colID] = struct{}{}
+			}
+		})
+	}
+	for colID := range cleared {
+		presence.ClearColumnPresence(colID)
+	}
+	for colID, p := range wanted {
+		presence.SetColumnPresence(colID, p)
+	}
+	return res
 }
 
 // Apply pushes an AST into the column filters. For each clause:
