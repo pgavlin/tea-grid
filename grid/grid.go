@@ -625,9 +625,15 @@ func (m *Model[T]) hasActiveFilters() bool {
 }
 
 // queryBarVisible reports whether the query bar should occupy a row in
-// the rendered output. The bar collapses to nothing when not focused
-// and there is nothing to show — no canonical text, no lossy filters,
-// no parse error.
+// the rendered output. Visible when the user is editing, when there
+// are lossy filters to surface (filters whose state can not be
+// expressed in the bar text), or when a parse error needs displaying.
+//
+// Plain canonical text alone — i.e. a query that fully round-trips
+// through the active filters — does NOT keep the bar visible: the
+// filters are visible elsewhere (column headers, column popups), so
+// the bar text would only duplicate information already on screen and
+// would steal a row from the data view for no benefit.
 func (m *Model[T]) queryBarVisible() bool {
 	if m.queryBar == nil {
 		return false
@@ -635,7 +641,7 @@ func (m *Model[T]) queryBarVisible() bool {
 	if m.queryBarActive {
 		return true
 	}
-	return m.queryBar.Text() != "" || len(m.queryBar.Lossy()) > 0 || m.queryBar.ParseErr() != ""
+	return len(m.queryBar.Lossy()) > 0 || m.queryBar.ParseErr() != ""
 }
 
 // invalidateQueryBar re-renders the bar's text and lossy set from the
