@@ -102,10 +102,11 @@ func (m Model[T]) View() string {
 // canonical text. Lossy annotations and parse errors are appended
 // after the body in both modes.
 func (m Model[T]) renderQueryBar() string {
-	label := "/ "
+	label := m.styles.QueryBarLossy.Render("⌕ ")
+	labelWidth := lipgloss.Width(label)
 	var body string
 	if m.queryBarActive {
-		editorWidth := m.width - lipgloss.Width(label) - m.styles.QueryBar.GetHorizontalFrameSize()
+		editorWidth := m.width - labelWidth - m.styles.QueryBar.GetHorizontalFrameSize()
 		if editorWidth < 1 {
 			editorWidth = 1
 		}
