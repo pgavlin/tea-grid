@@ -428,6 +428,7 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd
 		m.filterEditColIdx = -1
 		m.dirty = true
 		m.filterDirty = true
+		m.invalidateQueryBar()
 		m.updateViewportSize()
 		return m, func() tea.Msg {
 			return FilterChangedMsg{ColumnID: col.ColumnID, Active: col.Filter.Active()}
@@ -441,6 +442,7 @@ func (m Model[T]) handleFilterEditKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd
 		m.filterEditColIdx = -1
 		m.dirty = true
 		m.filterDirty = true
+		m.invalidateQueryBar()
 		m.updateViewportSize()
 		return m, func() tea.Msg {
 			return FilterChangedMsg{ColumnID: col.ColumnID, Active: false}

@@ -8139,3 +8139,28 @@ func TestQueryBar_BackgroundSurvivesAcrossLabel(t *testing.T) {
 		t.Errorf("query bar emits inner full-reset (would lose outer background):\n%q", barLine)
 	}
 }
+
+func TestQueryBar_PreFillsAfterColumnPopupConfirm(t *testing.T) {
+	g := newQueryBarGrid()
+	// Mutate the filter as the column popup would, then route through
+	// the popup's Confirm path.
+	g.focusedCell = CellPosition{Row: -1, Col: 1} // header of Department
+	g, _ = g.Update(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
+	if g.filterEditColIdx < 0 {
+		t.Fatal("expected column filter editor to open")
+	}
+	// Mutate filter while in popup mode (toggle "Engineering").
+	sf := g.cols[1].Filter.(*filter.SetFilter)
+	sf.Exclude("Sales")
+	sf.Exclude("Marketing")
+	// Confirm closes the popup.
+	g, _ = g.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if g.queryBar.Text() == "" {
+		t.Errorf("bar text empty after popup confirm; should reflect active filter")
+	}
+	// Now open the bar — pre-fill should match the current filter state.
+	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if got := g.queryBar.EditorText(); !strings.Contains(got, "Engineering") {
+		t.Errorf("bar editor pre-fill = %q, want it to contain Engineering", got)
+	}
+}
