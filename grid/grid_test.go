@@ -8309,3 +8309,24 @@ func TestQueryBar_ClearFiltersClearsPresence(t *testing.T) {
 		t.Errorf("ClearFilters did not clear presence")
 	}
 }
+
+func TestQueryBar_RendersInitialColumnFilterState(t *testing.T) {
+	stateFilter := filter.NewSetFilter("open", "closed")
+	stateFilter.Exclude("closed")
+	g := New(
+		WithColumns[TestRow]([]data.Column[TestRow]{
+			{
+				ColumnID:   "state",
+				HeaderName: "State",
+				Value:      func(r TestRow) any { return r.Department }, // any value func is fine
+				Filterable: true,
+				Filter:     stateFilter,
+			},
+		}),
+		WithRows[TestRow](testData()),
+		WithQueryBar[TestRow](),
+	)
+	if got := g.queryBar.Text(); got != "state:open" {
+		t.Errorf("queryBar.Text() = %q, want %q", got, "state:open")
+	}
+}

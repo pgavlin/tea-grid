@@ -205,8 +205,14 @@ func New[T any](opts ...Option[T]) Model[T] {
 	if m.queryBar != nil {
 		m.queryBar.SetAutoVocabulary(querybar.BuildAutoVocab(m.cols))
 		// Apply any initial bar text by submitting it through Apply.
+		// When no initial text was supplied we still need to render
+		// the bar from the (possibly pre-populated) column filters —
+		// WithColumnFilter sets state without going through the
+		// invalidateQueryBar path that other mutators use.
 		if m.queryBar.Text() != "" {
 			m.applyQueryBarSubmit()
+		} else {
+			m.invalidateQueryBar()
 		}
 	}
 
