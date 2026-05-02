@@ -8014,7 +8014,7 @@ func TestQueryBar_RenderActiveShowsLabel(t *testing.T) {
 	g := newQueryBarGrid()
 	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	out := g.View()
-	if !strings.Contains(out, "⌕ ") {
+	if !strings.Contains(out, "🔍 ") {
 		t.Errorf("active bar should show search-glyph label; got %q", out)
 	}
 }
