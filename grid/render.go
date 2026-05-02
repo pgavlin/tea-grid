@@ -102,8 +102,10 @@ func (m Model[T]) View() string {
 // canonical text. Lossy annotations and parse errors are appended
 // after the body in both modes.
 func (m Model[T]) renderQueryBar() string {
-	label := lipgloss.NewStyle().Bold(true).Render("? ")
-	labelWidth := lipgloss.Width(label)
+	// Raw ANSI for bold-on/bold-off (without a full \x1b[m reset) so
+	// the outer QueryBar background survives across the label.
+	const label = "\x1b[1m? \x1b[22m"
+	const labelWidth = 2
 	var body string
 	if m.queryBarActive {
 		editorWidth := m.width - labelWidth - m.styles.QueryBar.GetHorizontalFrameSize()
@@ -124,14 +126,22 @@ func (m Model[T]) renderQueryBar() string {
 		}
 		annotation := fmt.Sprintf("  [+%d hidden filter%s: %s%s]",
 			len(lossy), pluralS(len(lossy)), strings.Join(lossy, ", "), hint)
-		body += m.styles.QueryBarLossy.Render(annotation)
+		body += faintWrap(annotation)
 	}
 
 	if e := m.queryBar.ParseErr(); e != "" {
-		body += "  " + m.styles.QueryBarLossy.Render("("+e+")")
+		body += "  " + faintWrap("("+e+")")
 	}
 
 	return m.styles.QueryBar.Width(m.width).Render(body)
+}
+
+// faintWrap wraps s in raw ANSI faint-on/faint-off codes that toggle
+// only intensity, leaving the surrounding background intact. Used by
+// the query bar so its outer QueryBar style background survives across
+// inner annotations.
+func faintWrap(s string) string {
+	return "\x1b[2m" + s + "\x1b[22m"
 }
 
 func pluralS(n int) string {

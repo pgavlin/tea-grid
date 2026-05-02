@@ -8107,3 +8107,35 @@ func TestPluralS(t *testing.T) {
 		t.Errorf("pluralS(0) = %q, want s", got)
 	}
 }
+
+func TestQueryBar_BackgroundSurvivesAcrossLabel(t *testing.T) {
+	// Custom style with a clearly-identifiable background. The bar's
+	// inner styling (bold label, dim annotation) must not emit a full
+	// "\x1b[m" reset; otherwise the outer background gets lost partway.
+	bgStyles := DefaultStyles()
+	bgStyles.QueryBar = lipgloss.NewStyle().Background(lipgloss.Color("9")) // bright red
+	g := New(
+		WithColumns[TestRow](testCols()),
+		WithRows[TestRow](testData()),
+		WithStyles[TestRow](bgStyles),
+		WithFocused[TestRow](true),
+		WithWidth[TestRow](40),
+		WithHeight[TestRow](10),
+		WithQueryBar[TestRow](),
+	)
+	g, _ = g.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	for _, r := range "name:Alice" {
+		g, _ = g.Update(tea.KeyPressMsg{Code: rune(r), Text: string(r)})
+	}
+	out := g.View()
+	// Look at the first line of the View — the bar.
+	barLine := strings.SplitN(out, "\n", 2)[0]
+	// A full SGR reset ("\x1b[m" or "\x1b[0m") inside the bar would
+	// clear the outer background. The bar should only use attribute-
+	// specific resets ("\x1b[22m", "\x1b[27m") which preserve bg.
+	if strings.Count(barLine, "\x1b[m") > 1 || strings.Contains(barLine, "\x1b[0m") {
+		// The outermost lipgloss.Render closes with \x1b[m; one is
+		// expected. More than one means an inner segment reset.
+		t.Errorf("query bar emits inner full-reset (would lose outer background):\n%q", barLine)
+	}
+}
