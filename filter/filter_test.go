@@ -717,8 +717,8 @@ func TestNumberFilterUpdateParsesDuringTyping(t *testing.T) {
 		f.Update(runeKeyMsg(r))
 	}
 
-	if !f.isRange {
-		t.Error("should parse as range while typing")
+	if !f.rngOK || f.rng.From == nil || *f.rng.From != 10 || f.rng.To == nil || *f.rng.To != 50 {
+		t.Errorf("should parse as range while typing; got rngOK=%v rng=%+v", f.rngOK, f.rng)
 	}
 	if !f.Matches(float64(25)) {
 		t.Error("range 10..50 should match 25")

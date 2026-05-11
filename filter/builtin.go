@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/pgavlin/tea-grid/internal/lineedit"
+	"github.com/pgavlin/tea-grid/searchquery"
 )
 
 // --- TextFilter ---
@@ -136,11 +137,18 @@ func (f *TextFilter) SetClause(values []string, negate bool) error {
 // NumberFilter performs comparison operations on numeric values.
 // Supports operators: =, !=, <, >, <=, >=, and ranges (e.g., "10..50").
 type NumberFilter struct {
-	editor  lineedit.Model
-	op      string
-	val     float64
-	val2    float64 // for range
-	isRange bool
+	editor lineedit.Model
+
+	// = and != are NumberFilter-specific and parsed separately from the
+	// shared comparator/range grammar.
+	op  string
+	val float64
+
+	// rng holds the parsed comparator/range form (>x, >=x, <x, <=x,
+	// a..b, a..*, *..b, and bare x). rngOK is true once a non-empty
+	// input has parsed successfully.
+	rng   searchquery.Range[float64]
+	rngOK bool
 
 	// Editing state
 	width   int
@@ -160,38 +168,39 @@ func (f *NumberFilter) SetText(text string) {
 
 func (f *NumberFilter) parseText() {
 	text := strings.TrimSpace(f.editor.Text())
-	f.isRange = false
 	f.op = ""
+	f.rng = searchquery.Range[float64]{}
+	f.rngOK = false
 
-	// Check for range: "10..50"
-	if parts := strings.SplitN(text, "..", 2); len(parts) == 2 {
-		v1, err1 := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
-		v2, err2 := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
-		if err1 == nil && err2 == nil {
-			f.val = v1
-			f.val2 = v2
-			f.isRange = true
-			return
+	if text == "" {
+		return
+	}
+
+	// = and != are NumberFilter-specific operators, not part of the
+	// shared range grammar. Strip them before delegating.
+	switch {
+	case strings.HasPrefix(text, "!="):
+		if v, err := parseFloat(text[2:]); err == nil {
+			f.op = "!="
+			f.val = v
 		}
-	}
-
-	// Check for operators
-	for _, op := range []string{"!=", "<=", ">=", "<", ">", "="} {
-		if strings.HasPrefix(text, op) {
-			rest := strings.TrimSpace(text[len(op):])
-			if v, err := strconv.ParseFloat(rest, 64); err == nil {
-				f.op = op
-				f.val = v
-				return
-			}
+		return
+	case strings.HasPrefix(text, "="):
+		if v, err := parseFloat(text[1:]); err == nil {
+			f.op = "="
+			f.val = v
 		}
+		return
 	}
 
-	// Plain number (equals)
-	if v, err := strconv.ParseFloat(text, 64); err == nil {
-		f.op = "="
-		f.val = v
+	if r, err := searchquery.ParseRange(text, parseFloat); err == nil {
+		f.rng = r
+		f.rngOK = true
 	}
+}
+
+func parseFloat(s string) (float64, error) {
+	return strconv.ParseFloat(strings.TrimSpace(s), 64)
 }
 
 func (f *NumberFilter) Matches(value any) bool {
@@ -209,26 +218,35 @@ func (f *NumberFilter) Matches(value any) bool {
 		return false
 	}
 
-	if f.isRange {
-		return num >= f.val && num <= f.val2
-	}
-
 	switch f.op {
 	case "=":
 		return num == f.val
 	case "!=":
 		return num != f.val
-	case "<":
-		return num < f.val
-	case ">":
-		return num > f.val
-	case "<=":
-		return num <= f.val
-	case ">=":
-		return num >= f.val
-	default:
+	}
+
+	if !f.rngOK {
 		return true
 	}
+	if f.rng.From != nil {
+		if f.rng.FromExclusive {
+			if !(num > *f.rng.From) {
+				return false
+			}
+		} else if !(num >= *f.rng.From) {
+			return false
+		}
+	}
+	if f.rng.To != nil {
+		if f.rng.ToExclusive {
+			if !(num < *f.rng.To) {
+				return false
+			}
+		} else if !(num <= *f.rng.To) {
+			return false
+		}
+	}
+	return true
 }
 
 func (f *NumberFilter) View() string {
@@ -291,10 +309,10 @@ func (f *NumberFilter) SetClause(values []string, negate bool) error {
 	}
 	prev := f.editor.Text()
 	f.SetText(values[0])
-	// parseText leaves op="" and isRange=false when it could not
-	// extract any predicate. Active() only checks editor text, so we
-	// inspect the parsed state directly.
-	if values[0] != "" && f.op == "" && !f.isRange {
+	// parseText leaves op="" and rngOK=false when it could not extract
+	// any predicate. Active() only checks editor text, so we inspect
+	// the parsed state directly.
+	if values[0] != "" && f.op == "" && !f.rngOK {
 		f.SetText(prev)
 		return fmt.Errorf("NumberFilter: could not parse %q", values[0])
 	}

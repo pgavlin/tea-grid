@@ -50,8 +50,24 @@ YYYY-MM-DD..*             open-ended upper
 *..YYYY-MM-DD             open-ended lower
 ```
 
-Full ISO timestamps accepted; the time portion is stripped. The same
-shape applies to numeric ranges — see the open follow-up below.
+Full ISO timestamps accepted; the time portion is stripped.
+
+`ParseTimeRange` is a one-liner over the generic `ParseRange[T]`,
+which parses the same grammar against any value type. The caller
+supplies the value parser:
+
+```go
+type Range[T any] struct {
+    From, To                   *T
+    FromExclusive, ToExclusive bool
+}
+
+func ParseRange[T any](s string, parse func(string) (T, error)) (Range[T], error)
+```
+
+`TimeRange` is a type alias for `Range[time.Time]`. `filter.NumberFilter`
+uses `ParseRange[float64]` for its comparator/range handling; `=` and
+`!=` stay as NumberFilter-specific operators on top.
 
 ## Use with tea-grid
 
@@ -73,25 +89,6 @@ The vocabulary is auto-derived from columns. Override with
 to a single column.
 
 ## Open follow-ups
-
-### Generic `Range[T]`
-
-`filter.NumberFilter` and this package's `ParseTimeRange` parse the
-same shape (`>x`, `<x`, `>=x`, `<=x`, `a..b`, `*..b`, `a..*`) against
-different value types. Parameterize once, drop into both:
-
-```go
-type Range[T any] struct {
-    From, To       *T
-    FromExclusive  bool
-    ToExclusive    bool
-}
-
-func ParseRange[T any](s string, parse func(string) (T, error)) (Range[T], error)
-```
-
-`NumberFilter`'s `=`/`!=` operators stay as separate operator handling
-on top of the range parser.
 
 ### Live bare-prefix while typing
 
