@@ -2,6 +2,10 @@
 
 An AG Grid-inspired data grid component for [Bubble Tea](https://github.com/charmbracelet/bubbletea). Provides sorting, filtering, selection, cell editing, column/row pinning, grouping, virtual scrolling, and extensible cell rendering within the Elm Architecture.
 
+![demo](demo.gif)
+
+The demo is the `examples/querybar` program, recorded with [vhs](https://github.com/charmbracelet/vhs); regenerate it with `vhs demo.tape`.
+
 ## Features
 
 - **Sorting** -- single and multi-column, ascending/descending, custom comparators

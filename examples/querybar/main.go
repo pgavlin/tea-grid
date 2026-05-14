@@ -46,6 +46,7 @@ func columns() []data.Column[Issue] {
 			Value:      func(i Issue) any { return i.Title },
 			Filter:     filter.NewTextFilter(),
 			Filterable: true,
+			Sortable:   true,
 			Flex:       2,
 		},
 		{
@@ -54,6 +55,7 @@ func columns() []data.Column[Issue] {
 			Value:      func(i Issue) any { return i.State },
 			Filter:     filter.NewSetFilter("open", "closed", "draft"),
 			Filterable: true,
+			Sortable:   true,
 			Width:      10,
 		},
 		{
@@ -62,7 +64,8 @@ func columns() []data.Column[Issue] {
 			Value:      func(i Issue) any { return i.Priority },
 			Filter:     filter.NewNumberFilter(),
 			Filterable: true,
-			Width:      10,
+			Sortable:   true,
+			Width:      12,
 		},
 		{
 			ColumnID:   "Active",
@@ -70,6 +73,7 @@ func columns() []data.Column[Issue] {
 			Value:      func(i Issue) any { return i.Active },
 			Filter:     filter.NewBoolFilter(),
 			Filterable: true,
+			Sortable:   true,
 			Width:      8,
 		},
 		{
@@ -78,6 +82,7 @@ func columns() []data.Column[Issue] {
 			Value:      func(i Issue) any { return i.Created },
 			Filter:     filter.NewTimeFilter(),
 			Filterable: true,
+			Sortable:   true,
 			Width:      14,
 		},
 		{
@@ -86,6 +91,7 @@ func columns() []data.Column[Issue] {
 			Value:      func(i Issue) any { return i.Labels },
 			Filter:     filter.NewMultiSetFilter(),
 			Filterable: true,
+			Sortable:   true,
 			Flex:       1,
 		},
 	}
@@ -102,6 +108,21 @@ func sampleData() []Issue {
 		{Title: "flaky test in checkout", State: "closed", Priority: 4, Active: false, Created: mustParse("2026-01-20"), Labels: []string{"bug", "test"}},
 		{Title: "rewrite billing module", State: "draft", Priority: 1, Active: true, Created: mustParse("2026-03-01"), Labels: []string{"refactor"}},
 		{Title: "investigate pager noise", State: "open", Priority: 3, Active: true, Created: mustParse("2026-03-12"), Labels: []string{"ops", "urgent"}},
+		{Title: "publish v2 release notes", State: "draft", Priority: 2, Active: true, Created: mustParse("2026-04-02"), Labels: []string{"docs", "release"}},
+		{Title: "kafka consumer stalls under load", State: "open", Priority: 5, Active: true, Created: mustParse("2025-11-28"), Labels: []string{"bug", "urgent", "ops"}},
+		{Title: "migrate auth to OIDC", State: "open", Priority: 4, Active: true, Created: mustParse("2025-12-10"), Labels: []string{"security", "refactor"}},
+		{Title: "deprecate v1 schema endpoints", State: "draft", Priority: 3, Active: false, Created: mustParse("2026-02-18"), Labels: []string{"api", "breaking"}},
+		{Title: "redesign onboarding tour", State: "open", Priority: 2, Active: true, Created: mustParse("2026-04-22"), Labels: []string{"feature", "ux"}},
+		{Title: "fix CSV import unicode handling", State: "closed", Priority: 3, Active: false, Created: mustParse("2025-10-04"), Labels: []string{"bug"}},
+		{Title: "add export to Parquet", State: "open", Priority: 1, Active: true, Created: mustParse("2026-05-01"), Labels: []string{"feature"}},
+		{Title: "remove legacy mobile API", State: "draft", Priority: 4, Active: true, Created: mustParse("2026-03-22"), Labels: []string{"refactor", "breaking"}},
+		{Title: "intermittent 502s from edge", State: "open", Priority: 5, Active: true, Created: mustParse("2026-04-30"), Labels: []string{"bug", "urgent", "ops"}},
+		{Title: "support SSO for enterprise tier", State: "open", Priority: 3, Active: true, Created: mustParse("2026-02-26"), Labels: []string{"feature", "security"}},
+		{Title: "audit prometheus cardinality", State: "closed", Priority: 2, Active: false, Created: mustParse("2025-09-18"), Labels: []string{"ops"}},
+		{Title: "rate-limit unauthenticated POSTs", State: "open", Priority: 4, Active: true, Created: mustParse("2026-03-08"), Labels: []string{"security", "ops"}},
+		{Title: "i18n for billing emails", State: "draft", Priority: 1, Active: true, Created: mustParse("2026-05-06"), Labels: []string{"feature", "docs"}},
+		{Title: "incident retro: 2025-11-22 outage", State: "closed", Priority: 3, Active: false, Created: mustParse("2025-11-25"), Labels: []string{"docs", "ops"}},
+		{Title: "drop Python 3.9 from CI matrix", State: "closed", Priority: 1, Active: false, Created: mustParse("2026-01-08"), Labels: []string{"ops", "test"}},
 	}
 }
 
