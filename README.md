@@ -1,6 +1,6 @@
 # tea-grid
 
-An AG Grid-inspired data grid component for [Bubble Tea](https://github.com/charmbracelet/bubbletea). Provides sorting, filtering, selection, cell editing, column/row pinning, grouping, virtual scrolling, and extensible cell rendering within the Elm Architecture.
+An AG Grid-inspired data grid component for [Bubble Tea v2](https://charm.land/bubbletea). Provides sorting, filtering, selection, cell editing, column/row pinning, grouping, virtual scrolling, and extensible cell rendering within the Elm Architecture.
 
 ![demo](demo.gif)
 
@@ -32,7 +32,7 @@ import (
     "fmt"
     "os"
 
-    tea "github.com/charmbracelet/bubbletea"
+    tea "charm.land/bubbletea/v2"
 
     "github.com/pgavlin/tea-grid/data"
     "github.com/pgavlin/tea-grid/grid"
@@ -56,7 +56,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     case tea.WindowSizeMsg:
         m.grid.SetWidth(msg.Width)
         m.grid.SetHeight(msg.Height)
-    case tea.KeyMsg:
+    case tea.KeyPressMsg:
         if msg.String() == "q" || msg.String() == "ctrl+c" {
             return m, tea.Quit
         }
@@ -66,7 +66,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     return m, cmd
 }
 
-func (m model) View() string { return m.grid.View() }
+func (m model) View() tea.View {
+    v := tea.NewView(m.grid.View())
+    v.AltScreen = true
+    return v
+}
 
 func main() {
     cols := data.FromType[Employee]()
@@ -85,7 +89,7 @@ func main() {
         grid.WithFocused[Employee](true),
     )
 
-    p := tea.NewProgram(model{grid: g}, tea.WithAltScreen())
+    p := tea.NewProgram(model{grid: g})
     if _, err := p.Run(); err != nil {
         fmt.Fprintf(os.Stderr, "Error: %v\n", err)
         os.Exit(1)
@@ -100,12 +104,13 @@ The core type is `grid.Model[T]`. All state lives in the model; messages flow th
 ### Package Structure
 
 ```
-grid/       Main integration package: Model, Update, View, options, styles, keymap
-data/       Column, RowNode, CellContext, CellRenderer, CellEditor, built-in renderers/editors
-filter/     Filter interface and built-in filters (text, number, set, bool, time)
-sort/       Sort state and multi-column sort logic
-selection/  Rectangle-based selection model (row, column, rect)
-grouping/   Row grouping, tree flattening, and aggregation functions
+grid/        Main integration package: Model, Update, View, options, styles, keymap
+data/        Column, RowNode, CellContext, CellRenderer, CellEditor, built-in renderers/editors
+filter/      Filter interface and built-in filters (text, number, set, bool, time, multiset)
+sort/        Sort state and multi-column sort logic
+selection/   Rectangle-based selection model (row, column, rect)
+grouping/    Row grouping, tree flattening, and aggregation functions
+searchquery/ Query bar parser and vocabulary (powers WithQueryBar)
 ```
 
 ### Display Pipeline
@@ -134,7 +139,7 @@ cols := []data.Column[Employee]{
     {
         ColumnID:   "name",
         HeaderName: "Name",
-        ValueGetter: func(e Employee) any { return e.Name },
+        Value:      func(e Employee) any { return e.Name },
         Sortable:   true,
         Filterable: true,
         Flex:       1,
@@ -169,6 +174,7 @@ See the `examples/` directory:
 - **spreadsheet** -- editable grid with multiple column types
 - **selection** -- row, column, and rect selection
 - **hscroll** -- horizontal scrolling with pinned columns
+- **querybar** -- GitHub-style query bar with column-aware syntax
 - **csv** -- load and display CSV files
 - **jsonl** -- load and display JSONL files
 - **anyrow** -- map-based rows with automatic column inference
@@ -189,11 +195,21 @@ Default bindings (vim-style, configurable via `grid.WithKeyMap`):
 | `j`/`k` or arrows | Navigate rows |
 | `h`/`l` or arrows | Navigate columns |
 | `pgup`/`pgdn` | Page up/down |
+| `ctrl+u`/`ctrl+d` | Half page up/down |
 | `home`/`end` | First/last row |
-| `space` | Toggle row selection |
-| `shift+arrows` | Expand rectangular selection |
-| `s` | Sort by focused column |
+| `0`/`$` | First/last column |
+| `g` | Go to header |
+| `space` | Toggle cell selection |
+| `R`/`C` | Select row / column |
+| `ctrl+a` | Select all |
+| `esc` | Deselect / clear filters / cancel edit |
+| `shift+arrows` or `H`/`J`/`K`/`L` | Expand rectangular selection |
+| `s`/`S` | Sort / multi-sort by focused column |
+| `enter`/`shift+enter` | Sort / multi-sort (when header focused) |
 | `/` | Open query bar |
 | `ctrl+f` | Column filter |
-| `enter`/`F2` | Edit cell |
-| `G` | Toggle group by column |
+| `enter`/`F2` | Edit cell (in a data row) |
+| `G` | Toggle grouping by focused column |
+| `enter` | Toggle group expansion (on a group row) |
+| `ctrl+shift+left`/`right` | Collapse / expand all groups |
+| `w`/`W` | Auto-fit focused column / all columns |
