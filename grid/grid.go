@@ -27,6 +27,11 @@ import (
 // editState holds the state for an active cell edit.
 type editState[T any] struct {
 	position CellPosition
+	// rowID identifies the row under edit. The display pipeline can be
+	// recomputed between starting and confirming an edit (e.g. the embedder
+	// changes filters or grouping), which shifts position.Row, so the target
+	// is resolved by ID rather than by index on confirm.
+	rowID    string
 	editor   data.CellEditor[T]
 	oldValue any
 }
@@ -1459,6 +1464,13 @@ func (m *Model[T]) measureColumnWidth(col data.Column[T], colIdx int, rows []*da
 	}
 
 	for i, rn := range rows {
+		// Group nodes carry a zero-value Data and render aggregations whose
+		// width is already bounded by the column, so they shouldn't drive
+		// measurement -- and calling col.Value on the zero Data would panic
+		// for a pointer row type.
+		if rn.IsGroup {
+			continue
+		}
 		if col.ColumnSpan != nil && col.ColumnSpan(rn.Data) > 1 {
 			continue
 		}

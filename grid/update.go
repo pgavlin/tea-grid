@@ -321,41 +321,48 @@ func (m Model[T]) handleEditKeyMsg(msg tea.KeyPressMsg) (Model[T], tea.Cmd) {
 		}
 
 		pos := m.editState.position
+		rowID := m.editState.rowID
 		newValue := m.editState.editor.Value()
 		oldValue := m.editState.oldValue
 
-		// Apply value
+		// Resolve the target by ID against the source rows. Leaf displayRows
+		// nodes are the same pointers as m.rows, so mutating the source node
+		// updates both; pos.Row may have shifted (or now point at a group
+		// node) if the display pipeline was recomputed mid-edit.
 		col := m.cols[pos.Col]
-		if col.ValueSetter != nil {
-			rn := m.displayRows[pos.Row]
-			col.ValueSetter(&rn.Data, newValue)
-			// Also update in the source rows
-			for _, srcRn := range m.rows {
-				if srcRn.ID == rn.ID {
+		var rowData T
+		found := false
+		for _, srcRn := range m.rows {
+			if srcRn.ID == rowID {
+				if col.ValueSetter != nil {
 					col.ValueSetter(&srcRn.Data, newValue)
-					break
 				}
+				rowData = srcRn.Data
+				found = true
+				break
 			}
 		}
 
 		m.editState = nil
 		m.dirty = true
 		m.filterDirty = true
-		data := m.displayRows[pos.Row].Data
 
-		return m, tea.Batch(
+		cmds := []tea.Cmd{
 			func() tea.Msg {
 				return CellEditingConfirmedMsg{Position: pos}
 			},
-			func() tea.Msg {
+		}
+		if found {
+			cmds = append(cmds, func() tea.Msg {
 				return CellValueChangedMsg[T]{
 					Position: pos,
 					OldValue: oldValue,
 					NewValue: newValue,
-					Data:     data,
+					Data:     rowData,
 				}
-			},
-		)
+			})
+		}
+		return m, tea.Batch(cmds...)
 
 	case key.Matches(msg, m.KeyMap.CancelEdit):
 		pos := m.editState.position
@@ -634,6 +641,7 @@ func (m Model[T]) startEditing() (Model[T], tea.Cmd) {
 
 	m.editState = &editState[T]{
 		position: pos,
+		rowID:    rn.ID,
 		editor:   editor,
 		oldValue: val,
 	}

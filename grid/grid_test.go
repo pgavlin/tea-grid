@@ -3109,6 +3109,108 @@ func TestEditing_TypeAndConfirm(t *testing.T) {
 	}
 }
 
+// The display pipeline can be recomputed between starting and confirming an
+// edit (e.g. the embedder changes a filter), which shifts position.Row. The
+// edit must still land on the originally-edited row, resolved by ID, not on
+// whatever row now occupies that index.
+func TestEditing_ConfirmResolvesRowByIDAfterReshuffle(t *testing.T) {
+	cols := testCols()
+	cols[0].Editable = true
+	cols[0].ValueSetter = func(d *TestRow, val any) { d.Name = val.(string) }
+
+	m := newTestGrid(
+		WithColumns[TestRow](cols),
+		WithRowID[TestRow](func(r TestRow) string { return r.Name }),
+		WithEditable[TestRow](true),
+	)
+	// Edit "Bob" (display index 1 in the default data).
+	m.focusedCell = CellPosition{Row: 1, Col: 0}
+	if m.displayRows[1].Data.Name != "Bob" {
+		t.Fatalf("precondition: expected Bob at index 1, got %q", m.displayRows[1].Data.Name)
+	}
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.editState == nil {
+		t.Fatal("expected editing to start")
+	}
+	for i := 0; i < len("Bob"); i++ {
+		m = sendKey(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	}
+	for _, r := range "Zed" {
+		m = sendKey(m, tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+
+	// Mid-edit, a quick filter drops "Alice" so index 1 now holds "Carol".
+	m.SetQuickFilter("o")
+	if m.displayRows[1].Data.Name != "Carol" {
+		t.Fatalf("precondition: expected Carol at index 1 after filter, got %q", m.displayRows[1].Data.Name)
+	}
+
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	for _, rn := range m.rows {
+		switch rn.ID {
+		case "Bob":
+			if rn.Data.Name != "Zed" {
+				t.Errorf("expected Bob's row to become Zed, got %q", rn.Data.Name)
+			}
+		case "Carol":
+			if rn.Data.Name != "Carol" {
+				t.Errorf("expected Carol untouched, got %q", rn.Data.Name)
+			}
+		}
+	}
+}
+
+// Same reshuffle hazard, but the index lands on a group node carrying a
+// zero-value (nil) Data for a pointer row type: confirming must not panic.
+func TestEditing_ConfirmAfterShiftToGroupNode_NoPanic(t *testing.T) {
+	type ptrRow struct {
+		Dept string
+		Name string
+	}
+	cols := []data.Column[*ptrRow]{
+		{ColumnID: "Dept", HeaderName: "D", Value: func(r *ptrRow) any { return r.Dept }, MinWidth: 4},
+		{
+			ColumnID:    "Name",
+			HeaderName:  "N",
+			Value:       func(r *ptrRow) any { return r.Name }, // panics on nil
+			ValueSetter: func(r **ptrRow, val any) { (*r).Name = val.(string) },
+			Editable:    true,
+			MinWidth:    4,
+		},
+	}
+	m := New(
+		WithColumns[*ptrRow](cols),
+		WithRowID[*ptrRow](func(r *ptrRow) string { return r.Name }),
+		WithRows[*ptrRow]([]*ptrRow{{Dept: "Eng", Name: "Al"}, {Dept: "Eng", Name: "Bo"}}),
+		WithEditable[*ptrRow](true),
+		WithFocused[*ptrRow](true),
+		WithWidth[*ptrRow](80),
+		WithHeight[*ptrRow](20),
+	)
+	m.focusedCell = CellPosition{Row: 0, Col: 1}
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.editState == nil {
+		t.Fatal("expected editing to start")
+	}
+
+	// Group by Dept mid-edit so index 0 is now a group node with nil Data.
+	m.groupModel.GroupColumns = []string{"Dept"}
+	m.groupModel.DefaultExpanded = -1
+	m.dirty = true
+	m.recomputeDisplayRows()
+	if !m.displayRows[0].IsGroup {
+		t.Fatalf("precondition: expected a group node at index 0")
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("confirm panicked after shift to group node: %v", r)
+		}
+	}()
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+}
+
 func TestEditing_EmitsCellValueChangedMsg(t *testing.T) {
 	cols := testCols()
 	cols[0].Editable = true
@@ -7610,6 +7712,60 @@ func TestAutoSizeColumns_StickyAcrossSetRows(t *testing.T) {
 	if m.colWidths[0] != before {
 		t.Errorf("override should persist across SetRows: %d -> %d", before, m.colWidths[0])
 	}
+}
+
+// AutoSizeColumn(s) measure m.displayRows, which on a grouped grid include
+// synthetic group nodes whose Data is the zero value of T. For a pointer row
+// type that's nil, so a Value func that dereferences the row would panic in
+// the measure loop unless group nodes are skipped.
+func TestAutoSizeColumn_GroupedPointerRow_NoPanic(t *testing.T) {
+	type ptrRow struct {
+		Dept string
+		Name string
+	}
+	cols := []data.Column[*ptrRow]{
+		{
+			ColumnID:   "Dept",
+			HeaderName: "D",
+			Value:      func(r *ptrRow) any { return r.Dept },
+			MinWidth:   1,
+			Flex:       1,
+		},
+		{
+			ColumnID:   "Name",
+			HeaderName: "N",
+			Value:      func(r *ptrRow) any { return r.Name }, // panics on nil
+			MinWidth:   1,
+			Flex:       1,
+		},
+	}
+	m := New(
+		WithColumns[*ptrRow](cols),
+		WithRows[*ptrRow]([]*ptrRow{{Dept: "Eng", Name: "Al"}, {Dept: "Eng", Name: "Bartholomew"}}),
+		WithGrouping[*ptrRow]("Dept"),
+		WithGroupDefaultExpanded[*ptrRow](-1),
+		WithWidth[*ptrRow](80),
+	)
+
+	// Sanity check: a group node with nil Data must be present in displayRows.
+	hasGroup := false
+	for _, rn := range m.displayRows {
+		if rn.IsGroup && rn.Data == nil {
+			hasGroup = true
+			break
+		}
+	}
+	if !hasGroup {
+		t.Fatal("expected a group node with nil Data in displayRows")
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("AutoSize panicked on grouped pointer-row grid: %v", r)
+		}
+	}()
+	m.AutoSizeColumn("Name")
+	m.AutoSizeColumns()
 }
 
 func TestAutoSizeColumns_StickyAcrossFilter(t *testing.T) {
