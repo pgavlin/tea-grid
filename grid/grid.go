@@ -262,6 +262,14 @@ func (m Model[T]) Rows() []T {
 	return result
 }
 
+// DisplayRowCount returns the number of rows currently rendered: the rows that
+// survive the external filter, column filters, presence, and quick filter, plus
+// the pinned rows that bypass those filters. Compare against len(Rows()) to
+// report "M/N rows".
+func (m Model[T]) DisplayRowCount() int {
+	return len(m.pinnedTop) + len(m.displayRows) + len(m.pinnedBot)
+}
+
 // SetColumns replaces the column definitions.
 func (m *Model[T]) SetColumns(cols []data.Column[T]) {
 	m.cols = cols

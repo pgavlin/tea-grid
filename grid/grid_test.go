@@ -301,6 +301,31 @@ func TestWithPinnedTopRows(t *testing.T) {
 	}
 }
 
+func TestDisplayRowCount(t *testing.T) {
+	m := newTestGrid()
+	if got := m.DisplayRowCount(); got != 5 {
+		t.Errorf("expected 5 display rows, got %d", got)
+	}
+
+	// Quick filter narrows the count.
+	m.SetQuickFilter("engineering")
+	if got := m.DisplayRowCount(); got != 2 {
+		t.Errorf("expected 2 display rows after quick filter, got %d", got)
+	}
+}
+
+func TestDisplayRowCount_PinnedBypassFilter(t *testing.T) {
+	m := newTestGrid(
+		WithPinnedTopRows[TestRow](func(r TestRow) bool { return r.Name == "Bob" }),
+	)
+	// Bob (Sales) is pinned and bypasses the quick filter; the four unpinned
+	// rows are filtered down to the two Engineering rows.
+	m.SetQuickFilter("engineering")
+	if got := m.DisplayRowCount(); got != 3 {
+		t.Errorf("expected 3 display rows (2 filtered + 1 pinned), got %d", got)
+	}
+}
+
 func TestWithPinnedBottomRows(t *testing.T) {
 	m := New(
 		WithColumns[TestRow](testCols()),
